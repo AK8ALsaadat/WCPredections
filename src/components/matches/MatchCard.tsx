@@ -10,6 +10,7 @@ import { MatchPointsBreakdown } from "@/components/matches/MatchPointsBreakdown"
 import { asFinishType } from "@/lib/finish-type";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { PredictNavLink } from "@/components/matches/PredictNavLink";
+import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
 import {
   prefetchPredictData,
   seedPredictMatchFromList,
@@ -232,14 +233,8 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
       )}
 
       {!canPredict && (
-        <div className="mt-4 flex justify-end">
-          <Link
-            href={`/matches/${match.id}/predictions`}
-            onClick={(e) => e.stopPropagation()}
-            className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20"
-          >
-            {t.matches.viewAllPredictions}
-          </Link>
+        <div className="mt-4" onClick={(e) => e.stopPropagation()}>
+          <ViewLeaguePredictionsButton matchId={match.id} fullWidth />
         </div>
       )}
 

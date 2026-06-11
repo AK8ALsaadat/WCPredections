@@ -10,6 +10,7 @@ import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Button } from "@/components/ui/Button";
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
 import { PredictNavLink } from "@/components/matches/PredictNavLink";
+import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
 import { MatchPointsBreakdown } from "@/components/matches/MatchPointsBreakdown";
 import { asFinishType } from "@/lib/finish-type";
 import { formatDate, isPredictionAllowed } from "@/lib/utils";
@@ -210,10 +211,8 @@ export default function MatchDetailPage() {
         )}
 
         {!canPredict && (
-          <div className="flex justify-center border-t border-card-border pt-4">
-            <Link href={`/matches/${m.id}/predictions`}>
-              <Button variant="secondary">{t.matches.viewAllPredictions}</Button>
-            </Link>
+          <div className="border-t border-card-border pt-4">
+            <ViewLeaguePredictionsButton matchId={m.id} fullWidth />
           </div>
         )}
       </Card>
