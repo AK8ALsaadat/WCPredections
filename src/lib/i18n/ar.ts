@@ -1,6 +1,11 @@
 export const ar = {
   appName: "بطولة الاستراحة",
   worldCup: "كأس العالم 26",
+  locale: {
+    label: "اللغة",
+    ar: "عربي",
+    en: "English",
+  },
   nav: {
     dashboard: "الرئيسية",
     matches: "المباريات",
@@ -144,6 +149,12 @@ export const ar = {
     paginationPageOf: (page: number, total: number) =>
       `صفحة ${page} من ${total}`,
     refreshing: "تحديث…",
+    openMatchesCount: (n: number) =>
+      n === 1 ? "مباراة واحدة مفتوحة للتوقع" : `${n} مباراة مفتوحة للتوقع`,
+    syncHint: "انتظر المزامنة أو اطلب من المشرف تشغيلها من لوحة الإدارة",
+    lastUpdate: "آخر تحديث",
+    dataSource: "بيانات رسمية من football-data.org",
+    knockoutBadge: "إقصائي",
     vs: "ضد",
     predict: "توقّع",
     editPrediction: "عدّل توقعك",
@@ -278,6 +289,8 @@ export const ar = {
     noSubRounds: "ما فيه جولات فرعية حالياً — الترتيب العام يشمل كل المباريات",
     backDashboard: "العودة للرئيسية",
     viewMatches: "عرض المباريات",
+    matchCount: (n: number) =>
+      n === 1 ? "مباراة واحدة" : `${n} مباراة`,
   },
   profile: {
     memberSince: "عضو منذ",
@@ -311,6 +324,17 @@ export const ar = {
     EXTRA_TIME: "وقت إضافي",
     PENALTIES: "ركلات ترجيح",
   },
+  admin: {
+    title: "لوحة الإدارة",
+  },
+  lockReasons: {
+    live: "المباراة جارية — الخصائص مقفلة",
+    finished: "المباراة انتهت — التوقع مغلق",
+    cancelled: "المباراة ملغاة — التوقع مغلق",
+    started: "المباراة بدأت — التوقع مغلق",
+    tooEarly: "التوقع يفتح قبل المباراة بـ 48 ساعة (اليوم أو بكره)",
+    windowOnly: "التوقع متاح لمباريات اليوم وبكره فقط",
+  },
   errors: {
     generic: "صار خطأ، حاول مرة ثانية",
     loadFailed: "فشل تحميل البيانات",
@@ -318,4 +342,6 @@ export const ar = {
     kickoff: "ما تقدر تتوقع بعد ما بدت المباراة",
     predictLock: "التوقع متاح من بعد غد بس",
   },
-} as const;
+};
+
+export type Messages = typeof ar;

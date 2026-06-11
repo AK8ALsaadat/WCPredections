@@ -6,7 +6,7 @@ import {
   getMatchTotalUserPoints,
   type MatchPointsBreakdownInput,
 } from "@/lib/match-points-breakdown";
-import { ar } from "@/lib/i18n/ar";
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 type MatchPointsBreakdownProps = MatchPointsBreakdownInput & {
   penaltyWinnerName?: string | null;
@@ -19,9 +19,10 @@ export function MatchPointsBreakdown({
   className = "",
   ...input
 }: MatchPointsBreakdownProps) {
+  const { messages: t } = useI18n();
   const [open, setOpen] = useState(false);
   const total = getMatchTotalUserPoints(input);
-  const { lines } = buildMatchPointsBreakdown(input);
+  const { lines } = buildMatchPointsBreakdown(input, t);
 
   if (
     !input.userPrediction &&
@@ -44,9 +45,9 @@ export function MatchPointsBreakdown({
               : "border-card-border bg-card-border/20 hover:bg-card-border/30"
         } ${compact ? "px-3 py-2" : "px-4 py-3"}`}
       >
-        <div className="text-right">
+        <div className="text-end">
           <p className={`text-muted ${compact ? "text-[10px]" : "text-xs"}`}>
-            {ar.matches.matchPoints}
+            {t.matches.matchPoints}
           </p>
           <p
             className={`font-bold tabular-nums ${
@@ -57,11 +58,11 @@ export function MatchPointsBreakdown({
                   : "text-muted"
             } ${compact ? "text-lg" : "text-2xl"}`}
           >
-            {total} {ar.profile.pointsShort}
+            {total} {t.profile.pointsShort}
           </p>
         </div>
         <span className={`text-muted ${compact ? "text-[10px]" : "text-xs"}`}>
-          {open ? ar.pointsBreakdown.hideDetails : ar.matches.tapForDetails}{" "}
+          {open ? t.pointsBreakdown.hideDetails : t.matches.tapForDetails}{" "}
           {open ? "▲" : "▼"}
         </span>
       </button>
@@ -74,7 +75,7 @@ export function MatchPointsBreakdown({
         >
           {lines.length === 0 ? (
             <p className={`text-muted ${compact ? "text-xs" : "text-sm"}`}>
-              {ar.matches.noPointsEarned}
+              {t.matches.noPointsEarned}
             </p>
           ) : (
             lines.map((line) => (
@@ -82,7 +83,7 @@ export function MatchPointsBreakdown({
                 key={line.id}
                 className="flex items-start justify-between gap-3 border-b border-card-border/40 pb-2 last:border-0 last:pb-0"
               >
-                <div className="min-w-0 text-right">
+                <div className="min-w-0 text-end">
                   <p
                     className={`font-medium ${
                       compact ? "text-xs" : "text-sm"
@@ -121,7 +122,7 @@ export function MatchPointsBreakdown({
                   compact ? "text-xs" : "text-sm"
                 }`}
               >
-                {ar.pointsBreakdown.total}
+                {t.pointsBreakdown.total}
               </span>
               <span
                 className={`font-bold tabular-nums text-primary ${

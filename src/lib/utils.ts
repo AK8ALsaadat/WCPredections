@@ -1,5 +1,12 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { ar } from "@/lib/i18n/ar";
+import type { Messages } from "@/lib/i18n/ar";
+import type { Locale } from "@/lib/i18n/index";
+
+function dateLocale(locale?: Locale): string {
+  return locale === "en" ? "en-US" : "ar-SA";
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -12,8 +19,8 @@ export function parseOptionalScore(value: string | undefined): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-export function formatDate(date: Date | string): string {
-  return new Intl.DateTimeFormat("ar-SA", {
+export function formatDate(date: Date | string, locale?: Locale): string {
+  return new Intl.DateTimeFormat(dateLocale(locale), {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -22,16 +29,16 @@ export function formatDate(date: Date | string): string {
   }).format(new Date(date));
 }
 
-export function formatDateShort(date: Date | string): string {
-  return new Intl.DateTimeFormat("ar-SA", {
+export function formatDateShort(date: Date | string, locale?: Locale): string {
+  return new Intl.DateTimeFormat(dateLocale(locale), {
     day: "numeric",
     month: "short",
     year: "numeric",
   }).format(new Date(date));
 }
 
-export function formatDayHeader(date: Date | string): string {
-  return new Intl.DateTimeFormat("ar-SA", {
+export function formatDayHeader(date: Date | string, locale?: Locale): string {
+  return new Intl.DateTimeFormat(dateLocale(locale), {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -107,31 +114,21 @@ export function isPredictionAllowed(
 
 export function getPredictionLockReason(
   matchTime: Date | string,
-  status?: string | null
+  status?: string | null,
+  messages: Messages = ar
 ): string | null {
-  if (status === "LIVE") {
-    return "المباراة جارية — الخصائص مقفلة";
-  }
-  if (status === "FINISHED") {
-    return "المباراة انتهت — التوقع مغلق";
-  }
-  if (status === "CANCELLED") {
-    return "المباراة ملغاة — التوقع مغلق";
-  }
-  if (isMatchStarted(matchTime)) {
-    return "المباراة بدأت — التوقع مغلق";
-  }
+  const t = messages.lockReasons;
+
+  if (status === "LIVE") return t.live;
+  if (status === "FINISHED") return t.finished;
+  if (status === "CANCELLED") return t.cancelled;
+  if (isMatchStarted(matchTime)) return t.started;
 
   const match = new Date(matchTime);
   const hoursLeft = hoursUntilMatch(match);
 
-  if (hoursLeft > PREDICTION_WINDOW_HOURS) {
-    return "التوقع يفتح قبل المباراة بـ 48 ساعة (اليوم أو بكره)";
-  }
-
-  if (!isWithinPredictionCalendarWindow(match)) {
-    return "التوقع متاح لمباريات اليوم وبكره فقط";
-  }
+  if (hoursLeft > PREDICTION_WINDOW_HOURS) return t.tooEarly;
+  if (!isWithinPredictionCalendarWindow(match)) return t.windowOnly;
 
   return null;
 }
@@ -220,10 +217,19 @@ export function formatCountdownParts(remainingMs: number) {
   return { days, hours, minutes, seconds };
 }
 
-export function formatCountdownAr(remainingMs: number): string {
+export function formatCountdown(remainingMs: number, locale?: Locale): string {
   const { days, hours, minutes, seconds } = formatCountdownParts(remainingMs);
-  const n = (value: number) => value.toLocaleString("ar-SA");
+  const numLocale = locale === "en" ? "en-US" : "ar-SA";
+  const n = (value: number) => value.toLocaleString(numLocale);
   const parts: string[] = [];
+
+  if (locale === "en") {
+    if (days > 0) parts.push(`${n(days)}d`);
+    if (hours > 0 || days > 0) parts.push(`${n(hours)}h`);
+    parts.push(`${n(minutes)}m`);
+    parts.push(`${n(seconds)}s`);
+    return parts.join(" ");
+  }
 
   if (days > 0) parts.push(`${n(days)} ي`);
   if (hours > 0 || days > 0) parts.push(`${n(hours)} س`);
@@ -231,6 +237,11 @@ export function formatCountdownAr(remainingMs: number): string {
   parts.push(`${n(seconds)} ث`);
 
   return parts.join(" ");
+}
+
+/** @deprecated Use formatCountdown instead */
+export function formatCountdownAr(remainingMs: number): string {
+  return formatCountdown(remainingMs);
 }
 
 export function getMatchResult(

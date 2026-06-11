@@ -17,10 +17,10 @@ import {
   prefetchPredictData,
   seedPredictMatchFromList,
 } from "@/lib/predict-prefetch";
-import { ar } from "@/lib/i18n/ar";
-import { FINISH_TYPE_LABELS, MATCH_STATUS_LABELS } from "@/types";
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 export default function MatchDetailPage() {
+  const { messages: t, locale } = useI18n();
   const params = useParams();
   const matchId = params.id as string;
   const [match, setMatch] = useState<Record<string, unknown> | null>(null);
@@ -70,12 +70,12 @@ export default function MatchDetailPage() {
           setError(data.error);
         }
       })
-      .catch(() => setError(ar.errors.loadFailed))
+      .catch(() => setError(t.errors.loadFailed))
       .finally(() => setLoading(false));
   }, [matchId]);
 
   if (loading) return <LoadingPage />;
-  if (error || !match) return <ErrorMessage message={error || ar.matches.notFound} />;
+  if (error || !match) return <ErrorMessage message={error || t.matches.notFound} />;
 
   const m = match as {
     id: string;
@@ -152,7 +152,7 @@ export default function MatchDetailPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Link href="/matches" className="text-sm text-primary hover:underline">
-        ← {ar.matches.back}
+        ← {t.matches.back}
       </Link>
 
       <Card>
@@ -160,10 +160,10 @@ export default function MatchDetailPage() {
           <span>{m.round.name}</span>
           {m.isKnockout && (
             <span className="rounded bg-warning/20 px-2 py-0.5 text-warning">
-              {ar.matches.knockout}
+              {t.matches.knockout}
             </span>
           )}
-          <span>{MATCH_STATUS_LABELS[m.status as keyof typeof MATCH_STATUS_LABELS]}</span>
+          <span>{t.status[m.status as keyof typeof t.status]}</span>
         </div>
 
         <div className="flex items-center justify-between gap-6 py-6">
@@ -178,7 +178,9 @@ export default function MatchDetailPage() {
                 ? `${m.homeScore} - ${m.awayScore}`
                 : "vs"}
             </div>
-            <p className="mt-2 text-sm text-muted">{formatDate(m.matchTime)}</p>
+            <p className="mt-2 text-sm text-muted">
+              {formatDate(m.matchTime, locale)}
+            </p>
             {canPredict && m.status !== "LIVE" && (
               <div className="mt-3 flex justify-center">
                 <PredictionCountdown matchTime={m.matchTime} />
@@ -186,7 +188,7 @@ export default function MatchDetailPage() {
             )}
             {m.actualFinishType && (
               <p className="mt-1 text-xs text-muted">
-                {FINISH_TYPE_LABELS[m.actualFinishType as keyof typeof FINISH_TYPE_LABELS]}
+                {t.finishType[m.actualFinishType as keyof typeof t.finishType]}
               </p>
             )}
           </div>
@@ -201,7 +203,7 @@ export default function MatchDetailPage() {
           <div className="flex justify-center border-t border-card-border pt-4">
             <PredictNavLink matchId={m.id}>
               <Button>
-                {m.userPrediction ? ar.matches.editPrediction : ar.matches.makePrediction}
+                {m.userPrediction ? t.matches.editPrediction : t.matches.makePrediction}
               </Button>
             </PredictNavLink>
           </div>
@@ -215,11 +217,11 @@ export default function MatchDetailPage() {
       {m.userPrediction && !isFinished && (
         <Card>
           <CardHeader>
-            <CardTitle>{ar.matches.yourPrediction}</CardTitle>
+            <CardTitle>{t.matches.yourPrediction}</CardTitle>
           </CardHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <p className="text-sm text-muted">{ar.matches.score}</p>
+              <p className="text-sm text-muted">{t.matches.score}</p>
               <p className="text-xl font-bold">
                 {m.userPrediction.predHome} - {m.userPrediction.predAway}
                 {m.userPrediction.isDouble && (
@@ -229,9 +231,9 @@ export default function MatchDetailPage() {
             </div>
             {m.userPrediction.predictedFinishType && (
               <div>
-                <p className="text-sm text-muted">{ar.matches.finishType}</p>
+                <p className="text-sm text-muted">{t.matches.finishType}</p>
                 <p className="font-medium">
-                  {FINISH_TYPE_LABELS[m.userPrediction.predictedFinishType as keyof typeof FINISH_TYPE_LABELS]}
+                  {t.finishType[m.userPrediction.predictedFinishType as keyof typeof t.finishType]}
                 </p>
               </div>
             )}
@@ -242,7 +244,7 @@ export default function MatchDetailPage() {
       {isFinished && m.userScorerPredictions && m.userScorerPredictions.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>{ar.matches.scorers}</CardTitle>
+            <CardTitle>{t.matches.scorers}</CardTitle>
           </CardHeader>
           <ul className="space-y-2">
             {m.userScorerPredictions.map((sp, i) => (
@@ -263,7 +265,7 @@ export default function MatchDetailPage() {
       {m.matchScorers && m.matchScorers.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>{ar.matches.goalScorers}</CardTitle>
+            <CardTitle>{t.matches.goalScorers}</CardTitle>
           </CardHeader>
           <ul className="space-y-2">
             {m.matchScorers.map((s, i) => (
@@ -271,7 +273,7 @@ export default function MatchDetailPage() {
                 <span>{s.player.name}</span>
                 <span className="text-muted">
                   {s.goals}{" "}
-                  {s.goals === 1 ? ar.matches.goals : ar.matches.goalsPlural}
+                  {s.goals === 1 ? t.matches.goals : t.matches.goalsPlural}
                 </span>
               </li>
             ))}
@@ -281,7 +283,7 @@ export default function MatchDetailPage() {
 
       <Link href={`/leaderboard/round/${m.round.id}`} className="block">
         <Card className="cursor-pointer transition-colors hover:border-primary/50">
-          <p className="text-sm text-muted">{ar.matches.viewRoundLb}</p>
+          <p className="text-sm text-muted">{t.matches.viewRoundLb}</p>
           <p className="font-semibold text-primary">{m.round.name} →</p>
         </Card>
       </Link>

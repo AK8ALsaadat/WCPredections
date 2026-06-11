@@ -9,10 +9,12 @@ import { Input } from "@/components/ui/Input";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { WorldCupFlagGarland } from "@/components/auth/WorldCupFlagGarland";
 import { GoldenSponsorBanner } from "@/components/layout/GoldenSponsorBanner";
-import { ar } from "@/lib/i18n/ar";
+import { LocaleBar } from "@/components/layout/LocaleBar";
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { messages: t } = useI18n();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -24,7 +26,7 @@ export default function RegisterPage() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError(ar.errors.passwordMismatch);
+      setError(t.errors.passwordMismatch);
       return;
     }
 
@@ -47,7 +49,7 @@ export default function RegisterPage() {
       router.push("/tutorial");
       router.refresh();
     } catch {
-      setError(ar.errors.generic);
+      setError(t.errors.generic);
     } finally {
       setLoading(false);
     }
@@ -55,25 +57,26 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-8">
+      <LocaleBar />
       <div className="w-full max-w-md">
         <WorldCupFlagGarland />
 
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-primary">{ar.appName}</h1>
-          <p className="mt-1 text-sm text-muted">{ar.auth.registerSubtitle}</p>
+          <h1 className="text-2xl font-bold text-primary">{t.appName}</h1>
+          <p className="mt-1 text-sm text-muted">{t.auth.registerSubtitle}</p>
         </div>
 
         <GoldenSponsorBanner />
 
         <Card>
           <CardHeader>
-            <CardTitle>{ar.auth.register}</CardTitle>
+            <CardTitle>{t.auth.register}</CardTitle>
           </CardHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <ErrorMessage message={error} />}
             <Input
-              label={ar.auth.username}
+              label={t.auth.username}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -83,7 +86,7 @@ export default function RegisterPage() {
               autoComplete="username"
             />
             <Input
-              label={ar.auth.password}
+              label={t.auth.password}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -92,7 +95,7 @@ export default function RegisterPage() {
               autoComplete="new-password"
             />
             <Input
-              label={ar.auth.confirmPassword}
+              label={t.auth.confirmPassword}
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -100,14 +103,14 @@ export default function RegisterPage() {
               autoComplete="new-password"
             />
             <Button type="submit" className="w-full" loading={loading}>
-              {ar.auth.createAccount}
+              {t.auth.createAccount}
             </Button>
           </form>
 
           <p className="mt-4 text-center text-sm text-muted">
-            {ar.auth.hasAccount}{" "}
+            {t.auth.hasAccount}{" "}
             <Link href="/login" className="text-primary hover:underline">
-              {ar.auth.login}
+              {t.auth.login}
             </Link>
           </p>
         </Card>

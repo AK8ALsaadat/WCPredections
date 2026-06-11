@@ -9,7 +9,7 @@ import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { formatDateShort } from "@/lib/utils";
 import Link from "next/link";
-import { ar } from "@/lib/i18n/ar";
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 import {
   isClientCacheFresh,
   readClientCache,
@@ -55,6 +55,7 @@ type ProfileData = {
 const PROFILE_CACHE_KEY = "profile";
 
 export default function ProfilePage() {
+  const { messages: t, locale } = useI18n();
   const router = useRouter();
   const [profile, setProfile] = useState<ProfileData | null>(() =>
     readClientCache<ProfileData>(PROFILE_CACHE_KEY)
@@ -93,7 +94,7 @@ export default function ProfilePage() {
         }
       })
       .catch(() => {
-        if (!cached) setError(ar.errors.loadFailed);
+        if (!cached) setError(t.errors.loadFailed);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -107,7 +108,7 @@ export default function ProfilePage() {
 
     const trimmed = newUsername.trim();
     if (trimmed.toLowerCase() === profile.username.toLowerCase()) {
-      setUsernameSuccess(ar.profile.usernameUpdated);
+      setUsernameSuccess(t.profile.usernameUpdated);
       return;
     }
 
@@ -125,7 +126,7 @@ export default function ProfilePage() {
       if (!data.success) {
         const msg = data.error ?? "";
         setUsernameError(
-          msg.includes("Username") ? ar.profile.usernameInvalid : msg
+          msg.includes("Username") ? t.profile.usernameInvalid : msg
         );
         return;
       }
@@ -138,10 +139,10 @@ export default function ProfilePage() {
         return next;
       });
       setNewUsername(updated);
-      setUsernameSuccess(ar.profile.usernameUpdated);
+      setUsernameSuccess(t.profile.usernameUpdated);
       router.refresh();
     } catch {
-      setUsernameError(ar.errors.generic);
+      setUsernameError(t.errors.generic);
     } finally {
       setSavingUsername(false);
     }
@@ -156,28 +157,28 @@ export default function ProfilePage() {
       <div>
         <h1 className="text-3xl font-bold">@{profile.username}</h1>
         <p className="mt-1 text-muted">
-          {ar.profile.memberSince} {formatDateShort(profile.createdAt)}
+          {t.profile.memberSince} {formatDateShort(profile.createdAt, locale)}
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{ar.profile.changeUsername}</CardTitle>
+          <CardTitle>{t.profile.changeUsername}</CardTitle>
         </CardHeader>
         <form onSubmit={handleUsernameSubmit} className="space-y-4">
           <Input
-            label={ar.profile.newUsername}
+            label={t.profile.newUsername}
             value={newUsername}
             onChange={(e) => setNewUsername(e.target.value)}
             autoComplete="username"
             maxLength={20}
             error={usernameError || undefined}
           />
-          <p className="text-sm text-muted">{ar.profile.usernameHint}</p>
+          <p className="text-sm text-muted">{t.profile.usernameHint}</p>
           {usernameSuccess && (
             <div className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-primary">
               <p>{usernameSuccess}</p>
-              <p className="mt-1 text-muted">{ar.profile.usernameLoginNote}</p>
+              <p className="mt-1 text-muted">{t.profile.usernameLoginNote}</p>
             </div>
           )}
           <Button
@@ -185,14 +186,14 @@ export default function ProfilePage() {
             loading={savingUsername}
             disabled={!newUsername.trim()}
           >
-            {ar.profile.saveUsername}
+            {t.profile.saveUsername}
           </Button>
         </form>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Card>
-          <p className="text-sm text-muted">{ar.dashboard.totalPoints}</p>
+          <p className="text-sm text-muted">{t.dashboard.totalPoints}</p>
           <p
             className={`text-2xl font-bold tabular-nums ${
               profile.totalPoints > 0
@@ -206,15 +207,15 @@ export default function ProfilePage() {
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-muted">{ar.profile.predictions}</p>
+          <p className="text-sm text-muted">{t.profile.predictions}</p>
           <p className="text-2xl font-bold">{profile.predictionsCount}</p>
         </Card>
         <Card>
-          <p className="text-sm text-muted">{ar.profile.correctScores}</p>
+          <p className="text-sm text-muted">{t.profile.correctScores}</p>
           <p className="text-2xl font-bold">{profile.correctPredictions}</p>
         </Card>
         <Card>
-          <p className="text-sm text-muted">{ar.profile.accuracy}</p>
+          <p className="text-sm text-muted">{t.profile.accuracy}</p>
           <p className="text-2xl font-bold">
             {profile.predictionsCount > 0
               ? `${Math.round((profile.correctPredictions / profile.predictionsCount) * 100)}%`
@@ -224,10 +225,10 @@ export default function ProfilePage() {
       </div>
 
       <section>
-        <h2 className="mb-4 text-xl font-semibold">{ar.profile.history}</h2>
+        <h2 className="mb-4 text-xl font-semibold">{t.profile.history}</h2>
         {profile.history.predictions.length === 0 ? (
           <Card>
-            <p className="text-center text-muted">{ar.profile.noHistory}</p>
+            <p className="text-center text-muted">{t.profile.noHistory}</p>
           </Card>
         ) : (
           <div className="space-y-3">
@@ -244,11 +245,11 @@ export default function ProfilePage() {
                         {p.match.homeTeam.shortName} vs {p.match.awayTeam.shortName}
                       </p>
                       <p className="text-sm text-muted">
-                        {ar.profile.predicted}: {p.predHome}-{p.predAway}
+                        {t.profile.predicted}: {p.predHome}-{p.predAway}
                         {p.isDouble && <span className="ml-1 text-warning">2x</span>}
                         {isFinished && (
                           <span className="ml-2">
-                            {ar.profile.actual}: {p.match.homeScore}-{p.match.awayScore}
+                            {t.profile.actual}: {p.match.homeScore}-{p.match.awayScore}
                           </span>
                         )}
                       </p>
@@ -257,7 +258,7 @@ export default function ProfilePage() {
                       <span
                         className={`text-lg font-bold ${totalPts > 0 ? "text-primary" : "text-muted"}`}
                       >
-                        {totalPts} {ar.profile.pointsShort}
+                        {totalPts} {t.profile.pointsShort}
                       </span>
                     )}
                   </div>
@@ -270,7 +271,7 @@ export default function ProfilePage() {
 
       {profile.history.scorerPredictions.length > 0 && (
         <section>
-          <h2 className="mb-4 text-xl font-semibold">{ar.profile.scorerHistory}</h2>
+          <h2 className="mb-4 text-xl font-semibold">{t.profile.scorerHistory}</h2>
           <div className="space-y-2">
             {profile.history.scorerPredictions.map((sp, i) => (
               <Card key={i} className="flex items-center justify-between p-4">
@@ -282,7 +283,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
                 <span className={sp.points > 0 ? "text-primary font-bold" : "text-muted"}>
-                  {sp.points} {ar.profile.pointsShort}
+                  {sp.points} {t.profile.pointsShort}
                 </span>
               </Card>
             ))}
@@ -291,7 +292,7 @@ export default function ProfilePage() {
       )}
 
       <Link href="/leaderboard/overall" className="text-primary hover:underline">
-        {ar.leaderboard.overall} →
+        {t.leaderboard.overall} →
       </Link>
     </div>
   );

@@ -1,5 +1,5 @@
 import { getMatchResult } from "@/lib/utils";
-import { ar } from "@/lib/i18n/ar";
+import type { Messages } from "@/lib/i18n/ar";
 import type { FinishType } from "@prisma/client";
 
 export type PointsBreakdownLine = {
@@ -39,7 +39,8 @@ export type MatchPointsBreakdownInput = {
 };
 
 function scoreBreakdownLine(
-  input: MatchPointsBreakdownInput
+  input: MatchPointsBreakdownInput,
+  messages: Messages
 ): PointsBreakdownLine | null {
   const p = input.userPrediction;
   if (!p || p.points === 0) return null;
@@ -50,26 +51,28 @@ function scoreBreakdownLine(
   const actual = getMatchResult(input.homeScore, input.awayScore);
   const winnerCorrect = predicted === actual;
 
-  let label: string = ar.pointsBreakdown.winnerCorrect;
+  let label: string = messages.pointsBreakdown.winnerCorrect;
   if (exact) {
-    label = ar.pointsBreakdown.exactScore;
+    label = messages.pointsBreakdown.exactScore;
   }
 
   const detail = exact
-    ? ar.pointsBreakdown.exactDetail(
+    ? messages.pointsBreakdown.exactDetail(
         p.predHome,
         p.predAway,
         input.homeScore,
         input.awayScore
       )
-    : ar.pointsBreakdown.winnerDetail(
+    : messages.pointsBreakdown.winnerDetail(
         p.predHome,
         p.predAway,
         input.homeScore,
         input.awayScore
       );
 
-  const multiplier = p.isDouble ? ` (${ar.pointsBreakdown.doubled})` : "";
+  const multiplier = p.isDouble
+    ? ` (${messages.pointsBreakdown.doubled})`
+    : "";
 
   return {
     id: "score",
@@ -80,16 +83,17 @@ function scoreBreakdownLine(
 }
 
 function finishTypeLine(
-  input: MatchPointsBreakdownInput
+  input: MatchPointsBreakdownInput,
+  messages: Messages
 ): PointsBreakdownLine | null {
   const p = input.userPrediction;
   if (!p || !input.isKnockout || p.finishTypePoints === 0) return null;
 
   return {
     id: "finish-type",
-    label: ar.pointsBreakdown.finishTypeCorrect,
+    label: messages.pointsBreakdown.finishTypeCorrect,
     detail: p.predictedFinishType
-      ? ar.pointsBreakdown.finishTypeDetail(p.predictedFinishType)
+      ? messages.pointsBreakdown.finishTypeDetail(p.predictedFinishType)
       : undefined,
     points: p.finishTypePoints,
   };
@@ -98,20 +102,21 @@ function finishTypeLine(
 export function buildMatchPointsBreakdown(
   input: MatchPointsBreakdownInput & {
     penaltyWinnerName?: string | null;
-  }
+  },
+  messages: Messages
 ): { total: number; lines: PointsBreakdownLine[] } {
   const lines: PointsBreakdownLine[] = [];
 
-  const scoreLine = scoreBreakdownLine(input);
+  const scoreLine = scoreBreakdownLine(input, messages);
   if (scoreLine) lines.push(scoreLine);
 
-  const finishLine = finishTypeLine(input);
+  const finishLine = finishTypeLine(input, messages);
   if (finishLine) lines.push(finishLine);
 
   if (input.userPrediction?.penaltyWinnerPoints) {
     lines.push({
       id: "penalty",
-      label: ar.pointsBreakdown.penaltyCorrect,
+      label: messages.pointsBreakdown.penaltyCorrect,
       detail: input.penaltyWinnerName ?? undefined,
       points: input.userPrediction.penaltyWinnerPoints,
     });
@@ -121,10 +126,10 @@ export function buildMatchPointsBreakdown(
     if (sp.points > 0) {
       lines.push({
         id: `scorer-${sp.player.name}`,
-        label: ar.pointsBreakdown.scorerHit(sp.player.name),
+        label: messages.pointsBreakdown.scorerHit(sp.player.name),
         detail:
           sp.predictedGoals > 1
-            ? ar.pointsBreakdown.scorerGoalsDetail(sp.predictedGoals)
+            ? messages.pointsBreakdown.scorerGoalsDetail(sp.predictedGoals)
             : undefined,
         points: sp.points,
       });
@@ -137,9 +142,9 @@ export function buildMatchPointsBreakdown(
       id: "bold-scorer",
       label:
         bold.points > 0
-          ? ar.pointsBreakdown.boldScorerWin(bold.player.name)
-          : ar.pointsBreakdown.boldScorerMiss(bold.player.name),
-      detail: ar.pointsBreakdown.boldScorerDetail,
+          ? messages.pointsBreakdown.boldScorerWin(bold.player.name)
+          : messages.pointsBreakdown.boldScorerMiss(bold.player.name),
+      detail: messages.pointsBreakdown.boldScorerDetail,
       points: bold.points,
     });
   }

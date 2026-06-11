@@ -6,7 +6,8 @@ import {
 } from "@/services/leaderboard.service";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { Card } from "@/components/ui/Card";
-import { ar } from "@/lib/i18n/ar";
+import { getServerI18n } from "@/lib/i18n/server";
+import type { Messages } from "@/lib/i18n/ar";
 import { getTournamentRoundName } from "@/lib/rounds";
 
 function RankStatCard({
@@ -14,11 +15,13 @@ function RankStatCard({
   label,
   rank,
   rankChange,
+  fullLeaderboardLabel,
 }: {
   href: string;
   label: string;
   rank: number | string;
   rankChange?: number;
+  fullLeaderboardLabel: string;
 }) {
   return (
     <Link href={href} className="group block">
@@ -38,7 +41,7 @@ function RankStatCard({
           )}
         </div>
         <p className="mt-2 text-xs text-primary md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
-          {ar.dashboard.fullLeaderboard} ←
+          {fullLeaderboardLabel} ←
         </p>
       </Card>
     </Link>
@@ -90,11 +93,13 @@ function StatPill({
 }
 
 function DashboardHeaderStats({
+  t,
   roundPoints,
   tournamentPoints,
   roundAverage,
   participantCount,
 }: {
+  t: Messages;
   roundPoints: number;
   tournamentPoints: number;
   roundAverage: number;
@@ -105,21 +110,21 @@ function DashboardHeaderStats({
   return (
     <div className="flex w-full flex-wrap gap-2 sm:gap-3 md:w-auto md:max-w-xl">
       <StatPill
-        label={ar.dashboard.roundPoints}
+        label={t.dashboard.roundPoints}
         value={roundPoints}
         tone="warning"
       />
       <StatPill
-        label={ar.dashboard.tournamentPoints}
+        label={t.dashboard.tournamentPoints}
         value={tournamentPoints}
         tone="primary"
       />
       <StatPill
-        label={ar.dashboard.roundAverage}
+        label={t.dashboard.roundAverage}
         value={avgDisplay}
         footer={
           participantCount > 0
-            ? ar.dashboard.roundParticipants(participantCount)
+            ? t.dashboard.roundParticipants(participantCount)
             : undefined
         }
       />
@@ -128,6 +133,7 @@ function DashboardHeaderStats({
 }
 
 export default async function DashboardPage() {
+  const { messages: t } = await getServerI18n();
   const user = await getCurrentUser();
   if (!user) return null;
 
@@ -170,13 +176,14 @@ export default async function DashboardPage() {
         <div className="flex flex-col gap-4 md:gap-5">
           <div>
             <h1 className="text-xl font-bold md:text-3xl">
-              {ar.dashboard.welcome}،{" "}
+              {t.dashboard.welcome}{" "}
               <span className="text-primary">@{user.username}</span>
             </h1>
-            <p className="mt-1 text-muted">{ar.dashboard.hub}</p>
+            <p className="mt-1 text-muted">{t.dashboard.hub}</p>
             <p className="mt-1 text-xs text-muted/80">{tournamentName}</p>
           </div>
           <DashboardHeaderStats
+            t={t}
             roundPoints={headerRoundPoints}
             tournamentPoints={headerTournamentPoints}
             roundAverage={headerRoundAverage}
@@ -191,16 +198,18 @@ export default async function DashboardPage() {
         {data.hasSubRound && subRoundStats && (
           <RankStatCard
             href={subRoundLbHref}
-            label={ar.dashboard.yourRoundRank}
+            label={t.dashboard.yourRoundRank}
             rank={subRoundStats.myRank ?? "—"}
+            fullLeaderboardLabel={t.dashboard.fullLeaderboard}
           />
         )}
 
         <RankStatCard
           href="/leaderboard/overall"
-          label={ar.dashboard.yourOverallRank}
+          label={t.dashboard.yourOverallRank}
           rank={myOverall?.rank ?? "—"}
           rankChange={myOverall?.rankChange}
+          fullLeaderboardLabel={t.dashboard.fullLeaderboard}
         />
       </div>
 
@@ -210,7 +219,7 @@ export default async function DashboardPage() {
             <div className="mb-3 flex items-center justify-between md:mb-4">
               <div>
                 <h2 className="text-lg font-semibold md:text-xl">
-                  {ar.leaderboard.round}
+                  {t.leaderboard.round}
                 </h2>
                 <p className="mt-0.5 text-sm text-muted">{data.subRound.name}</p>
               </div>
@@ -218,14 +227,14 @@ export default async function DashboardPage() {
                 href={subRoundLbHref}
                 className="shrink-0 text-sm text-primary hover:underline"
               >
-                {ar.dashboard.fullLeaderboard} ←
+                {t.dashboard.fullLeaderboard} ←
               </Link>
             </div>
 
             <LeaderboardTable
               entries={data.subRoundLb.slice(0, 5)}
               highlightUserId={user.userId}
-              pointsLabel={ar.leaderboard.roundPointsColumn}
+              pointsLabel={t.leaderboard.roundPointsColumn}
             />
           </div>
         )}
@@ -237,13 +246,13 @@ export default async function DashboardPage() {
               href={tournamentLbHref}
               className="text-sm text-primary hover:underline"
             >
-              {ar.dashboard.fullLeaderboard} ←
+              {t.dashboard.fullLeaderboard} ←
             </Link>
           </div>
           <LeaderboardTable
             entries={data.tournamentLb.slice(0, 5)}
             highlightUserId={user.userId}
-            pointsLabel={ar.leaderboard.roundPointsColumn}
+            pointsLabel={t.leaderboard.roundPointsColumn}
           />
         </div>
       </section>

@@ -10,8 +10,6 @@ import type {
   Player,
   MatchScorer,
 } from "@prisma/client";
-import { ar } from "@/lib/i18n/ar";
-
 export type { FinishType, MatchStatus };
 
 export type UserSession = {
@@ -66,6 +64,3 @@ export type ApiResponse<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-export const FINISH_TYPE_LABELS: Record<FinishType, string> = ar.finishType;
-
-export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = ar.status;

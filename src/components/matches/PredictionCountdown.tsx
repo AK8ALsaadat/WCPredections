@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import {
-  formatCountdownAr,
+  formatCountdown,
   getPredictionCountdownTarget,
 } from "@/lib/utils";
-import { ar } from "@/lib/i18n/ar";
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 type PredictionCountdownProps = {
   matchTime: string | Date;
@@ -56,6 +56,7 @@ export function PredictionCountdown({
   className = "",
   variant = "compact",
 }: PredictionCountdownProps) {
+  const { messages: t, locale } = useI18n();
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [target, setTarget] = useState(
     () => getPredictionCountdownTarget(matchTime)
@@ -87,8 +88,8 @@ export function PredictionCountdown({
   const styles = urgencyStyles[urgency];
   const label =
     target.kind === "closes"
-      ? ar.matches.countdownCloses
-      : ar.matches.countdownOpens;
+      ? t.matches.countdownCloses
+      : t.matches.countdownOpens;
 
   const isProminent = variant === "prominent";
 
@@ -100,7 +101,11 @@ export function PredictionCountdown({
         isProminent ? "px-5 py-4" : "px-3 py-2.5"
       } ${className}`}
     >
-      <p className={`font-medium ${styles.label} ${isProminent ? "text-sm" : "text-xs"}`}>
+      <p
+        className={`font-medium ${styles.label} ${
+          isProminent ? "text-sm" : "text-xs"
+        }`}
+      >
         {label}
       </p>
       <p
@@ -109,7 +114,7 @@ export function PredictionCountdown({
         }`}
         dir="ltr"
       >
-        {formatCountdownAr(remainingMs)}
+        {formatCountdown(remainingMs, locale)}
       </p>
     </div>
   );

@@ -8,8 +8,7 @@ import { TeamLogo } from "@/components/ui/TeamLogo";
 import { Card } from "@/components/ui/Card";
 import { MatchPointsBreakdown } from "@/components/matches/MatchPointsBreakdown";
 import { asFinishType } from "@/lib/finish-type";
-import { MATCH_STATUS_LABELS } from "@/types";
-import { ar } from "@/lib/i18n/ar";
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import {
   prefetchPredictData,
@@ -82,8 +81,9 @@ function ScorerList({ scorers }: { scorers: ScorerPick[] }) {
 }
 
 export function MatchCard({ match, showPredictButton }: MatchCardProps) {
+  const { messages: t, locale } = useI18n();
   const canPredict = isPredictionAllowed(match.matchTime, match.status);
-  const lockReason = getPredictionLockReason(match.matchTime, match.status);
+  const lockReason = getPredictionLockReason(match.matchTime, match.status, t);
   const isFinished = match.status === "FINISHED";
   const isLive = match.status === "LIVE";
   const hasPrediction = !!match.userPrediction;
@@ -93,7 +93,7 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
     !!match.userBoldScorerBet;
   const stageLabel =
     (match.stageName &&
-      ar.stageLabels[match.stageName as keyof typeof ar.stageLabels]) ||
+      t.stageLabels[match.stageName as keyof typeof t.stageLabels]) ||
     match.stageName ||
     match.round.name;
 
@@ -142,18 +142,20 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
         <span>{stageLabel}</span>
         <div className="flex items-center gap-2">
           {match.isKnockout && (
-            <span className="rounded bg-warning/20 px-2 py-0.5 text-warning">إقصائي</span>
+            <span className="rounded bg-warning/20 px-2 py-0.5 text-warning">
+              {t.matches.knockoutBadge}
+            </span>
           )}
           {hasPrediction && !isFinished && (
             <span className="rounded bg-warning/15 px-2 py-0.5 text-warning">
-              {ar.matches.yourPrediction}
+              {t.matches.yourPrediction}
             </span>
           )}
           {!canPredict && !isFinished && !isLive && (
-            <span className="rounded bg-card-border px-2 py-0.5">{ar.matches.locked}</span>
+            <span className="rounded bg-card-border px-2 py-0.5">{t.matches.locked}</span>
           )}
           <span className={isLive ? "font-semibold text-primary" : ""}>
-            {MATCH_STATUS_LABELS[match.status as keyof typeof MATCH_STATUS_LABELS] ?? match.status}
+            {t.status[match.status as keyof typeof t.status] ?? match.status}
           </span>
         </div>
       </div>
@@ -187,12 +189,14 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
                 </div>
               </div>
             ) : (
-              <span className="text-lg font-medium text-muted">{ar.matches.vs}</span>
+              <span className="text-lg font-medium text-muted">{t.matches.vs}</span>
             )}
             {match.userPrediction?.isDouble && showUserPrediction && (
               <span className="mt-0.5 text-[10px] font-semibold text-warning">2x</span>
             )}
-            <span className="mt-1 text-xs text-muted">{formatDate(match.matchTime)}</span>
+            <span className="mt-1 text-xs text-muted">
+              {formatDate(match.matchTime, locale)}
+            </span>
           </div>
 
           <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
@@ -218,7 +222,7 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
                 : "rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
             }
           >
-            {hasPrediction ? ar.matches.editPrediction : ar.matches.predict}
+            {hasPrediction ? t.matches.editPrediction : t.matches.predict}
           </PredictNavLink>
         </div>
       )}

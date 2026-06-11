@@ -4,10 +4,11 @@ import { getSubRounds, getTournamentRound } from "@/services/match.service";
 import { getCurrentUser } from "@/lib/session";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { Card } from "@/components/ui/Card";
-import { ar } from "@/lib/i18n/ar";
+import { getServerI18n } from "@/lib/i18n/server";
 import { getTournamentRoundName } from "@/lib/rounds";
 
 export default async function OverallLeaderboardPage() {
+  const { messages: t } = await getServerI18n();
   const [leaderboard, user, tournamentRound, subRounds] = await Promise.all([
     getOverallLeaderboard(),
     getCurrentUser(),
@@ -20,13 +21,15 @@ export default async function OverallLeaderboardPage() {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <header className="text-right">
+      <header className="text-end">
         <h1 className="text-xl font-bold md:text-3xl">🏆 {tournamentName}</h1>
         <p className="mt-1 text-xs text-muted md:text-sm">
-          {ar.leaderboard.overallDesc}
+          {t.leaderboard.overallDesc}
         </p>
         {tournamentMatches > 0 && (
-          <p className="mt-1 text-xs text-muted">{tournamentMatches} مباراة</p>
+          <p className="mt-1 text-xs text-muted">
+            {t.leaderboard.matchCount(tournamentMatches)}
+          </p>
         )}
       </header>
 
@@ -38,8 +41,8 @@ export default async function OverallLeaderboardPage() {
 
       {subRounds.length > 0 && (
         <section className="space-y-3 border-t border-card-border pt-6">
-          <h2 className="text-right text-base font-semibold md:text-lg">
-            {ar.leaderboard.round}
+          <h2 className="text-end text-base font-semibold md:text-lg">
+            {t.leaderboard.round}
           </h2>
           <div className="space-y-2">
             {subRounds.map((round) => (
@@ -47,7 +50,7 @@ export default async function OverallLeaderboardPage() {
                 <Card className="cursor-pointer transition-colors active:border-primary/50">
                   <div className="flex items-center justify-between gap-3 py-1">
                     <span className="text-xs text-muted">
-                      {round._count.matches} مباراة
+                      {t.leaderboard.matchCount(round._count.matches)}
                     </span>
                     <span className="font-medium">{round.name}</span>
                   </div>
@@ -60,7 +63,7 @@ export default async function OverallLeaderboardPage() {
 
       <div className="hidden text-center md:block">
         <Link href="/dashboard" className="text-sm text-primary hover:underline">
-          {ar.leaderboard.backDashboard} ←
+          {t.leaderboard.backDashboard} ←
         </Link>
       </div>
     </div>

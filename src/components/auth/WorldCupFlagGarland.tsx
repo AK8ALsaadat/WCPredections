@@ -1,5 +1,7 @@
+"use client";
+
 import Image from "next/image";
-import { ar } from "@/lib/i18n/ar";
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 type FlagSpec = {
   id: string;
@@ -124,6 +126,8 @@ function HangingFlag({ flag }: { flag: FlagSpec }) {
 }
 
 export function WorldCupFlagGarland() {
+  const { messages: t } = useI18n();
+
   return (
     <div className="relative mx-auto mb-2 w-full max-w-lg" aria-hidden>
       <div className="relative h-28 overflow-visible sm:h-32">
@@ -178,7 +182,7 @@ export function WorldCupFlagGarland() {
         <span className="h-px w-8 bg-gradient-to-l from-warning/60 to-transparent" />
         <span className="text-lg">🏆</span>
         <span className="text-xs font-bold tracking-wide text-warning sm:text-sm">
-          {ar.worldCup}
+          {t.worldCup}
         </span>
         <span className="text-lg">🏆</span>
         <span className="h-px w-8 bg-gradient-to-r from-warning/60 to-transparent" />

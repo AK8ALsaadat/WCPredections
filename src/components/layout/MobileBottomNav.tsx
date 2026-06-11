@@ -2,15 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { ar } from "@/lib/i18n/ar";
-
-const navItems = [
-  { href: "/dashboard", label: ar.nav.dashboard, icon: "🏠" },
-  { href: "/matches", label: ar.nav.matches, icon: "⚽" },
-  { href: "/leaderboard/overall", label: ar.nav.leaderboard, icon: "🏆" },
-  { href: "/profile", label: ar.nav.profile, icon: "👤" },
-];
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 function isActive(pathname: string, href: string) {
   if (href === "/leaderboard/overall") {
@@ -21,6 +15,17 @@ function isActive(pathname: string, href: string) {
 
 export function MobileBottomNav() {
   const pathname = usePathname();
+  const { messages: t } = useI18n();
+
+  const navItems = useMemo(
+    () => [
+      { href: "/dashboard", label: t.nav.dashboard, icon: "🏠" },
+      { href: "/matches", label: t.nav.matches, icon: "⚽" },
+      { href: "/leaderboard/overall", label: t.nav.leaderboard, icon: "🏆" },
+      { href: "/profile", label: t.nav.profile, icon: "👤" },
+    ],
+    [t]
+  );
 
   return (
     <nav

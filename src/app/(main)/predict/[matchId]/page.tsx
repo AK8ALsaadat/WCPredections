@@ -28,7 +28,7 @@ import {
   isPredictionAllowed,
   getPredictionLockReason,
 } from "@/lib/utils";
-import { ar } from "@/lib/i18n/ar";
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 import {
   buildPlayerTeamSets,
   getScorerBudgetStatus,
@@ -184,6 +184,7 @@ function applySavedPrediction(m: MatchData, setters: {
 }
 
 export default function PredictPage() {
+  const { messages: t, locale } = useI18n();
   const params = useParams();
   const router = useRouter();
   const matchId = params.matchId as string;
@@ -320,7 +321,7 @@ export default function PredictPage() {
           signal: abort.signal,
         });
         if (!res) {
-          if (!cancelled && !cached) setError(ar.errors.loadFailed);
+          if (!cancelled && !cached) setError(t.errors.loadFailed);
           return;
         }
 
@@ -349,7 +350,7 @@ export default function PredictPage() {
         });
       } catch (err) {
         if (!isAbortError(err) && !cancelled && !cached) {
-          setError(ar.errors.loadFailed);
+          setError(t.errors.loadFailed);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -390,12 +391,12 @@ export default function PredictPage() {
 
   function handleDoubleToggle(checked: boolean) {
     if (match?.userPrediction?.isDouble && !checked) {
-      setError(ar.predict.doubleLocked);
+      setError(t.predict.doubleLocked);
       return;
     }
     const limits = match?.roundUsageLimits?.doubles;
     if (checked && limits && !limits.canEnable && !limits.onThisMatch) {
-      setError(ar.predict.doubleExhausted);
+      setError(t.predict.doubleExhausted);
       return;
     }
     setError("");
@@ -404,12 +405,12 @@ export default function PredictPage() {
 
   function handleBoldToggle(checked: boolean) {
     if (match?.userBoldScorerBet?.playerId && !checked) {
-      setError(ar.predict.boldLocked);
+      setError(t.predict.boldLocked);
       return;
     }
     const limits = match?.roundUsageLimits?.boldScorer;
     if (checked && limits && !limits.canUse && !limits.onThisMatch) {
-      setError(ar.predict.boldExhausted);
+      setError(t.predict.boldExhausted);
       return;
     }
     setError("");
@@ -429,24 +430,24 @@ export default function PredictPage() {
       !doubleLimits.canEnable &&
       !doubleLimits.onThisMatch
     ) {
-      setError(ar.predict.doubleExhausted);
+      setError(t.predict.doubleExhausted);
       return;
     }
 
     if (budget.anyExceeded) {
-      setError(ar.predict.scorersExceeded);
+      setError(t.predict.scorersExceeded);
       return;
     }
 
     if (hasAnyGoals && scorerCount === 0) {
       setError(
-        hasPlayers ? ar.predict.scorersRequired : ar.predict.scorersNeedLineup
+        hasPlayers ? t.predict.scorersRequired : t.predict.scorersNeedLineup
       );
       return;
     }
 
     if (boldEnabled && !boldPlayerId) {
-      setError(ar.predict.boldScorerBet.choosePlayerRequired);
+      setError(t.predict.boldScorerBet.choosePlayerRequired);
       return;
     }
 
@@ -474,10 +475,10 @@ export default function PredictPage() {
         return;
       }
 
-      setSuccess(ar.matches.predictionSubmitted);
+      setSuccess(t.matches.predictionSubmitted);
       setTimeout(() => router.push(`/matches/${matchId}`), 1500);
     } catch {
-      setError(ar.errors.generic);
+      setError(t.errors.generic);
     } finally {
       setSubmitting(false);
     }
@@ -488,15 +489,15 @@ export default function PredictPage() {
   }
 
   if (error && !match) return <ErrorMessage message={error} />;
-  if (!match) return <ErrorMessage message={ar.errors.loadFailed} />;
+  if (!match) return <ErrorMessage message={t.errors.loadFailed} />;
 
-  const lockReason = getPredictionLockReason(match.matchTime, match.status);
+  const lockReason = getPredictionLockReason(match.matchTime, match.status, t);
   if (!isPredictionAllowed(match.matchTime, match.status)) {
     return (
       <div className="mx-auto max-w-lg space-y-4">
-        <ErrorMessage message={`${ar.matches.locked} — ${lockReason}`} />
+        <ErrorMessage message={`${t.matches.locked} — ${lockReason}`} />
         <Link href={`/matches/${matchId}`} className="text-primary hover:underline">
-          {ar.matches.back}
+          {t.matches.back}
         </Link>
       </div>
     );
@@ -543,7 +544,7 @@ export default function PredictPage() {
               value: player.id,
               label:
                 player.section === "bench"
-                  ? `${player.name} (${ar.predict.scorerBench})`
+                  ? `${player.name} (${t.predict.scorerBench})`
                   : player.name,
             })),
           },
@@ -553,7 +554,7 @@ export default function PredictPage() {
               value: player.id,
               label:
                 player.section === "bench"
-                  ? `${player.name} (${ar.predict.scorerBench})`
+                  ? `${player.name} (${t.predict.scorerBench})`
                   : player.name,
             })),
           },
@@ -561,13 +562,13 @@ export default function PredictPage() {
       : undefined;
 
   const boldSelectOptions = [
-    { value: "", label: ar.predict.boldScorerBet.choosePlayer },
+    { value: "", label: t.predict.boldScorerBet.choosePlayer },
   ];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Link href={`/matches/${matchId}`} className="text-sm text-primary hover:underline">
-        {ar.matches.back}
+        {t.matches.back}
       </Link>
 
       <Card>
@@ -576,13 +577,15 @@ export default function PredictPage() {
             <TeamLogo {...match.homeTeam} />
             <span className="font-medium">{match.homeTeam.shortName}</span>
           </div>
-          <span className="text-muted">{ar.matches.vs}</span>
+          <span className="text-muted">{t.matches.vs}</span>
           <div className="flex items-center gap-2">
             <span className="font-medium">{match.awayTeam.shortName}</span>
             <TeamLogo {...match.awayTeam} />
           </div>
         </div>
-        <p className="mt-2 text-center text-sm text-muted">{formatDate(match.matchTime)}</p>
+        <p className="mt-2 text-center text-sm text-muted">
+          {formatDate(match.matchTime, locale)}
+        </p>
         <div className="mt-4">
           <PredictionCountdown
             matchTime={match.matchTime}
@@ -601,7 +604,7 @@ export default function PredictPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{ar.predict.scorePrediction}</CardTitle>
+            <CardTitle>{t.predict.scorePrediction}</CardTitle>
           </CardHeader>
           <div className="flex items-end justify-center gap-4">
             <Input
@@ -625,29 +628,29 @@ export default function PredictPage() {
             />
           </div>
           <p className="mt-3 text-center text-sm text-muted">
-            {ar.predict.scoreFirstHint}
+            {t.predict.scoreFirstHint}
           </p>
 
           <div className="mt-4 space-y-3">
             {doubleLimits && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm">
                 <span className="font-semibold text-warning">
-                  {ar.predict.doubleCounter(
+                  {t.predict.doubleCounter(
                     doubleLimits.used,
                     doubleLimits.max
                   )}
                 </span>
                 {doubleLimits.onThisMatch ? (
                   <span className="text-warning">
-                    {ar.predict.doubleOnThisMatch}
+                    {t.predict.doubleOnThisMatch}
                   </span>
                 ) : doubleLimits.remaining > 0 ? (
                   <span className="text-muted">
-                    {ar.predict.doubleRemaining(doubleLimits.remaining)}
+                    {t.predict.doubleRemaining(doubleLimits.remaining)}
                   </span>
                 ) : (
                   <span className="text-danger">
-                    {ar.predict.doubleExhausted}
+                    {t.predict.doubleExhausted}
                   </span>
                 )}
               </div>
@@ -669,12 +672,12 @@ export default function PredictPage() {
               />
               <div>
                 <p className="font-medium text-warning">
-                  {ar.predict.doublePoints}
+                  {t.predict.doublePoints}
                 </p>
                 <p className="text-sm text-muted">
                   {doubleCommitted
-                    ? ar.predict.doubleLocked
-                    : ar.predict.doubleHint}
+                    ? t.predict.doubleLocked
+                    : t.predict.doubleHint}
                 </p>
               </div>
             </label>
@@ -683,7 +686,7 @@ export default function PredictPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{ar.predict.boldScorerBet.title}</CardTitle>
+            <CardTitle>{t.predict.boldScorerBet.title}</CardTitle>
           </CardHeader>
 
           {boldLimits && (
@@ -695,38 +698,38 @@ export default function PredictPage() {
               }`}
             >
               <span className="font-semibold">
-                {ar.predict.boldCounter(
+                {t.predict.boldCounter(
                   boldLimits.used ? boldLimits.max : 0,
                   boldLimits.max
                 )}
               </span>
               <span>
                 {boldLimits.onThisMatch && boldLimits.playerName
-                  ? ar.predict.boldUsedHere(boldLimits.playerName)
+                  ? t.predict.boldUsedHere(boldLimits.playerName)
                   : boldLimits.onOtherMatch
-                    ? ar.predict.boldExhausted
-                    : ar.predict.boldAvailable}
+                    ? t.predict.boldExhausted
+                    : t.predict.boldAvailable}
               </span>
             </div>
           )}
 
           {lineupLoading ? (
             <p className="py-4 text-center text-sm text-muted">
-              {ar.predict.lineupLoading}
+              {t.predict.lineupLoading}
             </p>
           ) : !hasPlayers ? (
             <p className="py-4 text-center text-sm text-muted">
-              {ar.predict.lineupUnavailable}
+              {t.predict.lineupUnavailable}
             </p>
           ) : boldLockedOnOther ? (
             <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
-              <p>{ar.predict.boldScorerBet.usedElsewhere}</p>
+              <p>{t.predict.boldScorerBet.usedElsewhere}</p>
               {match.boldScorerRoundStatus?.otherMatchId && (
                 <Link
                   href={`/matches/${match.boldScorerRoundStatus.otherMatchId}`}
                   className="mt-2 inline-block font-medium text-primary hover:underline"
                 >
-                  {ar.predict.boldScorerBet.viewOtherMatch}
+                  {t.predict.boldScorerBet.viewOtherMatch}
                 </Link>
               )}
             </div>
@@ -782,12 +785,12 @@ export default function PredictPage() {
                       boldEnabled ? "text-primary" : "text-foreground"
                     )}
                   >
-                    {ar.predict.boldScorerBet.enable}
+                    {t.predict.boldScorerBet.enable}
                   </p>
                   <p className="text-sm text-muted">
                     {boldCommitted
-                      ? ar.predict.boldLocked
-                      : ar.predict.boldScorerBet.hint}
+                      ? t.predict.boldLocked
+                      : t.predict.boldScorerBet.hint}
                   </p>
                 </div>
               </label>
@@ -795,7 +798,7 @@ export default function PredictPage() {
               {boldEnabled && (
                 <div className="rounded-lg border border-primary/25 bg-background/80 p-4">
                   <Select
-                    label={ar.predict.boldScorerBet.choosePlayer}
+                    label={t.predict.boldScorerBet.choosePlayer}
                     value={boldPlayerId}
                     onChange={(e) => setBoldPlayerId(e.target.value)}
                     options={boldSelectOptions}
@@ -808,7 +811,7 @@ export default function PredictPage() {
                       onClick={() => setBoldPlayerId("")}
                       className="mt-3 text-sm text-muted hover:text-danger"
                     >
-                      {ar.predict.boldScorerBet.clearSelection}
+                      {t.predict.boldScorerBet.clearSelection}
                     </button>
                   )}
                 </div>
@@ -820,28 +823,28 @@ export default function PredictPage() {
         {match.isKnockout && (
           <Card>
             <CardHeader>
-              <CardTitle>{ar.predict.knockout}</CardTitle>
+              <CardTitle>{t.predict.knockout}</CardTitle>
             </CardHeader>
             <Select
-              label={ar.predict.finishTypeLabel}
+              label={t.predict.finishTypeLabel}
               value={finishType}
               onChange={(e) => setFinishType(e.target.value)}
               options={[
-                { value: "", label: ar.predict.selectFinish },
-                { value: "NINETY_MINUTES", label: ar.predict.ninety },
-                { value: "EXTRA_TIME", label: ar.predict.extraTime },
-                { value: "PENALTIES", label: ar.predict.penalties },
+                { value: "", label: t.predict.selectFinish },
+                { value: "NINETY_MINUTES", label: t.predict.ninety },
+                { value: "EXTRA_TIME", label: t.predict.extraTime },
+                { value: "PENALTIES", label: t.predict.penalties },
               ]}
             />
 
             {finishType === "PENALTIES" && (
               <div className="mt-4">
                 <Select
-                  label={ar.predict.penaltyWinner}
+                  label={t.predict.penaltyWinner}
                   value={penaltyWinner}
                   onChange={(e) => setPenaltyWinner(e.target.value)}
                   options={[
-                    { value: "", label: ar.predict.selectWinner },
+                    { value: "", label: t.predict.selectWinner },
                     { value: match.homeTeam.id, label: match.homeTeam.name },
                     { value: match.awayTeam.id, label: match.awayTeam.name },
                   ]}
@@ -856,7 +859,7 @@ export default function PredictPage() {
             <div className="py-16">
               <LoadingSpinner />
               <p className="mt-3 text-center text-sm text-muted">
-                {ar.predict.lineupLoading}
+                {t.predict.lineupLoading}
               </p>
             </div>
           ) : hasPlayers && lineup ? (
@@ -873,9 +876,9 @@ export default function PredictPage() {
                     <span className="font-medium text-foreground">
                       {match.homeTeam.shortName}:{" "}
                     </span>
-                    {budget.homeTotal} / {predHome} {ar.predict.goalsUnit}
+                    {budget.homeTotal} / {predHome} {t.predict.goalsUnit}
                     {budget.homeExceeded && (
-                      <span className="mr-1 font-bold"> — {ar.predict.exceeded}</span>
+                      <span className="mr-1 font-bold"> — {t.predict.exceeded}</span>
                     )}
                   </div>
                   <div
@@ -888,9 +891,9 @@ export default function PredictPage() {
                     <span className="font-medium text-foreground">
                       {match.awayTeam.shortName}:{" "}
                     </span>
-                    {budget.awayTotal} / {predAway} {ar.predict.goalsUnit}
+                    {budget.awayTotal} / {predAway} {t.predict.goalsUnit}
                     {budget.awayExceeded && (
-                      <span className="mr-1 font-bold"> — {ar.predict.exceeded}</span>
+                      <span className="mr-1 font-bold"> — {t.predict.exceeded}</span>
                     )}
                   </div>
                 </div>
@@ -898,7 +901,7 @@ export default function PredictPage() {
 
               {budget.anyExceeded && (
                 <div className="mb-4 rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-sm text-danger">
-                  {ar.predict.scorersExceeded}
+                  {t.predict.scorersExceeded}
                 </div>
               )}
 
@@ -922,27 +925,27 @@ export default function PredictPage() {
                 onToggle={toggleScorer}
                 onGoalsChange={setScorerGoals}
                 labels={{
-                  title: ar.predict.scorerPrediction,
+                  title: t.predict.scorerPrediction,
                   hint: hasAnyGoals
-                    ? ar.predict.scorerHint
-                    : ar.predict.scorerHintNoGoals,
-                  bench: ar.predict.scorerBench,
-                  formation: ar.predict.scorerFormation,
-                  officialBadge: ar.predict.scorerOfficialBadge,
-                  probableBadge: ar.predict.scorerProbableBadge,
-                  estimatedBadge: ar.predict.scorerEstimatedBadge,
-                  officialNote: ar.predict.scorerOfficialNote,
-                  probableNote: ar.predict.scorerProbableNote,
-                  estimatedNote: ar.predict.scorerEstimatedNote,
-                  selectedScorers: ar.predict.selectedScorers,
-                  goalsLabel: ar.predict.goalsLabel,
-                  remove: ar.predict.removeScorer,
+                    ? t.predict.scorerHint
+                    : t.predict.scorerHintNoGoals,
+                  bench: t.predict.scorerBench,
+                  formation: t.predict.scorerFormation,
+                  officialBadge: t.predict.scorerOfficialBadge,
+                  probableBadge: t.predict.scorerProbableBadge,
+                  estimatedBadge: t.predict.scorerEstimatedBadge,
+                  officialNote: t.predict.scorerOfficialNote,
+                  probableNote: t.predict.scorerProbableNote,
+                  estimatedNote: t.predict.scorerEstimatedNote,
+                  selectedScorers: t.predict.selectedScorers,
+                  goalsLabel: t.predict.goalsLabel,
+                  remove: t.predict.removeScorer,
                 }}
               />
             </>
           ) : (
             <p className="py-8 text-center text-sm text-muted">
-              {ar.predict.lineupUnavailable}
+              {t.predict.lineupUnavailable}
             </p>
           )}
         </Card>
@@ -954,7 +957,7 @@ export default function PredictPage() {
           loading={submitting}
           disabled={budget.anyExceeded || needsLineupForScorers}
         >
-          {ar.predict.submit}
+          {t.predict.submit}
         </Button>
       </form>
     </div>

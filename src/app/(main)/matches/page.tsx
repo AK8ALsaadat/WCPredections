@@ -16,7 +16,7 @@ import {
   readClientCache,
   writeClientCache,
 } from "@/lib/client-page-cache";
-import { ar } from "@/lib/i18n/ar";
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 type Round = { id: string; name: string };
 type Match = Parameters<typeof MatchCard>[0]["match"];
@@ -41,6 +41,7 @@ function matchesCacheKey(roundId: string, page: number) {
 }
 
 export default function MatchesPage() {
+  const { messages: t, locale } = useI18n();
   const [rounds, setRounds] = useState<Round[]>(() =>
     readClientCache<Round[]>("rounds") ?? []
   );
@@ -134,7 +135,7 @@ export default function MatchesPage() {
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         if (seq !== loadSeq.current) return;
-        if (!cached) setError(ar.errors.loadFailed);
+        if (!cached) setError(t.errors.loadFailed);
       } finally {
         if (seq === loadSeq.current) {
           setLoading(false);
@@ -234,7 +235,7 @@ export default function MatchesPage() {
 
   const sortedDays = Object.keys(grouped).sort();
   const pageLabel =
-    meta.pageKind === "open" ? ar.matches.pageOpen : ar.matches.pageOther;
+    meta.pageKind === "open" ? t.matches.pageOpen : t.matches.pageOther;
 
   if (loading && matches.length === 0) return <LoadingPage />;
 
@@ -242,13 +243,15 @@ export default function MatchesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">{ar.matches.title}</h1>
-          <p className="mt-1 text-muted">{ar.matches.subtitle}</p>
+          <h1 className="text-3xl font-bold">{t.matches.title}</h1>
+          <p className="mt-1 text-muted">{t.matches.subtitle}</p>
           {lastUpdate && (
             <p className="mt-1 text-xs text-muted">
-              آخر تحديث: {lastUpdate.toLocaleTimeString("ar-SA")} · بيانات رسمية من football-data.org
+              {t.matches.lastUpdate}:{" "}
+              {lastUpdate.toLocaleTimeString(locale === "en" ? "en-US" : "ar-SA")}{" "}
+              · {t.matches.dataSource}
               {refreshing && (
-                <span className="mr-2 text-primary"> · {ar.matches.refreshing}</span>
+                <span className="mr-2 text-primary"> · {t.matches.refreshing}</span>
               )}
             </p>
           )}
@@ -256,14 +259,14 @@ export default function MatchesPage() {
         {rounds.length > 0 && (
           <div className="w-full sm:w-64">
             <Select
-              label={ar.matches.filterRound}
+              label={t.matches.filterRound}
               value={selectedRound}
               onChange={(e) => {
                 setSelectedRound(e.target.value);
                 setPage(1);
               }}
               options={[
-                { value: "", label: ar.matches.allRounds },
+                { value: "", label: t.matches.allRounds },
                 ...rounds.map((r) => ({ value: r.id, label: r.name })),
               ]}
             />
@@ -272,13 +275,13 @@ export default function MatchesPage() {
       </div>
 
       <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
-        {ar.matches.lockNotice}
+        {t.matches.lockNotice}
       </div>
 
       <p className="text-sm text-muted">
-        {ar.matches.predictWindow}{" "}
+        {t.matches.predictWindow}{" "}
         <span className="text-primary">
-          ({formatDayHeader(new Date())} — {predictionTimezone})
+          ({formatDayHeader(new Date(), locale)} — {predictionTimezone})
         </span>
       </p>
 
@@ -286,8 +289,8 @@ export default function MatchesPage() {
 
       {matches.length === 0 ? (
         <div className="rounded-xl border border-card-border bg-card p-12 text-center text-muted">
-          <p>{ar.matches.noMatches}</p>
-          <p className="mt-2 text-xs">انتظر المزامنة أو اطلب من المشرف تشغيلها من لوحة الإدارة</p>
+          <p>{t.matches.noMatches}</p>
+          <p className="mt-2 text-xs">{t.matches.syncHint}</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -295,7 +298,7 @@ export default function MatchesPage() {
             <h2 className="text-lg font-semibold text-primary">{pageLabel}</h2>
             {meta.openCount > 0 && meta.pageKind === "open" && (
               <span className="text-sm text-muted">
-                {meta.openCount} مباراة مفتوحة للتوقع
+                {t.matches.openMatchesCount(meta.openCount)}
               </span>
             )}
           </div>
@@ -304,7 +307,7 @@ export default function MatchesPage() {
             {sortedDays.map((dayKey) => (
               <section key={dayKey}>
                 <h3 className="mb-4 border-b border-card-border pb-2 text-base font-semibold text-foreground">
-                  {formatDayHeader(dayKey)}
+                  {formatDayHeader(dayKey, locale)}
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   {grouped[dayKey].map((match) => (
@@ -320,9 +323,9 @@ export default function MatchesPage() {
             totalPages={meta.totalPages}
             onPageChange={handlePageChange}
             labels={{
-              previous: ar.matches.paginationPrevious,
-              next: ar.matches.paginationNext,
-              pageOf: ar.matches.paginationPageOf,
+              previous: t.matches.paginationPrevious,
+              next: t.matches.paginationNext,
+              pageOf: t.matches.paginationPageOf,
             }}
           />
         </div>

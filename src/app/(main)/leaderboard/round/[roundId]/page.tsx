@@ -4,13 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { getRoundLeaderboard } from "@/services/leaderboard.service";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
-import { ar } from "@/lib/i18n/ar";
+import { getServerI18n } from "@/lib/i18n/server";
 
 export default async function RoundLeaderboardPage({
   params,
 }: {
   params: Promise<{ roundId: string }>;
 }) {
+  const { messages: t } = await getServerI18n();
   const { roundId } = await params;
 
   const [round, leaderboard, user] = await Promise.all([
@@ -26,20 +27,20 @@ export default async function RoundLeaderboardPage({
 
   return (
     <div className="space-y-6">
-      <header className="text-right">
+      <header className="text-end">
         <Link
           href="/leaderboard/overall"
           className="mb-2 inline-block text-xs text-primary hover:underline md:text-sm"
         >
-          ← {ar.leaderboard.overall}
+          ← {t.leaderboard.overall}
         </Link>
         <h1 className="text-xl font-bold md:text-3xl">{round.name}</h1>
         <p className="mt-1 text-xs text-muted md:text-sm">
-          {ar.leaderboard.roundDesc}
+          {t.leaderboard.roundDesc}
         </p>
         {round._count.matches > 0 && (
           <p className="mt-1 text-xs text-muted">
-            {round._count.matches} مباراة
+            {t.leaderboard.matchCount(round._count.matches)}
           </p>
         )}
       </header>
@@ -47,12 +48,12 @@ export default async function RoundLeaderboardPage({
       <LeaderboardTable
         entries={leaderboard}
         highlightUserId={user?.userId}
-        pointsLabel={ar.leaderboard.roundPointsColumn}
+        pointsLabel={t.leaderboard.roundPointsColumn}
       />
 
       <div className="flex justify-center gap-4 text-sm">
         <Link href="/matches" className="text-primary hover:underline">
-          {ar.leaderboard.viewMatches}
+          {t.leaderboard.viewMatches}
         </Link>
       </div>
     </div>

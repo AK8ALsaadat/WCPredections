@@ -1,8 +1,12 @@
+"use client";
+
 import type { LeaderboardEntry } from "@/types";
 import { Card } from "@/components/ui/Card";
-import { ar } from "@/lib/i18n/ar";
+import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 function RankTrend({ change }: { change?: number }) {
+  const { messages: t } = useI18n();
+
   if (change == null || change === 0) {
     return <span className="inline-block text-xs text-muted">—</span>;
   }
@@ -11,7 +15,7 @@ function RankTrend({ change }: { change?: number }) {
     return (
       <span
         className="inline-flex items-center gap-0.5 text-xs font-semibold text-primary"
-        title={ar.leaderboard.rankUp}
+        title={t.leaderboard.rankUp}
       >
         <span aria-hidden>▲</span>
         <span>{change}</span>
@@ -22,7 +26,7 @@ function RankTrend({ change }: { change?: number }) {
   return (
     <span
       className="inline-flex items-center gap-0.5 text-xs font-semibold text-danger"
-      title={ar.leaderboard.rankDown}
+      title={t.leaderboard.rankDown}
     >
       <span aria-hidden>▼</span>
       <span>{Math.abs(change)}</span>
@@ -65,6 +69,8 @@ function MobileLeaderboardList({
   showRankTrend?: boolean;
   pointsLabel?: string;
 }) {
+  const { messages: t } = useI18n();
+
   return (
     <div className="space-y-2 md:hidden">
       {entries.map((entry) => (
@@ -77,7 +83,7 @@ function MobileLeaderboardList({
           }`}
         >
           <RankBadge rank={entry.rank} />
-          <div className="min-w-0 flex-1 text-right">
+          <div className="min-w-0 flex-1 text-end">
             <p className="truncate font-medium">@{entry.username}</p>
             {showRankTrend && (
               <div className="mt-0.5">
@@ -85,9 +91,9 @@ function MobileLeaderboardList({
               </div>
             )}
           </div>
-          <div className="shrink-0 text-left">
+          <div className="shrink-0 text-start">
             <p className="text-[10px] text-muted">
-              {pointsLabel ?? ar.leaderboard.points}
+              {pointsLabel ?? t.leaderboard.points}
             </p>
             <p className={`text-lg font-bold tabular-nums ${pointsTone(entry.points)}`}>
               {entry.points}
@@ -110,11 +116,13 @@ export function LeaderboardTable({
   showRankTrend?: boolean;
   pointsLabel?: string;
 }) {
+  const { messages: t } = useI18n();
+
   if (entries.length === 0) {
     return (
       <Card>
         <p className="py-6 text-center text-sm text-muted">
-          {ar.leaderboard.empty}
+          {t.leaderboard.empty}
         </p>
       </Card>
     );
@@ -133,19 +141,19 @@ export function LeaderboardTable({
         <table className="w-full">
           <thead>
             <tr className="border-b border-card-border bg-background/60">
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted">
-                {ar.leaderboard.rank}
+              <th className="px-4 py-3 text-end text-xs font-semibold uppercase tracking-wider text-muted">
+                {t.leaderboard.rank}
               </th>
               {showRankTrend && (
                 <th className="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted">
-                  {ar.leaderboard.trend}
+                  {t.leaderboard.trend}
                 </th>
               )}
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted">
-                {ar.leaderboard.username}
+              <th className="px-4 py-3 text-end text-xs font-semibold uppercase tracking-wider text-muted">
+                {t.leaderboard.username}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted">
-                {pointsLabel ?? ar.leaderboard.points}
+              <th className="px-4 py-3 text-start text-xs font-semibold uppercase tracking-wider text-muted">
+                {pointsLabel ?? t.leaderboard.points}
               </th>
             </tr>
           </thead>
@@ -169,7 +177,7 @@ export function LeaderboardTable({
                 )}
                 <td className="px-4 py-3 font-medium">@{entry.username}</td>
                 <td
-                  className={`px-4 py-3 text-left text-lg font-bold tabular-nums ${pointsTone(entry.points)}`}
+                  className={`px-4 py-3 text-start text-lg font-bold tabular-nums ${pointsTone(entry.points)}`}
                 >
                   {entry.points}
                 </td>
