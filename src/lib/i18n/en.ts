@@ -149,6 +149,10 @@ export const en = {
     yourMatchesToday: "Your matches today",
     yourMatchesTodayHint:
       "Today's matches you predicted — stay here after predictions close so you can review your picks",
+    yourFinalPredictions: "Your final predictions",
+    yourFinalPredictionsHint:
+      "Today's matches you locked in — they stay here after the window closes with league picks",
+    viewLeaguePredictionsShort: "League predictions",
     yourPredictionShort: "Your pick",
     viewYourPrediction: "View your prediction",
     pageOther: "Other matches",

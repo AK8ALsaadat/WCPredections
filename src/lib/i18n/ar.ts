@@ -146,6 +146,10 @@ export const ar = {
     yourMatchesToday: "مبارياتك اليوم",
     yourMatchesTodayHint:
       "مباريات اليوم اللي توقعتها — تبقى هنا حتى بعد إغلاق التوقع وتقدر تشوف توقعك",
+    yourFinalPredictions: "توقعاتك النهائية",
+    yourFinalPredictionsHint:
+      "مباريات اليوم اللي سجّلت توقعك فيها — تبقى هنا بعد الإغلاق وتقدر تشوف توقعات الدوري",
+    viewLeaguePredictionsShort: "شف توقعات الدوري",
     yourPredictionShort: "توقعك",
     viewYourPrediction: "عرض توقعك",
     pageOther: "باقي المباريات",

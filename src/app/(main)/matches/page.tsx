@@ -300,6 +300,37 @@ export default function MatchesPage() {
 
       {error && <ErrorMessage message={error} />}
 
+      {showPinnedSection && (
+        <section className="mb-8 space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-2 border-b border-primary/30 pb-3">
+            <div>
+              <h2 className="text-lg font-semibold text-primary">
+                {t.matches.yourFinalPredictions}
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                {t.matches.yourFinalPredictionsHint}
+              </p>
+            </div>
+            <Link
+              href="/predictions"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              {t.predictions.title} →
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {pinnedMatches.map((match) => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                showPredictButton
+                finalPrediction
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {matches.length === 0 && pinnedMatches.length === 0 ? (
         <div className="rounded-xl border border-card-border bg-card p-12 text-center text-muted">
           <p>{t.matches.noMatches}</p>
@@ -317,32 +348,6 @@ export default function MatchesPage() {
           </div>
 
           <div className="space-y-8">
-            {showPinnedSection && (
-              <section className="rounded-2xl border border-primary/25 bg-primary/5 p-4 md:p-5">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-primary/20 pb-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-primary">
-                      {t.matches.yourMatchesToday}
-                    </h3>
-                    <p className="mt-1 text-xs text-muted">
-                      {t.matches.yourMatchesTodayHint}
-                    </p>
-                  </div>
-                  <Link
-                    href="/predictions"
-                    className="text-xs font-medium text-primary hover:underline"
-                  >
-                    {t.predictions.title} →
-                  </Link>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {pinnedMatches.map((match) => (
-                    <MatchCard key={match.id} match={match} showPredictButton />
-                  ))}
-                </div>
-              </section>
-            )}
-
             {sortedDays.map((dayKey) => (
               <section key={dayKey}>
                 <h3 className="mb-4 border-b border-card-border pb-2 text-base font-semibold text-foreground">

@@ -53,6 +53,8 @@ type MatchCardProps = {
     } | null;
   };
   showPredictButton?: boolean;
+  /** بطاقة توقعاتك النهائية — نفس شكل التوقع مع زر توقعات الدوري */
+  finalPrediction?: boolean;
 };
 
 function shortPlayerName(name: string) {
@@ -81,7 +83,11 @@ function ScorerList({ scorers }: { scorers: ScorerPick[] }) {
   );
 }
 
-export function MatchCard({ match, showPredictButton }: MatchCardProps) {
+export function MatchCard({
+  match,
+  showPredictButton,
+  finalPrediction = false,
+}: MatchCardProps) {
   const { messages: t, locale } = useI18n();
   const canPredict = isPredictionAllowed(match.matchTime, match.status);
   const lockReason = getPredictionLockReason(match.matchTime, match.status, t);
@@ -181,6 +187,16 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
                   </p>
                 )}
               </div>
+            ) : isFinished && finalPrediction && showUserPrediction ? (
+              <div className="text-center">
+                <span className="text-2xl font-bold">
+                  {match.homeScore} - {match.awayScore}
+                </span>
+                <p className="mt-1 text-xs font-semibold text-warning">
+                  {t.matches.yourPredictionShort}: {match.userPrediction!.predHome}-
+                  {match.userPrediction!.predAway}
+                </p>
+              </div>
             ) : isFinished ? (
               <span className="text-2xl font-bold">
                 {match.homeScore} - {match.awayScore}
@@ -240,11 +256,42 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
         </div>
       )}
 
-      {showPredictButton && lockReason && !isFinished && !canPredict && (
+      {finalPrediction && !canPredict && hasPrediction && !isFinished && (
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+          <Link
+            href={`/matches/${match.id}/predictions`}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+          >
+            {t.matches.viewLeaguePredictionsShort}
+          </Link>
+          <Link
+            href={`/matches/${match.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-lg border border-card-border px-4 py-2 text-sm font-medium text-muted hover:text-foreground"
+          >
+            {t.matches.viewYourPrediction}
+          </Link>
+        </div>
+      )}
+
+      {finalPrediction && isFinished && hasPrediction && (
+        <div className="mt-4 flex justify-end">
+          <Link
+            href={`/matches/${match.id}/predictions`}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+          >
+            {t.matches.viewLeaguePredictionsShort}
+          </Link>
+        </div>
+      )}
+
+      {showPredictButton && !finalPrediction && lockReason && !isFinished && !canPredict && (
         <p className="mt-2 text-xs text-muted">{lockReason}</p>
       )}
 
-      {!canPredict && hasPrediction && !isFinished && (
+      {!finalPrediction && !canPredict && hasPrediction && !isFinished && (
         <div className="mt-3 text-center">
           <Link
             href={`/matches/${match.id}`}
@@ -255,7 +302,7 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
         </div>
       )}
 
-      {!canPredict && (
+      {!finalPrediction && !canPredict && (
         <div className="mt-4" onClick={(e) => e.stopPropagation()}>
           <ViewLeaguePredictionsButton matchId={match.id} fullWidth />
         </div>
