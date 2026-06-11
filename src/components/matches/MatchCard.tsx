@@ -9,6 +9,7 @@ import { MatchPointsBreakdown } from "@/components/matches/MatchPointsBreakdown"
 import { asFinishType } from "@/lib/finish-type";
 import { MATCH_STATUS_LABELS } from "@/types";
 import { ar } from "@/lib/i18n/ar";
+import { PredictNavLink } from "@/components/matches/PredictNavLink";
 
 type ScorerPick = {
   predictedGoals: number;
@@ -177,9 +178,8 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
 
       {showPredictButton && canPredict && (
         <div className="mt-4 flex justify-end">
-          <Link
-            href={`/predict/${match.id}`}
-            prefetch
+          <PredictNavLink
+            matchId={match.id}
             className={
               hasPrediction
                 ? "rounded-lg border border-warning/50 bg-warning/15 px-4 py-2 text-sm font-medium text-warning hover:bg-warning/25"
@@ -187,7 +187,7 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
             }
           >
             {hasPrediction ? ar.matches.editPrediction : ar.matches.predict}
-          </Link>
+          </PredictNavLink>
         </div>
       )}
 

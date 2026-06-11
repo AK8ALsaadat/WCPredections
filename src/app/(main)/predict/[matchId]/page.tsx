@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -12,8 +13,15 @@ import { PredictPageSkeleton } from "@/components/predict/PredictPageSkeleton";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
-import { PitchLineup } from "@/components/predict/PitchLineup";
 import { clientFetch, isAbortError } from "@/lib/client-fetch";
+import {
+  isPredictLineupCacheFresh,
+  isPredictMatchCacheFresh,
+  readPredictLineupCache,
+  readPredictMatchCache,
+  writePredictLineupCache,
+  writePredictMatchCache,
+} from "@/lib/predict-prefetch";
 import {
   cn,
   formatDate,
@@ -33,6 +41,20 @@ import type {
 } from "@/services/match-players.service";
 
 const LINEUP_REFRESH_MS = 180_000;
+
+const PitchLineup = dynamic(
+  () =>
+    import("@/components/predict/PitchLineup").then((mod) => ({
+      default: mod.PitchLineup,
+    })),
+  {
+    loading: () => (
+      <div className="py-12">
+        <LoadingSpinner />
+      </div>
+    ),
+  }
+);
 
 type MatchData = {
   id: string;
@@ -94,25 +116,6 @@ type LineupData = {
   awayShortName: string;
 };
 
-function extractLineup(data: Record<string, unknown>): LineupData | null {
-  if (!Array.isArray(data.homePlayers) || !Array.isArray(data.awayPlayers)) {
-    return null;
-  }
-  return {
-    homePlayers: data.homePlayers as MatchPlayerView[],
-    awayPlayers: data.awayPlayers as MatchPlayerView[],
-    homeFormation: (data.homeFormation as string | null | undefined) ?? null,
-    awayFormation: (data.awayFormation as string | null | undefined) ?? null,
-    homeLineupSource: data.homeLineupSource as LineupSource | undefined,
-    awayLineupSource: data.awayLineupSource as LineupSource | undefined,
-    lineupStatus: data.lineupStatus as LineupSource | undefined,
-    homeTeamName: String(data.homeTeamName ?? ""),
-    awayTeamName: String(data.awayTeamName ?? ""),
-    homeShortName: String(data.homeShortName ?? ""),
-    awayShortName: String(data.awayShortName ?? ""),
-  };
-}
-
 function applySavedPrediction(m: MatchData, setters: {
   setPredHome: (v: number) => void;
   setPredAway: (v: number) => void;
@@ -148,10 +151,18 @@ export default function PredictPage() {
   const router = useRouter();
   const matchId = params.matchId as string;
 
-  const [match, setMatch] = useState<MatchData | null>(null);
-  const [lineup, setLineup] = useState<LineupData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [lineupLoading, setLineupLoading] = useState(true);
+  const [match, setMatch] = useState<MatchData | null>(() =>
+    readPredictMatchCache<MatchData>(matchId)
+  );
+  const [lineup, setLineup] = useState<LineupData | null>(() =>
+    readPredictLineupCache<LineupData>(matchId)
+  );
+  const [loading, setLoading] = useState(
+    () => !readPredictMatchCache<MatchData>(matchId)
+  );
+  const [lineupLoading, setLineupLoading] = useState(
+    () => !readPredictLineupCache<LineupData>(matchId)
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -186,12 +197,43 @@ export default function PredictPage() {
   const scorerCount = Object.keys(scorerPicks).length;
 
   useEffect(() => {
+    const cachedMatch = readPredictMatchCache<MatchData>(matchId);
+    const cachedLineup = readPredictLineupCache<LineupData>(matchId);
+
+    if (cachedMatch) {
+      setMatch(cachedMatch);
+      setLoading(false);
+      applySavedPrediction(cachedMatch, {
+        setPredHome,
+        setPredAway,
+        setIsDouble,
+        setFinishType,
+        setPenaltyWinner,
+        setScorerPicks,
+        setBoldPlayerId,
+        setBoldEnabled,
+      });
+    }
+
+    if (cachedLineup) {
+      setLineup(cachedLineup);
+      setLineupLoading(false);
+    }
+  }, [matchId]);
+
+  useEffect(() => {
     const abort = new AbortController();
     let cancelled = false;
 
     async function loadLineup(silent = false) {
       if (cancelled) return;
-      if (!silent) setLineupLoading(true);
+      if (!silent && !readPredictLineupCache(matchId)) setLineupLoading(true);
+
+      if (!silent && isPredictLineupCacheFresh(matchId)) {
+        setLineupLoading(false);
+        return;
+      }
+
       try {
         const res = await clientFetch(`/api/matches/${matchId}/lineup`, {
           signal: abort.signal,
@@ -200,24 +242,34 @@ export default function PredictPage() {
         const data = await res.json();
         if (cancelled) return;
         if (data.success) {
-          setLineup(data.data as LineupData);
+          const payload = data.data as LineupData;
+          writePredictLineupCache(matchId, payload);
+          setLineup(payload);
         }
       } catch (err) {
         if (isAbortError(err) || cancelled) return;
       } finally {
-        if (!cancelled && !silent) setLineupLoading(false);
+        if (!cancelled) setLineupLoading(false);
       }
     }
 
-    async function loadPage() {
-      setLoading(true);
-      setLineupLoading(true);
+    async function loadMatch() {
+      if (cancelled) return;
+
+      const cached = readPredictMatchCache<MatchData>(matchId);
+      if (cached && isPredictMatchCacheFresh(matchId)) {
+        setLoading(false);
+        return;
+      }
+
+      if (!cached) setLoading(true);
+
       try {
-        const res = await clientFetch(`/api/matches/${matchId}?lineup=true`, {
+        const res = await clientFetch(`/api/matches/${matchId}?predict=true`, {
           signal: abort.signal,
         });
         if (!res) {
-          if (!cancelled) setError(ar.errors.loadFailed);
+          if (!cancelled && !cached) setError(ar.errors.loadFailed);
           return;
         }
 
@@ -225,13 +277,13 @@ export default function PredictPage() {
         if (cancelled) return;
 
         if (!data.success) {
-          setError(data.error);
+          if (!cached) setError(data.error);
           return;
         }
 
-        const payload = data.data as MatchData & Record<string, unknown>;
+        const payload = data.data as MatchData;
+        writePredictMatchCache(matchId, payload);
         setMatch(payload);
-        setLineup(extractLineup(payload));
         setError("");
 
         applySavedPrediction(payload, {
@@ -245,18 +297,16 @@ export default function PredictPage() {
           setBoldEnabled,
         });
       } catch (err) {
-        if (!isAbortError(err) && !cancelled) {
+        if (!isAbortError(err) && !cancelled && !cached) {
           setError(ar.errors.loadFailed);
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-          setLineupLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
-    void loadPage();
+    void loadMatch();
+    void loadLineup();
 
     const interval = setInterval(() => {
       void loadLineup(true);
@@ -374,7 +424,7 @@ export default function PredictPage() {
     }
   }
 
-  if (loading) {
+  if (loading && !match) {
     return <PredictPageSkeleton />;
   }
 

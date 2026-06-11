@@ -13,7 +13,11 @@ export async function GET(
       return apiError("Match not found", 404);
     }
 
-    return apiSuccess(lineup);
+    return apiSuccess(lineup, 200, {
+      headers: {
+        "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
+      },
+    });
   } catch (error) {
     return handleApiError(error);
   }

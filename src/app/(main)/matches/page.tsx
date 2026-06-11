@@ -6,7 +6,8 @@ import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Select } from "@/components/ui/Select";
 import { Pagination } from "@/components/ui/Pagination";
-import { formatDayHeader, getPredictionTimezone } from "@/lib/utils";
+import { formatDayHeader, getPredictionTimezone, isPredictionAllowed } from "@/lib/utils";
+import { prefetchPredictData } from "@/lib/predict-prefetch";
 import {
   isClientCacheFresh,
   readClientCache,
@@ -146,6 +147,13 @@ export default function MatchesPage() {
     const interval = setInterval(() => loadMatches({ force: true }), REFRESH_MS);
     return () => clearInterval(interval);
   }, [loadMatches]);
+
+  useEffect(() => {
+    matches
+      .filter((m) => isPredictionAllowed(m.matchTime))
+      .slice(0, 6)
+      .forEach((m) => prefetchPredictData(m.id));
+  }, [matches]);
 
   const grouped = matches.reduce<Record<string, Match[]>>((acc, match) => {
     const d = new Date(match.matchTime);

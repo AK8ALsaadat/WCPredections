@@ -9,6 +9,7 @@ import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Button } from "@/components/ui/Button";
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
+import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import { MatchPointsBreakdown } from "@/components/matches/MatchPointsBreakdown";
 import { asFinishType } from "@/lib/finish-type";
 import { formatDate, isPredictionAllowed } from "@/lib/utils";
@@ -161,11 +162,11 @@ export default function MatchDetailPage() {
 
         {canPredict && (
           <div className="flex justify-center border-t border-card-border pt-4">
-            <Link href={`/predict/${m.id}`}>
+            <PredictNavLink matchId={m.id}>
               <Button>
                 {m.userPrediction ? ar.matches.editPrediction : ar.matches.makePrediction}
               </Button>
-            </Link>
+            </PredictNavLink>
           </div>
         )}
       </Card>

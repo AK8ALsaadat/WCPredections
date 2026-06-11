@@ -1,0 +1,90 @@
+import {
+  isClientCacheFresh,
+  readClientCache,
+  writeClientCache,
+} from "@/lib/client-page-cache";
+
+const MATCH_FRESH_MS = 120_000;
+const LINEUP_FRESH_MS = 300_000;
+
+const inflight = new Map<string, Promise<void>>();
+
+export function predictMatchCacheKey(matchId: string) {
+  return `predict:match:${matchId}`;
+}
+
+export function predictLineupCacheKey(matchId: string) {
+  return `predict:lineup:${matchId}`;
+}
+
+async function fetchPredictMatch(matchId: string) {
+  const res = await fetch(`/api/matches/${matchId}?predict=true`, {
+    credentials: "same-origin",
+  });
+  if (!res.ok) return;
+  const data = await res.json();
+  if (data.success) {
+    writeClientCache(predictMatchCacheKey(matchId), data.data);
+  }
+}
+
+async function fetchPredictLineup(matchId: string) {
+  const res = await fetch(`/api/matches/${matchId}/lineup`, {
+    credentials: "same-origin",
+  });
+  if (!res.ok) return;
+  const data = await res.json();
+  if (data.success) {
+    writeClientCache(predictLineupCacheKey(matchId), data.data);
+  }
+}
+
+/** يحمّل بيانات التوقع مسبقاً عند المرور على رابط التوقع */
+export function prefetchPredictData(matchId: string) {
+  const matchFresh = isClientCacheFresh(
+    predictMatchCacheKey(matchId),
+    MATCH_FRESH_MS
+  );
+  const lineupFresh = isClientCacheFresh(
+    predictLineupCacheKey(matchId),
+    LINEUP_FRESH_MS
+  );
+  if (matchFresh && lineupFresh) return Promise.resolve();
+
+  const existing = inflight.get(matchId);
+  if (existing) return existing;
+
+  const task = Promise.all([
+    matchFresh ? Promise.resolve() : fetchPredictMatch(matchId),
+    lineupFresh ? Promise.resolve() : fetchPredictLineup(matchId),
+  ])
+    .then(() => undefined)
+    .finally(() => inflight.delete(matchId));
+
+  inflight.set(matchId, task);
+  return task;
+}
+
+export function readPredictMatchCache<T>(matchId: string): T | null {
+  return readClientCache<T>(predictMatchCacheKey(matchId));
+}
+
+export function readPredictLineupCache<T>(matchId: string): T | null {
+  return readClientCache<T>(predictLineupCacheKey(matchId));
+}
+
+export function writePredictMatchCache<T>(matchId: string, data: T) {
+  writeClientCache(predictMatchCacheKey(matchId), data);
+}
+
+export function writePredictLineupCache<T>(matchId: string, data: T) {
+  writeClientCache(predictLineupCacheKey(matchId), data);
+}
+
+export function isPredictMatchCacheFresh(matchId: string) {
+  return isClientCacheFresh(predictMatchCacheKey(matchId), MATCH_FRESH_MS);
+}
+
+export function isPredictLineupCacheFresh(matchId: string) {
+  return isClientCacheFresh(predictLineupCacheKey(matchId), LINEUP_FRESH_MS);
+}

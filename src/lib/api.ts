@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import type { ApiResponse } from "@/types";
 
-export function apiSuccess<T>(data: T, status = 200) {
+export function apiSuccess<T>(data: T, status = 200, init?: ResponseInit) {
   const body: ApiResponse<T> = { success: true, data };
-  return NextResponse.json(body, { status });
+  return NextResponse.json(body, { status, ...init });
 }
 
 export function apiError(message: string, status = 400) {

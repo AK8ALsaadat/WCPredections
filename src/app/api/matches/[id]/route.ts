@@ -1,6 +1,9 @@
 import { apiSuccess, apiError, handleApiError } from "@/lib/api";
 import { getCurrentUser } from "@/lib/session";
-import { getMatchById } from "@/services/match.service";
+import {
+  getMatchById,
+  getMatchByIdForPredict,
+} from "@/services/match.service";
 
 export async function GET(
   request: Request,
@@ -8,13 +11,25 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const includeLineup =
-      new URL(request.url).searchParams.get("lineup") === "true";
+    const { searchParams } = new URL(request.url);
+    const forPredict = searchParams.get("predict") === "true";
+    const includeLineup = searchParams.get("lineup") === "true";
     const user = await getCurrentUser();
-    const match = await getMatchById(id, user?.userId, { includeLineup });
+
+    const match = forPredict
+      ? await getMatchByIdForPredict(id, user?.userId)
+      : await getMatchById(id, user?.userId, { includeLineup });
 
     if (!match) {
       return apiError("Match not found", 404);
+    }
+
+    if (forPredict) {
+      return apiSuccess(match, 200, {
+        headers: {
+          "Cache-Control": "private, no-cache",
+        },
+      });
     }
 
     return apiSuccess(match);

@@ -143,6 +143,30 @@ const matchLineupCache = new Map<
   { data: Awaited<ReturnType<typeof buildMatchLineup>>; expiresAt: number }
 >();
 const MATCH_LINEUP_CACHE_MS = 5 * 60 * 1000;
+const MATCH_SHELL_REVALIDATE_SECONDS = 60;
+const MATCH_LINEUP_REVALIDATE_SECONDS = 300;
+
+async function fetchMatchShell(matchId: string) {
+  return prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      id: true,
+      matchTime: true,
+      isKnockout: true,
+      roundId: true,
+      homeTeam: { select: teamSelect },
+      awayTeam: { select: teamSelect },
+    },
+  });
+}
+
+function getCachedMatchShell(matchId: string) {
+  return unstable_cache(
+    () => fetchMatchShell(matchId),
+    ["match-shell", matchId],
+    { revalidate: MATCH_SHELL_REVALIDATE_SECONDS, tags: [`match-${matchId}`] }
+  )();
+}
 
 async function buildMatchLineup(matchId: string) {
   const match = await prisma.match.findUnique({
@@ -180,13 +204,24 @@ async function buildMatchLineup(matchId: string) {
   };
 }
 
+function getCachedMatchLineup(matchId: string) {
+  return unstable_cache(
+    () => buildMatchLineup(matchId),
+    ["match-lineup", matchId],
+    {
+      revalidate: MATCH_LINEUP_REVALIDATE_SECONDS,
+      tags: [`lineup-${matchId}`],
+    }
+  )();
+}
+
 export async function getMatchLineup(matchId: string) {
   const hit = matchLineupCache.get(matchId);
   if (hit && hit.expiresAt > Date.now()) {
     return hit.data;
   }
 
-  const data = await buildMatchLineup(matchId);
+  const data = await getCachedMatchLineup(matchId);
   if (data) {
     const ttl =
       data.lineupStatus === "official" ? 3 * 60 * 1000 : MATCH_LINEUP_CACHE_MS;
@@ -197,6 +232,64 @@ export async function getMatchLineup(matchId: string) {
   }
 
   return data;
+}
+
+/** بيانات خفيفة لصفحة التوقع — بدون أهداف المباراة أو التشكيلة */
+export async function getMatchByIdForPredict(matchId: string, userId?: string) {
+  const match = await getCachedMatchShell(matchId);
+  if (!match) return null;
+
+  let userPrediction = null;
+  let userScorerPredictions: { playerId: string; predictedGoals: number }[] = [];
+  let userBoldScorerBet = null;
+  let boldScorerRoundStatus = null;
+  let roundUsageLimits = null;
+
+  if (userId) {
+    const [prediction, scorers, boldStatus, limits] = await Promise.all([
+      prisma.prediction.findUnique({
+        where: { userId_matchId: { userId, matchId } },
+        select: {
+          predHome: true,
+          predAway: true,
+          isDouble: true,
+          predictedFinishType: true,
+          predictedPenaltyWinnerTeamId: true,
+        },
+      }),
+      prisma.scorerPrediction.findMany({
+        where: { userId, matchId },
+        select: { playerId: true, predictedGoals: true },
+      }),
+      getBoldScorerBetStatus(userId, matchId, match.roundId),
+      getRoundUsageLimits(userId, matchId, match.roundId),
+    ]);
+    userPrediction = prediction;
+    userScorerPredictions = scorers;
+    roundUsageLimits = limits;
+    boldScorerRoundStatus = {
+      used: boldStatus.used,
+      onThisMatch: boldStatus.onThisMatch,
+      onOtherMatch: boldStatus.onOtherMatch,
+      otherMatchId: boldStatus.otherMatchId,
+    };
+    if (boldStatus.onThisMatch && boldStatus.bet) {
+      userBoldScorerBet = {
+        playerId: boldStatus.bet.playerId,
+        points: boldStatus.bet.points,
+        player: { name: boldStatus.bet.playerName },
+      };
+    }
+  }
+
+  return {
+    ...match,
+    userPrediction,
+    userScorerPredictions,
+    userBoldScorerBet,
+    boldScorerRoundStatus,
+    roundUsageLimits,
+  };
 }
 
 export async function getMatchById(
