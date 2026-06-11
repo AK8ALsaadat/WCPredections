@@ -85,8 +85,17 @@ function isWithinPredictionCalendarWindow(matchTime: Date): boolean {
   return matchDay === today || matchDay === tomorrow;
 }
 
+function isMatchStatusLocked(status?: string | null): boolean {
+  return status === "LIVE" || status === "FINISHED" || status === "CANCELLED";
+}
+
 /** التوقع مسموح لمباريات اليوم وبكره فقط — خلال 48 ساعة وقبل بداية المباراة */
-export function isPredictionAllowed(matchTime: Date | string): boolean {
+export function isPredictionAllowed(
+  matchTime: Date | string,
+  status?: string | null
+): boolean {
+  if (isMatchStatusLocked(status)) return false;
+
   const match = new Date(matchTime);
   if (isMatchStarted(matchTime)) return false;
 
@@ -96,7 +105,19 @@ export function isPredictionAllowed(matchTime: Date | string): boolean {
   return isWithinPredictionCalendarWindow(match);
 }
 
-export function getPredictionLockReason(matchTime: Date | string): string | null {
+export function getPredictionLockReason(
+  matchTime: Date | string,
+  status?: string | null
+): string | null {
+  if (status === "LIVE") {
+    return "المباراة جارية — الخصائص مقفلة";
+  }
+  if (status === "FINISHED") {
+    return "المباراة انتهت — التوقع مغلق";
+  }
+  if (status === "CANCELLED") {
+    return "المباراة ملغاة — التوقع مغلق";
+  }
   if (isMatchStarted(matchTime)) {
     return "المباراة بدأت — التوقع مغلق";
   }

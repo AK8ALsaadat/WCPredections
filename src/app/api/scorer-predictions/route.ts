@@ -35,9 +35,9 @@ export async function DELETE(request: Request) {
 
     const match = await prisma.match.findUniqueOrThrow({
       where: { id: matchId },
-      select: { matchTime: true },
+      select: { matchTime: true, status: true },
     });
-    const lockReason = getPredictionLockReason(match.matchTime);
+    const lockReason = getPredictionLockReason(match.matchTime, match.status);
     if (lockReason) {
       throw new Error(lockReason);
     }

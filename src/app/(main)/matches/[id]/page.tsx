@@ -111,7 +111,7 @@ export default function MatchDetailPage() {
     } | null;
   };
 
-  const canPredict = isPredictionAllowed(m.matchTime);
+  const canPredict = isPredictionAllowed(m.matchTime, m.status);
   const isFinished = m.status === "FINISHED";
   const penaltyWinnerName =
     m.penaltyWinnerTeamId === m.homeTeam.id

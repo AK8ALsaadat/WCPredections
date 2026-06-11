@@ -236,7 +236,13 @@ export async function getMatchLineup(matchId: string) {
 
 /** بيانات خفيفة لصفحة التوقع — بدون أهداف المباراة أو التشكيلة */
 export async function getMatchByIdForPredict(matchId: string, userId?: string) {
-  const match = await getCachedMatchShell(matchId);
+  const [match, liveMeta] = await Promise.all([
+    getCachedMatchShell(matchId),
+    prisma.match.findUnique({
+      where: { id: matchId },
+      select: { status: true },
+    }),
+  ]);
   if (!match) return null;
 
   let userPrediction = null;
@@ -284,6 +290,7 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
 
   return {
     ...match,
+    status: liveMeta?.status ?? "SCHEDULED",
     userPrediction,
     userScorerPredictions,
     userBoldScorerBet,

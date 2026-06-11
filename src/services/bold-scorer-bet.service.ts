@@ -80,10 +80,11 @@ export async function submitBoldScorerBet(
       homeTeamId: true,
       awayTeamId: true,
       matchTime: true,
+      status: true,
     },
   });
 
-  const lockReason = getPredictionLockReason(match.matchTime);
+  const lockReason = getPredictionLockReason(match.matchTime, match.status);
   if (lockReason) {
     throw new Error(lockReason);
   }
@@ -94,9 +95,13 @@ export async function submitBoldScorerBet(
 
   if (!playerId) {
     if (existing?.matchId === matchId) {
-      await prisma.boldScorerBet.delete({ where: { id: existing.id } });
+      throw new Error("ما تقدر تلغي البطاقة الجريئة بعد تفعيلها");
     }
     return null;
+  }
+
+  if (existing?.matchId === matchId && existing.playerId !== playerId) {
+    throw new Error("ما تقدر تغيّر لاعب البطاقة الجريئة بعد تفعيلها");
   }
 
   const player = await prisma.player.findFirst({

@@ -205,6 +205,8 @@ export const ar = {
       n === 1 ? "متبقي مضاعفة واحدة" : `متبقي ${n} مضاعفات`,
     doubleExhausted: "استخدمت مضاعفتين هالجولة — مرة واحدة بس لكل مباراة",
     doubleOnThisMatch: "مفعّلة على هالمباراة",
+    doubleLocked: "المضاعفة مفعّلة — ما تقدر تلغيها بعد الحفظ",
+    boldLocked: "البطاقة الجريئة مستخدمة — ما تقدر تلغيها أو تغيّر اللاعب",
     boldCounter: (used: number, max: number) =>
       `البطاقة الجريئة: ${used}/${max}`,
     boldAvailable: "متاحة — اختر لاعب واحد",

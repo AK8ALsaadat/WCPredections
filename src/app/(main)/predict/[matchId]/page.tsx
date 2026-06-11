@@ -59,6 +59,7 @@ const PitchLineup = dynamic(
 type MatchData = {
   id: string;
   matchTime: string;
+  status?: string;
   isKnockout: boolean;
   homeTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
   awayTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
@@ -388,6 +389,10 @@ export default function PredictPage() {
   }
 
   function handleDoubleToggle(checked: boolean) {
+    if (match?.userPrediction?.isDouble && !checked) {
+      setError(ar.predict.doubleLocked);
+      return;
+    }
     const limits = match?.roundUsageLimits?.doubles;
     if (checked && limits && !limits.canEnable && !limits.onThisMatch) {
       setError(ar.predict.doubleExhausted);
@@ -398,6 +403,10 @@ export default function PredictPage() {
   }
 
   function handleBoldToggle(checked: boolean) {
+    if (match?.userBoldScorerBet?.playerId && !checked) {
+      setError(ar.predict.boldLocked);
+      return;
+    }
     const limits = match?.roundUsageLimits?.boldScorer;
     if (checked && limits && !limits.canUse && !limits.onThisMatch) {
       setError(ar.predict.boldExhausted);
@@ -481,8 +490,8 @@ export default function PredictPage() {
   if (error && !match) return <ErrorMessage message={error} />;
   if (!match) return <ErrorMessage message={ar.errors.loadFailed} />;
 
-  const lockReason = getPredictionLockReason(match.matchTime);
-  if (!isPredictionAllowed(match.matchTime)) {
+  const lockReason = getPredictionLockReason(match.matchTime, match.status);
+  if (!isPredictionAllowed(match.matchTime, match.status)) {
     return (
       <div className="mx-auto max-w-lg space-y-4">
         <ErrorMessage message={`${ar.matches.locked} — ${lockReason}`} />
@@ -500,16 +509,20 @@ export default function PredictPage() {
 
   const doubleLimits = match.roundUsageLimits?.doubles;
   const boldLimits = match.roundUsageLimits?.boldScorer;
+  const doubleCommitted = match.userPrediction?.isDouble === true;
+  const boldCommitted = !!match.userBoldScorerBet?.playerId;
   const boldLockedOnOther =
     boldLimits?.onOtherMatch ??
     match.boldScorerRoundStatus?.onOtherMatch ??
     false;
   const boldCheckboxDisabled =
-    boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch;
+    boldCommitted ||
+    (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch);
   const doubleCheckboxDisabled =
-    doubleLimits != null &&
-    !doubleLimits.canEnable &&
-    !doubleLimits.onThisMatch;
+    doubleCommitted ||
+    (doubleLimits != null &&
+      !doubleLimits.canEnable &&
+      !doubleLimits.onThisMatch);
   const allLineupPlayers = [
     ...(lineup?.homePlayers ?? []).map((p) => ({
       ...p,
@@ -645,7 +658,7 @@ export default function PredictPage() {
                 doubleCheckboxDisabled
                   ? "cursor-not-allowed border-card-border/60 opacity-60"
                   : "cursor-pointer border-card-border hover:border-warning/50"
-              }`}
+              } ${doubleCommitted ? "border-warning/40 bg-warning/10" : ""}`}
             >
               <input
                 type="checkbox"
@@ -658,7 +671,11 @@ export default function PredictPage() {
                 <p className="font-medium text-warning">
                   {ar.predict.doublePoints}
                 </p>
-                <p className="text-sm text-muted">{ar.predict.doubleHint}</p>
+                <p className="text-sm text-muted">
+                  {doubleCommitted
+                    ? ar.predict.doubleLocked
+                    : ar.predict.doubleHint}
+                </p>
               </div>
             </label>
           </div>
@@ -768,7 +785,9 @@ export default function PredictPage() {
                     {ar.predict.boldScorerBet.enable}
                   </p>
                   <p className="text-sm text-muted">
-                    {ar.predict.boldScorerBet.hint}
+                    {boldCommitted
+                      ? ar.predict.boldLocked
+                      : ar.predict.boldScorerBet.hint}
                   </p>
                 </div>
               </label>
@@ -781,8 +800,9 @@ export default function PredictPage() {
                     onChange={(e) => setBoldPlayerId(e.target.value)}
                     options={boldSelectOptions}
                     groups={boldPlayerGroups}
+                    disabled={boldCommitted}
                   />
-                  {boldPlayerId && (
+                  {boldPlayerId && !boldCommitted && (
                     <button
                       type="button"
                       onClick={() => setBoldPlayerId("")}

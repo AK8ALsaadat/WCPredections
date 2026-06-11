@@ -71,17 +71,22 @@ export async function submitPrediction(
     include: { homeTeam: true, awayTeam: true },
   });
 
-  const lockReason = getPredictionLockReason(match.matchTime);
+  const lockReason = getPredictionLockReason(match.matchTime, match.status);
   if (lockReason) {
     throw new Error(lockReason);
   }
 
   const existing = await prisma.prediction.findUnique({
     where: { userId_matchId: { userId, matchId: data.matchId } },
-    select: { id: true },
+    select: { id: true, isDouble: true },
   });
 
   const isDouble = data.isDouble ?? false;
+
+  if (existing?.isDouble && !isDouble) {
+    throw new Error("ما تقدر تلغي المضاعفة بعد تفعيلها");
+  }
+
   await validateDoubleUsage(
     userId,
     data.matchId,
@@ -202,7 +207,7 @@ export async function submitScorerPredictions(
     },
   });
 
-  const lockReason = getPredictionLockReason(match.matchTime);
+  const lockReason = getPredictionLockReason(match.matchTime, match.status);
   if (lockReason) {
     throw new Error(lockReason);
   }
@@ -262,17 +267,21 @@ export async function submitMatchPredictionBundle(
     },
   });
 
-  const lockReason = getPredictionLockReason(match.matchTime);
+  const lockReason = getPredictionLockReason(match.matchTime, match.status);
   if (lockReason) {
     throw new Error(lockReason);
   }
 
   const existing = await prisma.prediction.findUnique({
     where: { userId_matchId: { userId, matchId: data.matchId } },
-    select: { id: true },
+    select: { id: true, isDouble: true },
   });
 
   const isDouble = data.isDouble ?? false;
+
+  if (existing?.isDouble && !isDouble) {
+    throw new Error("ما تقدر تلغي المضاعفة بعد تفعيلها");
+  }
   await validateDoubleUsage(
     userId,
     data.matchId,
@@ -390,11 +399,18 @@ export async function submitMatchPredictionBundle(
       where: { userId_roundId: { userId, roundId: match.roundId } },
     });
 
+    if (existingBold?.matchId === data.matchId) {
+      if (!data.boldPlayerId) {
+        throw new Error("ما تقدر تلغي البطاقة الجريئة بعد تفعيلها");
+      }
+      if (data.boldPlayerId !== existingBold.playerId) {
+        throw new Error("ما تقدر تغيّر لاعب البطاقة الجريئة بعد تفعيلها");
+      }
+    }
+
     let boldBet = null;
     if (!data.boldPlayerId) {
-      if (existingBold?.matchId === data.matchId) {
-        await tx.boldScorerBet.delete({ where: { id: existingBold.id } });
-      }
+      // لا حذف — تم التحقق أعلاه
     } else {
       boldBet = await tx.boldScorerBet.upsert({
         where: {

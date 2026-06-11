@@ -82,8 +82,8 @@ function ScorerList({ scorers }: { scorers: ScorerPick[] }) {
 }
 
 export function MatchCard({ match, showPredictButton }: MatchCardProps) {
-  const canPredict = isPredictionAllowed(match.matchTime);
-  const lockReason = getPredictionLockReason(match.matchTime);
+  const canPredict = isPredictionAllowed(match.matchTime, match.status);
+  const lockReason = getPredictionLockReason(match.matchTime, match.status);
   const isFinished = match.status === "FINISHED";
   const isLive = match.status === "LIVE";
   const hasPrediction = !!match.userPrediction;
