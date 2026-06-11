@@ -29,6 +29,29 @@ async function main() {
   });
 
   console.log(`Done. Removed ${deleted.count} user(s).`);
+
+  if (deleted.count > 0) {
+    await revalidateLeaderboardCache();
+  }
+}
+
+async function revalidateLeaderboardCache() {
+  const base = process.env.BASE_URL ?? "https://wc-predections.vercel.app";
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    console.log("Skip leaderboard cache purge (CRON_SECRET not set).");
+    return;
+  }
+
+  const res = await fetch(`${base}/api/cron/revalidate-leaderboard`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${secret}` },
+  });
+  if (res.ok) {
+    console.log("Leaderboard cache purged.");
+  } else {
+    console.warn("Leaderboard cache purge failed:", res.status);
+  }
 }
 
 main()

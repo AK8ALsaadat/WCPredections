@@ -14,6 +14,7 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "qa:smoke": "node scripts/qa-smoke.mjs",
     "qa:cleanup": "npx tsx scripts/cleanup-qa-users.ts",
+    "qa:verify": "node scripts/qa-smoke.mjs && npm run qa:cleanup",
     "postinstall": "prisma generate"
   },
   "dependencies": {
