@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     const user = await getCurrentUser();
 
     if (schedule) {
-      await syncStalePredictedMatches(roundId);
+      await syncStalePredictedMatches(roundId, { maxMatches: 2 });
     }
 
     const raw = schedule

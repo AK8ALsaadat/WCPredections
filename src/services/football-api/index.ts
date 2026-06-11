@@ -583,7 +583,10 @@ export async function ensureMatchSyncedFromApi(matchId: string) {
   }
 }
 
-export async function syncStalePredictedMatches(roundId?: string) {
+export async function syncStalePredictedMatches(
+  roundId?: string,
+  options?: { maxMatches?: number }
+) {
   const provider = getFootballApiProvider();
   if (provider.name !== "sportscore") return { synced: 0 };
 
@@ -611,7 +614,7 @@ export async function syncStalePredictedMatches(roundId?: string) {
       homeTeam: { select: { name: true } },
       awayTeam: { select: { name: true } },
     },
-    take: 12,
+    take: options?.maxMatches ?? 12,
   });
 
   let synced = 0;
