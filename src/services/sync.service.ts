@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { syncMatchesFromApi } from "@/services/football-api";
+import { resolveFootballApiProviderName } from "@/services/football-api/types";
 import { recalculateMatchScoring } from "@/services/prediction.service";
 import { addDays, format } from "date-fns";
 
@@ -31,13 +32,14 @@ export function isSyncQuietHours(): boolean {
 
 /** كأس العالم — SportScore: fifa-world-cup | API-Football: league=1 | Football-Data: WC */
 function getWorldCupSyncOptions() {
-  const provider = process.env.FOOTBALL_API_PROVIDER ?? "api-football";
+  const provider = resolveFootballApiProviderName();
 
   if (provider === "sportscore") {
     return {
       leagueId:
-        process.env.SPORTSCORE_COMPETITION_SLUG ?? "fifa-world-cup",
-      season: process.env.FOOTBALL_SEASON ?? "2026",
+        (process.env.SPORTSCORE_COMPETITION_SLUG ?? "fifa-world-cup").trim(),
+      season: (process.env.FOOTBALL_SEASON ?? "2026").trim(),
+      quickSync: true,
     };
   }
 

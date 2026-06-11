@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { apiSuccess, apiError } from "@/lib/api";
+import { resolveFootballApiProviderName } from "@/services/football-api/types";
 
 export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`;
     return apiSuccess({
       database: "connected",
-      footballApi: process.env.FOOTBALL_API_PROVIDER ?? "api-football",
+      footballApi: resolveFootballApiProviderName(),
       autoSync: process.env.ENABLE_AUTO_SYNC !== "false",
     });
   } catch (error) {

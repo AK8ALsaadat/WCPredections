@@ -11,6 +11,14 @@ export async function syncMatchScorersFromApi(
   const provider = getFootballApiProvider();
   const apiScorers = await provider.fetchMatchScorers(fixtureApiId, options);
 
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      homeTeam: { select: { id: true, apiTeamId: true } },
+      awayTeam: { select: { id: true, apiTeamId: true } },
+    },
+  });
+
   const resolved: { playerId: string; goals: number }[] = [];
 
   for (const { playerApiId, goals, playerName, teamApiId } of apiScorers) {
@@ -22,28 +30,49 @@ export async function syncMatchScorersFromApi(
     });
 
     if (!player && playerName && teamApiId) {
-      const team = await prisma.team.findFirst({
-        where: { apiTeamId: teamApiId },
-        select: { id: true },
-      });
+      let teamId: string | null = null;
 
-      if (team) {
-        const created = await prisma.player.upsert({
-          where: {
-            teamId_apiPlayerId: {
-              teamId: team.id,
-              apiPlayerId: playerApiId,
-            },
-          },
-          create: {
-            teamId: team.id,
-            name: playerName,
-            apiPlayerId: playerApiId,
-          },
-          update: { name: playerName },
+      if (match?.homeTeam.apiTeamId === teamApiId) {
+        teamId = match.homeTeam.id;
+      } else if (match?.awayTeam.apiTeamId === teamApiId) {
+        teamId = match.awayTeam.id;
+      } else {
+        const team = await prisma.team.findFirst({
+          where: { apiTeamId: teamApiId },
           select: { id: true },
         });
-        player = created;
+        teamId = team?.id ?? null;
+      }
+
+      if (teamId) {
+        const byName = await prisma.player.findFirst({
+          where: {
+            teamId,
+            name: { equals: playerName, mode: "insensitive" },
+          },
+          select: { id: true },
+        });
+
+        if (byName) {
+          player = byName;
+        } else {
+          const created = await prisma.player.upsert({
+            where: {
+              teamId_apiPlayerId: {
+                teamId,
+                apiPlayerId: playerApiId,
+              },
+            },
+            create: {
+              teamId,
+              name: playerName,
+              apiPlayerId: playerApiId,
+            },
+            update: { name: playerName },
+            select: { id: true },
+          });
+          player = created;
+        }
       }
     }
 

@@ -7,9 +7,10 @@ import { ApiFootballProvider } from "./api-football.provider";
 import { FootballDataProvider } from "./football-data.provider";
 import { SportScoreProvider } from "./sportscore.provider";
 import type { ExternalMatch, FootballApiProvider, SyncOptions } from "./types";
+import { resolveFootballApiProviderName } from "./types";
 
 export function getFootballApiProvider(): FootballApiProvider {
-  const provider = process.env.FOOTBALL_API_PROVIDER ?? "api-football";
+  const provider = resolveFootballApiProviderName();
 
   switch (provider) {
     case "football-data":
@@ -98,6 +99,21 @@ async function resolveTeamId(
   });
   if (team) return team.id;
 
+  if (fallback?.name) {
+    const byName = await prisma.team.findFirst({
+      where: {
+        name: { equals: fallback.name, mode: "insensitive" },
+      },
+    });
+    if (byName) {
+      await prisma.team.update({
+        where: { id: byName.id },
+        data: { apiTeamId },
+      });
+      return byName.id;
+    }
+  }
+
   if (!fallback?.name) return null;
 
   const created = await prisma.team.upsert({
@@ -144,42 +160,41 @@ async function syncMatch(
     );
   }
 
-  const existing = await prisma.match.findUnique({
+  let existing = await prisma.match.findUnique({
     where: { apiMatchId: mapped.apiId },
   });
+
+  if (!existing) {
+    existing = await prisma.match.findFirst({
+      where: { roundId, homeTeamId, awayTeamId },
+    });
+  }
 
   const wasFinished = existing?.status === "FINISHED";
   const isNowFinished = mapped.status === "FINISHED";
 
-  const match = await prisma.match.upsert({
-    where: { apiMatchId: mapped.apiId },
-    create: {
-      apiMatchId: mapped.apiId,
-      roundId,
-      homeTeamId,
-      awayTeamId,
-      matchTime: mapped.matchTime,
-      groupCode: mapped.groupCode,
-      stageName: mapped.stageName,
-      status: mapped.status,
-      isKnockout: mapped.isKnockout,
-      homeScore: mapped.homeScore,
-      awayScore: mapped.awayScore,
-      actualFinishType: mapped.finishType,
-      penaltyWinnerTeamId,
-    },
-    update: {
-      matchTime: mapped.matchTime,
-      groupCode: mapped.groupCode,
-      stageName: mapped.stageName,
-      status: mapped.status,
-      isKnockout: mapped.isKnockout,
-      homeScore: mapped.homeScore,
-      awayScore: mapped.awayScore,
-      actualFinishType: mapped.finishType,
-      penaltyWinnerTeamId,
-    },
-  });
+  const matchData = {
+    apiMatchId: mapped.apiId,
+    roundId,
+    homeTeamId,
+    awayTeamId,
+    matchTime: mapped.matchTime,
+    groupCode: mapped.groupCode,
+    stageName: mapped.stageName,
+    status: mapped.status,
+    isKnockout: mapped.isKnockout,
+    homeScore: mapped.homeScore,
+    awayScore: mapped.awayScore,
+    actualFinishType: mapped.finishType,
+    penaltyWinnerTeamId,
+  };
+
+  const match = existing
+    ? await prisma.match.update({
+        where: { id: existing.id },
+        data: matchData,
+      })
+    : await prisma.match.create({ data: matchData });
 
   const scoresChanged =
     existing &&
@@ -234,10 +249,9 @@ export async function syncMatchesFromApi(
   if (!round) throw new Error("Round not found");
 
   const teams = await syncTeams(provider, options);
-  const playersCount =
-    process.env.SYNC_PLAYERS === "false"
-      ? 0
-      : await syncPlayers(provider, options);
+  const skipPlayers =
+    process.env.SYNC_PLAYERS === "false" || provider.name === "sportscore";
+  const playersCount = skipPlayers ? 0 : await syncPlayers(provider, options);
   const externalMatches = await provider.fetchMatches(options);
 
   let created = 0;

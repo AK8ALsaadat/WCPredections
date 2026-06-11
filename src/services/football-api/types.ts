@@ -36,7 +36,13 @@ export type SyncOptions = {
   season?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** SportScore: جلب المباريات الحية/الأخيرة فقط (أسرع للـ cron) */
+  quickSync?: boolean;
 };
+
+export function resolveFootballApiProviderName(): string {
+  return (process.env.FOOTBALL_API_PROVIDER ?? "api-football").trim();
+}
 
 export type ExternalMatchScorer = {
   playerApiId: string;

@@ -1,5 +1,7 @@
+import { resolveFootballApiProviderName } from "@/services/football-api/types";
+
 export function SportScoreAttribution() {
-  if (process.env.FOOTBALL_API_PROVIDER !== "sportscore") return null;
+  if (resolveFootballApiProviderName() !== "sportscore") return null;
 
   return (
     <footer className="border-t border-white/10 py-3 text-center text-xs text-muted-foreground">

@@ -244,65 +244,110 @@ export class SportScoreProvider implements FootballApiProvider {
     return Array.from(unique.values());
   }
 
-  async fetchMatches(_options: SyncOptions): Promise<ExternalMatch[]> {
+  private mapMatchSummary(
+    item: SportScoreMatchSummary,
+    teamSlugByName: Map<string, string>,
+    groupByTeamName: Map<string, string>
+  ): ExternalMatch {
+    const slug = matchSlugFromUrl(item.url);
+    const homeSlug = teamSlugByName.get(item.home) ?? slugify(item.home);
+    const awaySlug = teamSlugByName.get(item.away) ?? slugify(item.away);
+    const homeGroup = groupByTeamName.get(item.home);
+    const awayGroup = groupByTeamName.get(item.away);
+    const sameGroup = !!homeGroup && !!awayGroup && homeGroup === awayGroup;
+    const isKnockout =
+      isPlaceholderTeam(item.home) ||
+      isPlaceholderTeam(item.away) ||
+      (!!homeGroup && !!awayGroup && homeGroup !== awayGroup);
+
+    return {
+      apiId: slug,
+      homeTeamApiId: homeSlug,
+      awayTeamApiId: awaySlug,
+      homeTeamName: item.home,
+      awayTeamName: item.away,
+      homeTeamShortName: item.home.slice(0, 3),
+      awayTeamShortName: item.away.slice(0, 3),
+      matchTime: new Date(item.time),
+      groupCode: sameGroup ? homeGroup : null,
+      stageName: isKnockout ? "Knockout Stage" : "Group Stage",
+      status: mapStatus(item.status),
+      isKnockout,
+      homeScore: item.home_score,
+      awayScore: item.away_score,
+      finishType:
+        mapStatus(item.status) === "FINISHED" ? "NINETY_MINUTES" : null,
+    };
+  }
+
+  private async fetchMatchesQuick(): Promise<ExternalMatch[]> {
+    const [widget, tables] = await Promise.all([
+      this.fetch<{ matches: SportScoreMatchSummary[] }>(
+        "/api/widget/matches/",
+        { sport: "football", limit: "50" }
+      ),
+      this.fetchStandingsTables(),
+    ]);
+
+    const { teamSlugByName, groupByTeamName } = this.buildTeamMaps(tables);
+
+    return (widget.matches ?? [])
+      .filter((item) => item.competition === "FIFA World Cup")
+      .map((item) =>
+        this.mapMatchSummary(item, teamSlugByName, groupByTeamName)
+      )
+      .sort((a, b) => a.matchTime.getTime() - b.matchTime.getTime());
+  }
+
+  private async fetchMatchesFull(): Promise<ExternalMatch[]> {
     const tables = await this.fetchStandingsTables();
     const { teamSlugByName, groupByTeamName } = this.buildTeamMaps(tables);
     const teamSlugs = Array.from(new Set(teamSlugByName.values()));
     const matches = new Map<string, ExternalMatch>();
+    const batchSize = 10;
 
-    for (const teamSlug of teamSlugs) {
-      const schedule = await this.fetch<{
-        matches: SportScoreMatchSummary[];
-      }>("/api/widget/team/", {
-        sport: "football",
-        slug: teamSlug,
-        limit: "30",
-      });
+    for (let i = 0; i < teamSlugs.length; i += batchSize) {
+      const batch = teamSlugs.slice(i, i + batchSize);
+      const schedules = await Promise.all(
+        batch.map((teamSlug) =>
+          this.fetch<{ matches: SportScoreMatchSummary[] }>(
+            "/api/widget/team/",
+            {
+              sport: "football",
+              slug: teamSlug,
+              limit: "30",
+            }
+          )
+        )
+      );
 
-      for (const item of schedule.matches ?? []) {
-        if (item.competition !== "FIFA World Cup") continue;
+      for (const schedule of schedules) {
+        for (const item of schedule.matches ?? []) {
+          if (item.competition !== "FIFA World Cup") continue;
 
-        const slug = matchSlugFromUrl(item.url);
-        if (matches.has(slug)) continue;
+          const slug = matchSlugFromUrl(item.url);
+          if (matches.has(slug)) continue;
 
-        const homeSlug =
-          teamSlugByName.get(item.home) ?? slugify(item.home);
-        const awaySlug =
-          teamSlugByName.get(item.away) ?? slugify(item.away);
-
-        const homeGroup = groupByTeamName.get(item.home);
-        const awayGroup = groupByTeamName.get(item.away);
-        const sameGroup =
-          !!homeGroup && !!awayGroup && homeGroup === awayGroup;
-        const isKnockout =
-          isPlaceholderTeam(item.home) ||
-          isPlaceholderTeam(item.away) ||
-          (!!homeGroup && !!awayGroup && homeGroup !== awayGroup);
-
-        matches.set(slug, {
-          apiId: slug,
-          homeTeamApiId: homeSlug,
-          awayTeamApiId: awaySlug,
-          homeTeamName: item.home,
-          awayTeamName: item.away,
-          homeTeamShortName: item.home.slice(0, 3),
-          awayTeamShortName: item.away.slice(0, 3),
-          matchTime: new Date(item.time),
-          groupCode: sameGroup ? homeGroup : null,
-          stageName: isKnockout ? "Knockout Stage" : "Group Stage",
-          status: mapStatus(item.status),
-          isKnockout,
-          homeScore: item.home_score,
-          awayScore: item.away_score,
-          finishType:
-            mapStatus(item.status) === "FINISHED" ? "NINETY_MINUTES" : null,
-        });
+          matches.set(
+            slug,
+            this.mapMatchSummary(item, teamSlugByName, groupByTeamName)
+          );
+        }
       }
     }
 
     return Array.from(matches.values()).sort(
       (a, b) => a.matchTime.getTime() - b.matchTime.getTime()
     );
+  }
+
+  async fetchMatches(options: SyncOptions): Promise<ExternalMatch[]> {
+    if (options.quickSync) {
+      const quick = await this.fetchMatchesQuick();
+      if (quick.length > 0) return quick;
+    }
+
+    return this.fetchMatchesFull();
   }
 
   async fetchMatchScorers(
