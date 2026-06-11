@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+  CANCELLED
+}
+
+enum FinishType {
+  NINETY_MINUTES
+  EXTRA_TIME
+  PENALTIES
+}
+
+model User {
+  id              String   @id @default(cuid())
+  username        String   @unique
+  passwordHash    String   @map("password_hash")
+  isAdmin         Boolean  @default(false) @map("is_admin")
+  hasSeenTutorial Boolean  @default(false) @map("has_seen_tutorial")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  predictions        Prediction[]
+  scorerPredictions  ScorerPrediction[]
+  boldScorerBets     BoldScorerBet[]
+
+  @@map("users")
+}
+
+model Round {
+  id        String   @id @default(cuid())
+  name      String
+  startsAt  DateTime @map("starts_at")
+  endsAt    DateTime @map("ends_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  matches        Match[]
+  boldScorerBets BoldScorerBet[]
+
+  @@map("rounds")
+}
+
+model Team {
+  id        String  @id @default(cuid())
+  name      String
+  shortName String  @map("short_name")
+  logoUrl   String? @map("logo_url")
+  apiTeamId String? @unique @map("api_team_id")
+
+  players              Player[]
+  homeMatches          Match[]  @relation("HomeTeam")
+  awayMatches          Match[]  @relation("AwayTeam")
+  penaltyWins          Match[]  @relation("PenaltyWinner")
+  penaltyPredictions   Prediction[] @relation("PredictedPenaltyWinner")
+
+  @@map("teams")
+}
+
+model Player {
+  id        String  @id @default(cuid())
+  teamId    String  @map("team_id")
+  name      String
+  position  String?
+  shirtNumber Int?  @map("shirt_number")
+  apiPlayerId String? @map("api_player_id")
+
+  team              Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  scorerPredictions ScorerPrediction[]
+  matchScorers      MatchScorer[]
+  boldScorerBets    BoldScorerBet[]
+
+  @@unique([teamId, apiPlayerId])
+  @@map("players")
+}
+
+model Match {
+  id                    String      @id @default(cuid())
+  apiMatchId            String?     @unique @map("api_match_id")
+  roundId               String      @map("round_id")
+  homeTeamId            String      @map("home_team_id")
+  awayTeamId            String      @map("away_team_id")
+  matchTime             DateTime    @map("match_time")
+  groupCode             String?     @map("group_code")
+  stageName             String?     @map("stage_name")
+  status                MatchStatus @default(SCHEDULED)
+  isKnockout            Boolean     @default(false) @map("is_knockout")
+  homeScore             Int?        @map("home_score")
+  awayScore             Int?        @map("away_score")
+  actualFinishType      FinishType? @map("actual_finish_type")
+  penaltyWinnerTeamId   String?     @map("penalty_winner_team_id")
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  round               Round              @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  homeTeam            Team               @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam            Team               @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  penaltyWinnerTeam   Team?              @relation("PenaltyWinner", fields: [penaltyWinnerTeamId], references: [id])
+  predictions         Prediction[]
+  scorerPredictions   ScorerPrediction[]
+  matchScorers        MatchScorer[]
+  boldScorerBets      BoldScorerBet[]
+
+  @@index([roundId])
+  @@index([status, matchTime])
+  @@map("matches")
+}
+
+model Prediction {
+  id                            String      @id @default(cuid())
+  userId                        String      @map("user_id")
+  matchId                       String      @map("match_id")
+  predHome                      Int         @map("pred_home")
+  predAway                      Int         @map("pred_away")
+  isDouble                      Boolean     @default(false) @map("is_double")
+  predictedFinishType           FinishType? @map("predicted_finish_type")
+  predictedPenaltyWinnerTeamId  String?     @map("predicted_penalty_winner_team_id")
+  points                        Int         @default(0)
+  finishTypePoints              Int         @default(0) @map("finish_type_points")
+  penaltyWinnerPoints           Int         @default(0) @map("penalty_winner_points")
+  createdAt                     DateTime    @default(now()) @map("created_at")
+  updatedAt                     DateTime    @updatedAt @map("updated_at")
+
+  user                      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match                     Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  predictedPenaltyWinnerTeam Team? @relation("PredictedPenaltyWinner", fields: [predictedPenaltyWinnerTeamId], references: [id])
+
+  @@unique([userId, matchId])
+  @@index([userId])
+  @@index([matchId])
+  @@map("predictions")
+}
+
+model ScorerPrediction {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  matchId        String   @map("match_id")
+  playerId       String   @map("player_id")
+  predictedGoals Int      @default(1) @map("predicted_goals")
+  points         Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId, playerId])
+  @@index([userId])
+  @@index([matchId])
+  @@map("scorer_predictions")
+}
+
+model MatchScorer {
+  id       String @id @default(cuid())
+  matchId  String @map("match_id")
+  playerId String @map("player_id")
+  goals    Int    @default(1)
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+  @@map("match_scorers")
+}
+
+/** البطاقة الجريئة — تراهن على هداف مرة واحدة كل جولة */
+model BoldScorerBet {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  roundId   String   @map("round_id")
+  matchId   String   @map("match_id")
+  playerId  String   @map("player_id")
+  points    Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  round  Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roundId])
+  @@index([matchId])
+  @@index([userId])
+  @@map("bold_scorer_bets")
+}

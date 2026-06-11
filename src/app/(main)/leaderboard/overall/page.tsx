@@ -1,0 +1,68 @@
+import Link from "next/link";
+import { getOverallLeaderboard } from "@/services/leaderboard.service";
+import { getSubRounds, getTournamentRound } from "@/services/match.service";
+import { getCurrentUser } from "@/lib/session";
+import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
+import { Card } from "@/components/ui/Card";
+import { ar } from "@/lib/i18n/ar";
+import { getTournamentRoundName } from "@/lib/rounds";
+
+export default async function OverallLeaderboardPage() {
+  const [leaderboard, user, tournamentRound, subRounds] = await Promise.all([
+    getOverallLeaderboard(),
+    getCurrentUser(),
+    getTournamentRound(),
+    getSubRounds(),
+  ]);
+
+  const tournamentName = tournamentRound?.name ?? getTournamentRoundName();
+  const tournamentMatches = tournamentRound?._count.matches ?? 0;
+
+  return (
+    <div className="space-y-6 md:space-y-8">
+      <header className="text-right">
+        <h1 className="text-xl font-bold md:text-3xl">🏆 {tournamentName}</h1>
+        <p className="mt-1 text-xs text-muted md:text-sm">
+          {ar.leaderboard.overallDesc}
+        </p>
+        {tournamentMatches > 0 && (
+          <p className="mt-1 text-xs text-muted">{tournamentMatches} مباراة</p>
+        )}
+      </header>
+
+      <LeaderboardTable
+        entries={leaderboard}
+        highlightUserId={user?.userId}
+        showRankTrend
+      />
+
+      {subRounds.length > 0 && (
+        <section className="space-y-3 border-t border-card-border pt-6">
+          <h2 className="text-right text-base font-semibold md:text-lg">
+            {ar.leaderboard.round}
+          </h2>
+          <div className="space-y-2">
+            {subRounds.map((round) => (
+              <Link key={round.id} href={`/leaderboard/round/${round.id}`}>
+                <Card className="cursor-pointer transition-colors active:border-primary/50">
+                  <div className="flex items-center justify-between gap-3 py-1">
+                    <span className="text-xs text-muted">
+                      {round._count.matches} مباراة
+                    </span>
+                    <span className="font-medium">{round.name}</span>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="hidden text-center md:block">
+        <Link href="/dashboard" className="text-sm text-primary hover:underline">
+          {ar.leaderboard.backDashboard} ←
+        </Link>
+      </div>
+    </div>
+  );
+}

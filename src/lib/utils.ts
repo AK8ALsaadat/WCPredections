@@ -1,0 +1,231 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+export function formatDate(date: Date | string): string {
+  return new Intl.DateTimeFormat("ar-SA", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(date));
+}
+
+export function formatDateShort(date: Date | string): string {
+  return new Intl.DateTimeFormat("ar-SA", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(date));
+}
+
+export function formatDayHeader(date: Date | string): string {
+  return new Intl.DateTimeFormat("ar-SA", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(date));
+}
+
+const PREDICTION_TIMEZONE =
+  process.env.SYNC_TIMEZONE ?? process.env.PREDICTION_TIMEZONE ?? "Asia/Riyadh";
+
+export const PREDICTION_WINDOW_HOURS = 48;
+
+export function getPredictionTimezone(): string {
+  return PREDICTION_TIMEZONE;
+}
+
+export function isMatchStarted(matchTime: Date | string): boolean {
+  return new Date(matchTime) <= new Date();
+}
+
+function getCalendarDayInTz(instant: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
+}
+
+function getTomorrowCalendarDay(timeZone: string, from = new Date()): string {
+  const today = getCalendarDayInTz(from, timeZone);
+  const [year, month, day] = today.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return next.toISOString().slice(0, 10);
+}
+
+/** آخر يوم مسموح للتوقع (اليوم + بكره) بتوقيت الرياض */
+export function getPredictionWindowEndDate(): Date {
+  const tomorrow = getTomorrowCalendarDay(PREDICTION_TIMEZONE);
+  return new Date(`${tomorrow}T23:59:59.999`);
+}
+
+function hoursUntilMatch(matchTime: Date): number {
+  return (matchTime.getTime() - Date.now()) / (1000 * 60 * 60);
+}
+
+function isWithinPredictionCalendarWindow(matchTime: Date): boolean {
+  const today = getCalendarDayInTz(new Date(), PREDICTION_TIMEZONE);
+  const tomorrow = getTomorrowCalendarDay(PREDICTION_TIMEZONE);
+  const matchDay = getCalendarDayInTz(matchTime, PREDICTION_TIMEZONE);
+  return matchDay === today || matchDay === tomorrow;
+}
+
+/** التوقع مسموح لمباريات اليوم وبكره فقط — خلال 48 ساعة وقبل بداية المباراة */
+export function isPredictionAllowed(matchTime: Date | string): boolean {
+  const match = new Date(matchTime);
+  if (isMatchStarted(matchTime)) return false;
+
+  const hoursLeft = hoursUntilMatch(match);
+  if (hoursLeft > PREDICTION_WINDOW_HOURS) return false;
+
+  return isWithinPredictionCalendarWindow(match);
+}
+
+export function getPredictionLockReason(matchTime: Date | string): string | null {
+  if (isMatchStarted(matchTime)) {
+    return "المباراة بدأت — التوقع مغلق";
+  }
+
+  const match = new Date(matchTime);
+  const hoursLeft = hoursUntilMatch(match);
+
+  if (hoursLeft > PREDICTION_WINDOW_HOURS) {
+    return "التوقع يفتح قبل المباراة بـ 48 ساعة (اليوم أو بكره)";
+  }
+
+  if (!isWithinPredictionCalendarWindow(match)) {
+    return "التوقع متاح لمباريات اليوم وبكره فقط";
+  }
+
+  return null;
+}
+
+function getZonedMidnight(calendarDay: string, timeZone: string): Date {
+  if (timeZone === "Asia/Riyadh") {
+    return new Date(`${calendarDay}T00:00:00+03:00`);
+  }
+
+  return new Date(`${calendarDay}T00:00:00Z`);
+}
+
+/** آخر موعد لإرسال التوقع = انطلاق المباراة */
+export function getPredictionDeadline(matchTime: Date | string): Date | null {
+  if (isMatchStarted(matchTime) || !isPredictionAllowed(matchTime)) {
+    return null;
+  }
+
+  return new Date(matchTime);
+}
+
+/** أول لحظة يفتح فيها التوقع لهذه المباراة */
+export function getPredictionOpensAt(matchTime: Date | string): Date | null {
+  if (isMatchStarted(matchTime) || isPredictionAllowed(matchTime)) {
+    return null;
+  }
+
+  const match = new Date(matchTime);
+  const matchDay = getCalendarDayInTz(match, PREDICTION_TIMEZONE);
+  const [year, month, day] = matchDay.split("-").map(Number);
+  const dayBeforeMatch = new Date(Date.UTC(year, month - 1, day - 1))
+    .toISOString()
+    .slice(0, 10);
+
+  const fortyEightHoursBefore = new Date(
+    match.getTime() - PREDICTION_WINDOW_HOURS * 60 * 60 * 1000
+  );
+  const calendarWindowStart = getZonedMidnight(
+    dayBeforeMatch,
+    PREDICTION_TIMEZONE
+  );
+
+  const opensAt = new Date(
+    Math.max(
+      fortyEightHoursBefore.getTime(),
+      calendarWindowStart.getTime()
+    )
+  );
+
+  if (opensAt >= match || opensAt <= new Date()) {
+    return null;
+  }
+
+  return opensAt;
+}
+
+export type PredictionCountdownTarget = {
+  kind: "closes" | "opens";
+  at: Date;
+};
+
+export function getPredictionCountdownTarget(
+  matchTime: Date | string
+): PredictionCountdownTarget | null {
+  const deadline = getPredictionDeadline(matchTime);
+  if (deadline) {
+    return { kind: "closes", at: deadline };
+  }
+
+  const opensAt = getPredictionOpensAt(matchTime);
+  if (opensAt) {
+    return { kind: "opens", at: opensAt };
+  }
+
+  return null;
+}
+
+export function formatCountdownParts(remainingMs: number) {
+  const safeMs = Math.max(0, remainingMs);
+  const totalSeconds = Math.floor(safeMs / 1000);
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return { days, hours, minutes, seconds };
+}
+
+export function formatCountdownAr(remainingMs: number): string {
+  const { days, hours, minutes, seconds } = formatCountdownParts(remainingMs);
+  const n = (value: number) => value.toLocaleString("ar-SA");
+  const parts: string[] = [];
+
+  if (days > 0) parts.push(`${n(days)} ي`);
+  if (hours > 0 || days > 0) parts.push(`${n(hours)} س`);
+  parts.push(`${n(minutes)} د`);
+  parts.push(`${n(seconds)} ث`);
+
+  return parts.join(" ");
+}
+
+export function getMatchResult(
+  homeScore: number,
+  awayScore: number
+): "home" | "away" | "draw" {
+  if (homeScore > awayScore) return "home";
+  if (homeScore < awayScore) return "away";
+  return "draw";
+}
+
+export function groupByDate<T extends { matchTime: Date | string }>(
+  items: T[]
+): Record<string, T[]> {
+  const groups: Record<string, T[]> = {};
+
+  for (const item of items) {
+    const d = new Date(item.matchTime);
+    d.setHours(0, 0, 0, 0);
+    const key = d.toISOString();
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(item);
+  }
+
+  return groups;
+}

@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0f1a;
+  --foreground: #f1f5f9;
+  --card: #111827;
+  --card-border: #1e293b;
+  --primary: #22c55e;
+  --primary-hover: #16a34a;
+  --accent: #3b82f6;
+  --muted: #64748b;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-border: var(--card-border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -20%, rgb(34 197 94 / 0.08), transparent 55%),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@keyframes flag-sway {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+
+.flag-sway {
+  transform-origin: top center;
+  animation: flag-sway 4s ease-in-out infinite;
+}

@@ -1,0 +1,71 @@
+import type {
+  FinishType,
+  MatchStatus,
+  Match,
+  Prediction,
+  Round,
+  ScorerPrediction,
+  Team,
+  User,
+  Player,
+  MatchScorer,
+} from "@prisma/client";
+import { ar } from "@/lib/i18n/ar";
+
+export type { FinishType, MatchStatus };
+
+export type UserSession = {
+  userId: string;
+  username: string;
+  isAdmin: boolean;
+  hasSeenTutorial?: boolean;
+};
+
+export type TeamBasic = Pick<Team, "id" | "name" | "shortName" | "logoUrl">;
+
+export type MatchWithTeams = Match & {
+  homeTeam: TeamBasic;
+  awayTeam: TeamBasic;
+  penaltyWinnerTeam?: TeamBasic | null;
+  round: Pick<Round, "id" | "name">;
+};
+
+export type PredictionWithMatch = Prediction & {
+  match: MatchWithTeams;
+};
+
+export type ScorerPredictionWithPlayer = ScorerPrediction & {
+  player: Pick<Player, "id" | "name" | "teamId">;
+};
+
+export type LeaderboardEntry = {
+  rank: number;
+  userId: string;
+  username: string;
+  points: number;
+  /** موجب = تحسّن الترتيب، سالب = تراجع مقارنة بالأسبوع الماضي */
+  rankChange?: number;
+};
+
+export type UserProfile = Pick<User, "id" | "username" | "createdAt"> & {
+  totalPoints: number;
+  roundPoints: Record<string, number>;
+  predictionsCount: number;
+  correctPredictions: number;
+};
+
+export type MatchDetail = MatchWithTeams & {
+  predictions?: Prediction[];
+  scorerPredictions?: ScorerPredictionWithPlayer[];
+  matchScorers?: (MatchScorer & { player: Pick<Player, "id" | "name"> })[];
+  homePlayers?: Pick<Player, "id" | "name">[];
+  awayPlayers?: Pick<Player, "id" | "name">[];
+};
+
+export type ApiResponse<T> =
+  | { success: true; data: T }
+  | { success: false; error: string };
+
+export const FINISH_TYPE_LABELS: Record<FinishType, string> = ar.finishType;
+
+export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = ar.status;
