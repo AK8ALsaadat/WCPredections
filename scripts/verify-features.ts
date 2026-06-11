@@ -24,6 +24,7 @@ import {
   countTeamScorers,
   getScorerBudgetStatus,
 } from "../src/lib/scorer-prediction";
+import { resolveScorerGoalsForPlayer } from "../src/lib/player-matching";
 import { asFinishType } from "../src/lib/finish-type";
 import { parseOptionalScore } from "../src/lib/utils";
 import { statsFromLeaderboard } from "../src/services/leaderboard.service";
@@ -149,6 +150,24 @@ ok(
   "calculateScorerPredictionPoints",
   calculateScorerPredictionPoints(2, 1) === 1 &&
     calculateScorerPredictionPoints(1, 0) === 0
+);
+
+const goalsById = new Map([
+  ["api-scorer-id", 1],
+]);
+ok(
+  "resolveScorerGoalsForPlayer: مطابقة بالاسم عند اختلاف المعرف",
+  resolveScorerGoalsForPlayer(
+    "lineup-player-id",
+    { name: "Kylian Mbappé", teamId: "france" },
+    goalsById,
+    [
+      {
+        playerId: "api-scorer-id",
+        player: { name: "K. Mbappe", teamId: "france" },
+      },
+    ]
+  ) === 1
 );
 
 console.log("\n=== حدود الجولة ===");

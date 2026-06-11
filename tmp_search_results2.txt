@@ -1,0 +1,532 @@
+﻿
+src\app\(main)\matches\[id]\predictions\page.tsx:9:import { 
+LeaguePredictionsList } from "@/components/matches/LeaguePredictionsList";
+src\app\(main)\matches\[id]\predictions\page.tsx:13:import type { 
+LeagueMatchPredictionRow } from "@/types";
+src\app\(main)\matches\[id]\predictions\page.tsx:15:type 
+LeaguePredictionsPayload = {
+src\app\(main)\matches\[id]\predictions\page.tsx:39:  predictions: 
+LeagueMatchPredictionRow[];
+src\app\(main)\matches\[id]\predictions\page.tsx:42:export default function 
+LeagueMatchPredictionsPage() {
+src\app\(main)\matches\[id]\predictions\page.tsx:46:  const [data, setData] = 
+useState<LeaguePredictionsPayload | null>(null);
+src\app\(main)\matches\[id]\predictions\page.tsx:51:  async function 
+loadPredictions() {
+src\app\(main)\matches\[id]\predictions\page.tsx:53:      
+fetch(`/api/matches/${matchId}/predictions`).then((r) => r.json()),
+src\app\(main)\matches\[id]\predictions\page.tsx:69:    loadPredictions()
+src\app\(main)\matches\[id]\predictions\page.tsx:81:      
+loadPredictions().catch(() => {});
+src\app\(main)\matches\[id]\predictions\page.tsx:92:  const { match, 
+predictions } = data;
+src\app\(main)\matches\[id]\predictions\page.tsx:100:  const withDouble = 
+predictions.filter((p) => p.prediction?.isDouble).length;
+src\app\(main)\matches\[id]\predictions\page.tsx:101:  const withBold = 
+predictions.filter((p) => p.boldScorerBet).length;
+src\app\(main)\matches\[id]\predictions\page.tsx:140:          
+{t.matches.allPredictionsTitle}
+src\app\(main)\matches\[id]\predictions\page.tsx:196:            <p 
+className="text-lg font-bold text-primary">{predictions.length}</p>
+src\app\(main)\matches\[id]\predictions\page.tsx:198:              
+{predictions.length === 1
+src\app\(main)\matches\[id]\predictions\page.tsx:233:      
+<LeaguePredictionsList
+src\app\(main)\matches\[id]\predictions\page.tsx:234:        rows={predictions}
+src\app\(main)\matches\[id]\page.tsx:11:import { PredictionCountdown } from 
+"@/components/matches/PredictionCountdown";
+src\app\(main)\matches\[id]\page.tsx:13:import { ViewLeaguePredictionsButton } 
+from "@/components/matches/ViewLeaguePredictionsButton";
+src\app\(main)\matches\[id]\page.tsx:16:import { formatDate, 
+isPredictionAllowed } from "@/lib/utils";
+src\app\(main)\matches\[id]\page.tsx:45:              userPrediction?: {
+src\app\(main)\matches\[id]\page.tsx:52:              userScorerPredictions?: {
+src\app\(main)\matches\[id]\page.tsx:57:            if 
+(isPredictionAllowed(m.matchTime)) {
+src\app\(main)\matches\[id]\page.tsx:64:                userPrediction: 
+m.userPrediction ?? null,
+src\app\(main)\matches\[id]\page.tsx:65:                userScorerPredictions: 
+m.userScorerPredictions?.map((sp) => ({
+src\app\(main)\matches\[id]\page.tsx:111:    matchScorers: { player: { name: 
+string }; goals: number }[];
+src\app\(main)\matches\[id]\page.tsx:112:    userPrediction: {
+src\app\(main)\matches\[id]\page.tsx:122:    userScorerPredictions: {
+src\app\(main)\matches\[id]\page.tsx:127:    userBoldScorerBet?: {
+src\app\(main)\matches\[id]\page.tsx:133:  const canPredict = 
+isPredictionAllowed(m.matchTime, m.status);
+src\app\(main)\matches\[id]\page.tsx:154:          userPrediction: 
+m.userPrediction
+src\app\(main)\matches\[id]\page.tsx:156:                ...m.userPrediction,
+src\app\(main)\matches\[id]\page.tsx:158:                  
+m.userPrediction.predictedFinishType
+src\app\(main)\matches\[id]\page.tsx:162:          userScorerPredictions: 
+m.userScorerPredictions,
+src\app\(main)\matches\[id]\page.tsx:163:          userBoldScorerBet: 
+m.userBoldScorerBet
+src\app\(main)\matches\[id]\page.tsx:165:                points: 
+m.userBoldScorerBet.points,
+src\app\(main)\matches\[id]\page.tsx:166:                player: { name: 
+m.userBoldScorerBet.player.name },
+src\app\(main)\matches\[id]\page.tsx:206:                <PredictionCountdown 
+matchTime={m.matchTime} />
+src\app\(main)\matches\[id]\page.tsx:226:                {m.userPrediction ? 
+t.matches.editPrediction : t.matches.makePrediction}
+src\app\(main)\matches\[id]\page.tsx:234:            
+<ViewLeaguePredictionsButton matchId={m.id} fullWidth />
+src\app\(main)\matches\[id]\page.tsx:242:          scorersOnly={isLive && 
+!isFinished}
+src\app\(main)\matches\[id]\page.tsx:246:      {m.userPrediction && 
+!isFinished && (
+src\app\(main)\matches\[id]\page.tsx:249:            
+<CardTitle>{t.matches.yourPrediction}</CardTitle>
+src\app\(main)\matches\[id]\page.tsx:255:                
+{m.userPrediction.predHome} - {m.userPrediction.predAway}
+src\app\(main)\matches\[id]\page.tsx:256:                
+{m.userPrediction.isDouble && (
+src\app\(main)\matches\[id]\page.tsx:261:            
+{m.userPrediction.predictedFinishType && (
+src\app\(main)\matches\[id]\page.tsx:265:                  
+{t.finishType[m.userPrediction.predictedFinishType as keyof typeof 
+t.finishType]}
+src\app\(main)\matches\[id]\page.tsx:274:        m.userScorerPredictions &&
+src\app\(main)\matches\[id]\page.tsx:275:        
+m.userScorerPredictions.length > 0 && (
+src\app\(main)\matches\[id]\page.tsx:278:            
+<CardTitle>{t.matches.scorers}</CardTitle>
+src\app\(main)\matches\[id]\page.tsx:281:            
+{m.userScorerPredictions.map((sp, i) => (
+src\app\(main)\matches\[id]\page.tsx:296:      {m.matchScorers && 
+m.matchScorers.length > 0 && (
+src\app\(main)\matches\[id]\page.tsx:299:            
+<CardTitle>{t.matches.goalScorers}</CardTitle>
+src\app\(main)\matches\[id]\page.tsx:302:            {m.matchScorers.map((s, 
+i) => (
+src\app\(main)\matches\page.tsx:13:  getPredictionTimezone,
+src\app\(main)\matches\page.tsx:15:  isPredictionAllowed,
+src\app\(main)\matches\page.tsx:76:  const predictionTimezone = 
+getPredictionTimezone();
+src\app\(main)\matches\page.tsx:255:      .filter((m) => 
+isPredictionAllowed(m.matchTime))
+src\app\(main)\matches\page.tsx:263:          userPrediction: m.userPrediction
+src\app\(main)\matches\page.tsx:265:                predHome: 
+m.userPrediction.predHome,
+src\app\(main)\matches\page.tsx:266:                predAway: 
+m.userPrediction.predAway,
+src\app\(main)\matches\page.tsx:267:                isDouble: 
+m.userPrediction.isDouble,
+src\app\(main)\matches\page.tsx:268:                predictedFinishType: 
+m.userPrediction.predictedFinishType,
+src\app\(main)\matches\page.tsx:270:                  
+m.userPrediction.predictedPenaltyWinnerTeamId,
+src\app\(main)\matches\page.tsx:273:          userScorerPredictions: 
+m.userScorerPredictions?.map((sp) => ({
+src\app\(main)\matches\page.tsx:347:          ({formatDayHeader(new Date(), 
+locale)} — {predictionTimezone})
+src\app\(main)\matches\page.tsx:358:                
+{t.matches.yourFinalPredictions}
+src\app\(main)\matches\page.tsx:361:                
+{t.matches.yourFinalPredictionsHint}
+src\app\(main)\matches\page.tsx:365:              href="/predictions"
+src\app\(main)\matches\page.tsx:368:              {t.predictions.title} →
+src\app\(main)\matches\page.tsx:377:                finalPrediction
+src\app\(main)\predict\[matchId]\page.tsx:15:import { PredictionCountdown } 
+from "@/components/matches/PredictionCountdown";
+src\app\(main)\predict\[matchId]\page.tsx:30:  isPredictionAllowed,
+src\app\(main)\predict\[matchId]\page.tsx:31:  getPredictionLockReason,
+src\app\(main)\predict\[matchId]\page.tsx:39:  canAddScorer,
+src\app\(main)\predict\[matchId]\page.tsx:40:  getScorerBudgetStatus,
+src\app\(main)\predict\[matchId]\page.tsx:43:  pruneScorerPicksToBudget,
+src\app\(main)\predict\[matchId]\page.tsx:44:  type ScorerPicks,
+src\app\(main)\predict\[matchId]\page.tsx:45:} from "@/lib/scorer-prediction";
+src\app\(main)\predict\[matchId]\page.tsx:97:  userPrediction: {
+src\app\(main)\predict\[matchId]\page.tsx:104:  userScorerPredictions: { 
+playerId: string; predictedGoals: number }[];
+src\app\(main)\predict\[matchId]\page.tsx:105:  userBoldScorerBet?: {
+src\app\(main)\predict\[matchId]\page.tsx:110:  boldScorerRoundStatus?: {
+src\app\(main)\predict\[matchId]\page.tsx:125:    boldScorer: {
+src\app\(main)\predict\[matchId]\page.tsx:157:  scorerPicks: ScorerPicks;
+src\app\(main)\predict\[matchId]\page.tsx:168:  scorerPicks: {},
+src\app\(main)\predict\[matchId]\page.tsx:177:  if (m.userPrediction) {
+src\app\(main)\predict\[matchId]\page.tsx:178:    state.predHome = 
+m.userPrediction.predHome;
+src\app\(main)\predict\[matchId]\page.tsx:179:    state.predAway = 
+m.userPrediction.predAway;
+src\app\(main)\predict\[matchId]\page.tsx:180:    state.isDouble = 
+m.userPrediction.isDouble;
+src\app\(main)\predict\[matchId]\page.tsx:181:    state.finishType = 
+m.userPrediction.predictedFinishType ?? "";
+src\app\(main)\predict\[matchId]\page.tsx:182:    state.penaltyWinner = 
+m.userPrediction.predictedPenaltyWinnerTeamId ?? "";
+src\app\(main)\predict\[matchId]\page.tsx:184:  if 
+(m.userScorerPredictions?.length) {
+src\app\(main)\predict\[matchId]\page.tsx:185:    for (const sp of 
+m.userScorerPredictions) {
+src\app\(main)\predict\[matchId]\page.tsx:186:      
+state.scorerPicks[sp.playerId] = sp.predictedGoals ?? 1;
+src\app\(main)\predict\[matchId]\page.tsx:189:  if 
+(m.userBoldScorerBet?.playerId) {
+src\app\(main)\predict\[matchId]\page.tsx:190:    state.boldPlayerId = 
+m.userBoldScorerBet.playerId;
+src\app\(main)\predict\[matchId]\page.tsx:196:function applySavedPrediction(m: 
+MatchData, setters: {
+src\app\(main)\predict\[matchId]\page.tsx:202:  setScorerPicks: (v: 
+ScorerPicks) => void;
+src\app\(main)\predict\[matchId]\page.tsx:212:  
+setters.setScorerPicks(state.scorerPicks);
+src\app\(main)\predict\[matchId]\page.tsx:247:  const [scorerPicks, 
+setScorerPicks] = useState<ScorerPicks>(
+src\app\(main)\predict\[matchId]\page.tsx:248:    initialForm.scorerPicks
+src\app\(main)\predict\[matchId]\page.tsx:260:      getScorerBudgetStatus(
+src\app\(main)\predict\[matchId]\page.tsx:261:        scorerPicks,
+src\app\(main)\predict\[matchId]\page.tsx:267:    [scorerPicks, teamSets, 
+predHome, predAway]
+src\app\(main)\predict\[matchId]\page.tsx:273:    setScorerPicks((prev) => {
+src\app\(main)\predict\[matchId]\page.tsx:274:      const pruned = 
+pruneScorerPicksToBudget(
+src\app\(main)\predict\[matchId]\page.tsx:300:      
+applySavedPrediction(cachedMatch, {
+src\app\(main)\predict\[matchId]\page.tsx:306:        setScorerPicks,
+src\app\(main)\predict\[matchId]\page.tsx:316:      setScorerPicks({});
+src\app\(main)\predict\[matchId]\page.tsx:388:        
+applySavedPrediction(payload, {
+src\app\(main)\predict\[matchId]\page.tsx:394:          setScorerPicks,
+src\app\(main)\predict\[matchId]\page.tsx:457:  function 
+toggleScorer(playerId: string) {
+src\app\(main)\predict\[matchId]\page.tsx:458:    setScorerPicks((prev) => {
+src\app\(main)\predict\[matchId]\page.tsx:465:        !canAddScorer(
+src\app\(main)\predict\[matchId]\page.tsx:480:  function 
+setScorerGoals(playerId: string, goals: number) {
+src\app\(main)\predict\[matchId]\page.tsx:481:    setScorerPicks((prev) => {
+src\app\(main)\predict\[matchId]\page.tsx:495:  function 
+canSelectScorer(playerId: string) {
+src\app\(main)\predict\[matchId]\page.tsx:496:    if (playerId in scorerPicks) 
+return true;
+src\app\(main)\predict\[matchId]\page.tsx:497:    return canAddScorer(
+src\app\(main)\predict\[matchId]\page.tsx:498:      scorerPicks,
+src\app\(main)\predict\[matchId]\page.tsx:509:      scorerPicks,
+src\app\(main)\predict\[matchId]\page.tsx:519:    if 
+(match?.userPrediction?.isDouble && !checked) {
+src\app\(main)\predict\[matchId]\page.tsx:533:    if 
+(match?.userBoldScorerBet?.playerId && !checked) {
+src\app\(main)\predict\[matchId]\page.tsx:537:    const limits = 
+match?.roundUsageLimits?.boldScorer;
+src\app\(main)\predict\[matchId]\page.tsx:564:      
+setError(t.predict.scorersExceeded);
+src\app\(main)\predict\[matchId]\page.tsx:571:          ? 
+t.predict.scorersIncomplete
+src\app\(main)\predict\[matchId]\page.tsx:572:          : 
+t.predict.scorersNeedLineup
+src\app\(main)\predict\[matchId]\page.tsx:578:      
+setError(t.predict.boldScorerBet.choosePlayerRequired);
+src\app\(main)\predict\[matchId]\page.tsx:599:      const res = await 
+fetch("/api/predictions", {
+src\app\(main)\predict\[matchId]\page.tsx:609:          picks: 
+picksToArray(scorerPicks),
+src\app\(main)\predict\[matchId]\page.tsx:622:      
+setSuccess(t.matches.predictionSubmitted);
+src\app\(main)\predict\[matchId]\page.tsx:638:  const lockReason = 
+getPredictionLockReason(match.matchTime, match.status, t);
+src\app\(main)\predict\[matchId]\page.tsx:639:  if 
+(!isPredictionAllowed(match.matchTime, match.status)) {
+src\app\(main)\predict\[matchId]\page.tsx:653:  const needsLineupForScorers = 
+hasAnyGoals && !hasPlayers;
+src\app\(main)\predict\[matchId]\page.tsx:656:  const boldLimits = 
+match.roundUsageLimits?.boldScorer;
+src\app\(main)\predict\[matchId]\page.tsx:657:  const doubleCommitted = 
+match.userPrediction?.isDouble === true;
+src\app\(main)\predict\[matchId]\page.tsx:658:  const boldCommitted = 
+!!match.userBoldScorerBet?.playerId;
+src\app\(main)\predict\[matchId]\page.tsx:661:    
+match.boldScorerRoundStatus?.onOtherMatch ??
+src\app\(main)\predict\[matchId]\page.tsx:691:                  ? 
+`${player.name} (${t.predict.scorerBench})`
+src\app\(main)\predict\[matchId]\page.tsx:701:                  ? 
+`${player.name} (${t.predict.scorerBench})`
+src\app\(main)\predict\[matchId]\page.tsx:709:    { value: "", label: 
+t.predict.boldScorerBet.choosePlayer },
+src\app\(main)\predict\[matchId]\page.tsx:734:          <PredictionCountdown
+src\app\(main)\predict\[matchId]\page.tsx:751:            
+<CardTitle>{t.predict.scorePrediction}</CardTitle>
+src\app\(main)\predict\[matchId]\page.tsx:833:            
+<CardTitle>{t.predict.boldScorerBet.title}</CardTitle>
+src\app\(main)\predict\[matchId]\page.tsx:870:              
+<p>{t.predict.boldScorerBet.usedElsewhere}</p>
+src\app\(main)\predict\[matchId]\page.tsx:871:              
+{match.boldScorerRoundStatus?.otherMatchId && (
+src\app\(main)\predict\[matchId]\page.tsx:873:                  
+href={`/matches/${match.boldScorerRoundStatus.otherMatchId}`}
+src\app\(main)\predict\[matchId]\page.tsx:876:                  
+{t.predict.boldScorerBet.viewOtherMatch}
+src\app\(main)\predict\[matchId]\page.tsx:932:                    
+{t.predict.boldScorerBet.enable}
+src\app\(main)\predict\[matchId]\page.tsx:937:                      : 
+t.predict.boldScorerBet.hint}
+src\app\(main)\predict\[matchId]\page.tsx:945:                    
+label={t.predict.boldScorerBet.choosePlayer}
+src\app\(main)\predict\[matchId]\page.tsx:958:                      
+{t.predict.boldScorerBet.clearSelection}
+src\app\(main)\predict\[matchId]\page.tsx:1034:                        — 
+{t.predict.scorersRemaining(predHome - budget.homeTotal)}
+src\app\(main)\predict\[matchId]\page.tsx:1038:                      <span 
+className="mr-1 font-bold"> — {t.predict.scorersComplete}</span>
+src\app\(main)\predict\[matchId]\page.tsx:1062:                        — 
+{t.predict.scorersRemaining(predAway - budget.awayTotal)}
+src\app\(main)\predict\[matchId]\page.tsx:1066:                      <span 
+className="mr-1 font-bold"> — {t.predict.scorersComplete}</span>
+src\app\(main)\predict\[matchId]\page.tsx:1074:                  
+{t.predict.scorersExceeded}
+src\app\(main)\predict\[matchId]\page.tsx:1080:                  
+{t.predict.scorersIncomplete}
+src\app\(main)\predict\[matchId]\page.tsx:1100:                
+scorerPicks={scorerPicks}
+src\app\(main)\predict\[matchId]\page.tsx:1101:                
+canSelectPlayer={canSelectScorer}
+src\app\(main)\predict\[matchId]\page.tsx:1103:                
+onToggle={toggleScorer}
+src\app\(main)\predict\[matchId]\page.tsx:1104:                
+onGoalsChange={setScorerGoals}
+src\app\(main)\predict\[matchId]\page.tsx:1106:                  title: 
+t.predict.scorerPrediction,
+src\app\(main)\predict\[matchId]\page.tsx:1108:                    ? 
+t.predict.scorerHint
+src\app\(main)\predict\[matchId]\page.tsx:1109:                    : 
+t.predict.scorerHintNoGoals,
+src\app\(main)\predict\[matchId]\page.tsx:1110:                  bench: 
+t.predict.scorerBench,
+src\app\(main)\predict\[matchId]\page.tsx:1111:                  formation: 
+t.predict.scorerFormation,
+src\app\(main)\predict\[matchId]\page.tsx:1112:                  
+officialBadge: t.predict.scorerOfficialBadge,
+src\app\(main)\predict\[matchId]\page.tsx:1113:                  
+probableBadge: t.predict.scorerProbableBadge,
+src\app\(main)\predict\[matchId]\page.tsx:1114:                  
+estimatedBadge: t.predict.scorerEstimatedBadge,
+src\app\(main)\predict\[matchId]\page.tsx:1115:                  officialNote: 
+t.predict.scorerOfficialNote,
+src\app\(main)\predict\[matchId]\page.tsx:1116:                  probableNote: 
+t.predict.scorerProbableNote,
+src\app\(main)\predict\[matchId]\page.tsx:1117:                  
+estimatedNote: t.predict.scorerEstimatedNote,
+src\app\(main)\predict\[matchId]\page.tsx:1118:                  
+selectedScorers: t.predict.selectedScorers,
+src\app\(main)\predict\[matchId]\page.tsx:1120:                  remove: 
+t.predict.removeScorer,
+src\app\(main)\predict\[matchId]\page.tsx:1138:            
+needsLineupForScorers ||
+src\app\(main)\predictions\page.tsx:5:import { PredictionHistoryCard } from 
+"@/components/predictions/PredictionHistoryCard";
+src\app\(main)\predictions\page.tsx:11:  getPredictionOutcome,
+src\app\(main)\predictions\page.tsx:16:export default function 
+PredictionsHistoryPage() {
+src\app\(main)\predictions\page.tsx:42:      const outcome = 
+getPredictionOutcome(entry);
+src\app\(main)\predictions\page.tsx:60:        <h1 className="mt-3 text-3xl 
+font-bold">{t.predictions.title}</h1>
+src\app\(main)\predictions\page.tsx:61:        <p className="mt-1 
+text-muted">{t.predictions.subtitle}</p>
+src\app\(main)\predictions\page.tsx:68:            <p className="text-[11px] 
+text-muted">{t.predictions.correctExact}</p>
+src\app\(main)\predictions\page.tsx:72:            <p className="text-[11px] 
+text-muted">{t.predictions.correctWinner}</p>
+src\app\(main)\predictions\page.tsx:76:            <p className="text-[11px] 
+text-muted">{t.predictions.wrong}</p>
+src\app\(main)\predictions\page.tsx:80:            <p className="text-[11px] 
+text-muted">{t.predictions.pending}</p>
+src\app\(main)\predictions\page.tsx:95:            <PredictionHistoryCard 
+key={entry.match.id} entry={entry} />
+src\app\(main)\profile\page.tsx:10:import { PredictionHistoryCard } from 
+"@/components/predictions/PredictionHistoryCard";
+src\app\(main)\profile\page.tsx:39:  predictionsCount: number;
+src\app\(main)\profile\page.tsx:40:  correctPredictions: number;
+src\app\(main)\profile\page.tsx:42:    predictions: {
+src\app\(main)\profile\page.tsx:54:    scorerPredictions: {
+src\app\(main)\profile\page.tsx:60:    boldScorerBets: {
+src\app\(main)\profile\page.tsx:228:          <p className="text-sm 
+text-muted">{t.profile.predictions}</p>
+src\app\(main)\profile\page.tsx:229:          <p className="text-2xl 
+font-bold">{profile.predictionsCount}</p>
+src\app\(main)\profile\page.tsx:233:          <p className="text-2xl 
+font-bold">{profile.correctPredictions}</p>
+src\app\(main)\profile\page.tsx:238:            {profile.predictionsCount > 0
+src\app\(main)\profile\page.tsx:239:              ? 
+`${Math.round((profile.correctPredictions / profile.predictionsCount) * 100)}%`
+src\app\(main)\profile\page.tsx:249:            <Link href="/predictions" 
+className="text-sm text-primary hover:underline">
+src\app\(main)\profile\page.tsx:250:              
+{t.profile.viewAllPredictions} →
+src\app\(main)\profile\page.tsx:261:              <PredictionHistoryCard 
+key={entry.match.id} entry={entry} />
+src\app\api\admin\calculate-points\route.ts:6:} from 
+"@/services/prediction.service";
+src\app\api\bold-scorer-bet\route.ts:3:import { parseBody, boldScorerBetSchema 
+} from "@/lib/validations";
+src\app\api\bold-scorer-bet\route.ts:5:  getBoldScorerBetStatus,
+src\app\api\bold-scorer-bet\route.ts:6:  submitBoldScorerBet,
+src\app\api\bold-scorer-bet\route.ts:7:} from 
+"@/services/bold-scorer-bet.service";
+src\app\api\bold-scorer-bet\route.ts:19:    const status = await 
+getBoldScorerBetStatus(user.userId, matchId);
+src\app\api\bold-scorer-bet\route.ts:30:    const data = 
+parseBody(boldScorerBetSchema, body);
+src\app\api\bold-scorer-bet\route.ts:32:    const bet = await 
+submitBoldScorerBet(
+src\app\api\matches\[id]\predictions\route.ts:4:import { 
+getLeagueMatchPredictions } from "@/services/prediction.service";
+src\app\api\matches\[id]\predictions\route.ts:16:    const data = await 
+getLeagueMatchPredictions(id);
+src\app\api\matches\[id]\predictions\route.ts:28:    if (error instanceof 
+Error && error.message === "Predictions still open") {
+src\app\api\matches\route.ts:13:  enrichMatchesWithUserPredictions,
+src\app\api\matches\route.ts:45:      const matches = await 
+enrichMatchesWithUserPredictions(items, user?.userId);
+src\app\api\matches\route.ts:53:    const matches = await 
+enrichMatchesWithUserPredictions(raw, user?.userId);
+src\app\api\predictions\route.ts:5:  fullPredictionBundleSchema,
+src\app\api\predictions\route.ts:6:  type FullPredictionBundleInput,
+src\app\api\predictions\route.ts:8:import { submitMatchPredictionBundle } from 
+"@/services/prediction.service";
+src\app\api\predictions\route.ts:15:      fullPredictionBundleSchema,
+src\app\api\predictions\route.ts:17:    ) as FullPredictionBundleInput;
+src\app\api\predictions\route.ts:19:    const result = await 
+submitMatchPredictionBundle(user.userId, data);
+src\app\api\profile\route.ts:8:import { getUserPredictionHistory } from 
+"@/services/prediction.service";
+src\app\api\profile\route.ts:20:    const history = await 
+getUserPredictionHistory(user.id);
+src\app\api\profile\route.ts:23:    for (const p of history.predictions) {
+src\app\api\profile\route.ts:28:    for (const sp of 
+history.scorerPredictions) {
+src\app\api\profile\route.ts:32:    for (const bet of history.boldScorerBets) {
+src\app\api\profile\route.ts:36:    const correctPredictions = 
+history.predictions.filter(
+src\app\api\profile\route.ts:44:      predictionsCount: 
+history.predictions.length,
+src\app\api\profile\route.ts:45:      correctPredictions,
+src\app\api\scorer-predictions\route.ts:4:import { getPredictionLockReason } 
+from "@/lib/utils";
+src\app\api\scorer-predictions\route.ts:5:import { parseBody, 
+scorerPredictionSchema } from "@/lib/validations";
+src\app\api\scorer-predictions\route.ts:6:import { submitScorerPredictions } 
+from "@/services/prediction.service";
+src\app\api\scorer-predictions\route.ts:12:    const data = 
+parseBody(scorerPredictionSchema, body);
+src\app\api\scorer-predictions\route.ts:14:    const predictions = await 
+submitScorerPredictions(
+src\app\api\scorer-predictions\route.ts:20:    return apiSuccess(predictions, 
+201);
+src\app\api\scorer-predictions\route.ts:40:    const lockReason = 
+getPredictionLockReason(match.matchTime, match.status);
+src\app\api\scorer-predictions\route.ts:45:    await 
+prisma.scorerPrediction.deleteMany({
+src\app\api\scorer-predictions\route.ts:49:    return apiSuccess({ message: 
+"Scorer predictions cleared" });
+src\components\matches\LeaguePredictionsList.tsx:4:import type { 
+LeagueMatchPredictionRow } from "@/types";
+src\components\matches\LeaguePredictionsList.tsx:23:type 
+LeaguePredictionsListProps = {
+src\components\matches\LeaguePredictionsList.tsx:24:  rows: 
+LeagueMatchPredictionRow[];
+src\components\matches\LeaguePredictionsList.tsx:48:  row: 
+LeagueMatchPredictionRow;
+src\components\matches\LeaguePredictionsList.tsx:52:  const finishType = 
+asFinishType(row.prediction?.predictedFinishType);
+src\components\matches\LeaguePredictionsList.tsx:53:  const hasPenalty = 
+Boolean(row.prediction?.predictedPenaltyWinnerTeamId);
+src\components\matches\LeaguePredictionsList.tsx:54:  const hasBold = 
+Boolean(row.boldScorerBet);
+src\components\matches\LeaguePredictionsList.tsx:55:  const hasDouble = 
+Boolean(row.prediction?.isDouble);
+src\components\matches\LeaguePredictionsList.tsx:73:          
+title={`${t.matches.featureBold}: ${row.boldScorerBet!.player.name}`}
+src\components\matches\LeaguePredictionsList.tsx:78:            
+{shortPlayerName(row.boldScorerBet!.player.name)}
+src\components\matches\LeaguePredictionsList.tsx:106:function 
+PredictionScoreboard({
+src\components\matches\LeaguePredictionsList.tsx:111:  homeScorers,
+src\components\matches\LeaguePredictionsList.tsx:112:  awayScorers,
+src\components\matches\LeaguePredictionsList.tsx:120:  homeScorers: 
+LeagueMatchPredictionRow["scorerPredictions"];
+src\components\matches\LeaguePredictionsList.tsx:121:  awayScorers: 
+LeagueMatchPredictionRow["scorerPredictions"];
+src\components\matches\LeaguePredictionsList.tsx:152:      
+{(homeScorers.length > 0 || awayScorers.length > 0) && (
+src\components\matches\LeaguePredictionsList.tsx:164:            <ScorerChips 
+scorers={homeScorers} showResults={showResults} />
+src\components\matches\LeaguePredictionsList.tsx:176:            <ScorerChips
+src\components\matches\LeaguePredictionsList.tsx:177:              
+scorers={awayScorers}
+src\components\matches\LeaguePredictionsList.tsx:188:function ScorerChips({
+src\components\matches\LeaguePredictionsList.tsx:189:  scorers,
+src\components\matches\LeaguePredictionsList.tsx:193:  scorers: 
+LeagueMatchPredictionRow["scorerPredictions"];
+src\components\matches\LeaguePredictionsList.tsx:197:  if (scorers.length === 
+0) {
+src\components\matches\LeaguePredictionsList.tsx:205:      {scorers.map((pick) 
+=> {
+src\components\matches\LeaguePredictionsList.tsx:258:  row: 
+LeagueMatchPredictionRow;
+src\components\matches\LeaguePredictionsList.tsx:265:  const finishType = 
+asFinishType(row.prediction?.predictedFinishType);
+src\components\matches\LeaguePredictionsList.tsx:266:  const penaltyTeamId = 
+row.prediction?.predictedPenaltyWinnerTeamId;
+src\components\matches\LeaguePredictionsList.tsx:294:function 
+LeaguePredictionRow({
+src\components\matches\LeaguePredictionsList.tsx:310:  row: 
+LeagueMatchPredictionRow;
+src\components\matches\LeaguePredictionsList.tsx:328:  const showScorerResults 
+= hasScoringContext;
+src\components\matches\LeaguePredictionsList.tsx:329:  const showScoreResults 
+= isFinished && !!matchResult;
+src\components\matches\LeaguePredictionsList.tsx:331:  const homeScorers = 
+row.scorerPredictions.filter(
+src\components\matches\LeaguePredictionsList.tsx:334:  const awayScorers = 
+row.scorerPredictions.filter(
+src\components\matches\LeaguePredictionsList.tsx:346:        scorersOnly: 
+isLive && !isFinished,
+src\components\matches\LeaguePredictionsList.tsx:389:        
+<PredictionScoreboard
+src\components\matches\LeaguePredictionsList.tsx:392:          
+predHome={row.prediction?.predHome}
+src\components\matches\LeaguePredictionsList.tsx:393:          
+predAway={row.prediction?.predAway}
+src\components\matches\LeaguePredictionsList.tsx:394:          
+homeScorers={homeScorers}
+src\components\matches\LeaguePredictionsList.tsx:395:          
+awayScorers={awayScorers}
+src\components\matches\LeaguePredictionsList.tsx:396:          
+scorePoints={showScoreResults ? row.prediction?.points : undefined}
+src\components\matches\LeaguePredictionsList.tsx:397:          
+showResults={showScorerResults}
+src\components\matches\LeaguePredictionsList.tsx:451:                  
+{t.pointsBreakdown.liveScorerHint}
+src\components\matches\LeaguePredictionsList.tsx:511:export function 
+LeaguePredictionsList({
+src\components\matches\LeaguePredictionsList.tsx:524:}: 
+LeaguePredictionsListProps) {
+src\components\matches\LeaguePredictionsList.tsx:533:        <p 
+className="mt-3 text-sm text-muted">{t.matches.noLeaguePredictions}</p>
+src\components\matches\LeaguePredictionsList.tsx:563:          
+<LeaguePredictionRow
+src\components\matches\MatchCard.tsx:5:import { formatDate, 
+isPredictionAllowed, getPredictionLockReason } from "@/lib/utils";
+src\components\matches\MatchCard.tsx:6:import { PredictionCountdown } from 
+"@/components/matches/PredictionCountdown";
+src\components\matches\MatchCard.tsx:13:import { ViewLeaguePredictionsButton } 
+from "@/components/matches/ViewLeaguePredictionsButton";
+src\components\matches\MatchCard.tsx:19:type ScorerPick = {
+src\components\matches\MatchCard.tsx:39:    userPrediction?: {
+src\components\matches\MatchCard.tsx:49:    userScorerPredictions?: 
+ScorerPick[];
+src\components\matches\MatchCard.tsx:50:    userBoldScorerBet?: {
+src\components\matches\MatchCard.tsx:57:  finalPrediction?: boolean;
+src\components\matches\MatchCard.tsx:65:function ScorerList({ scorers }: { 
+scorers: ScorerPick[] }) {
+src\components\matches\MatchCard.tsx:66:  if (scorers.length === 0) return 
+null;
+src\components\matches\MatchCard.tsx:70:      {scorers.map((pick) => (
+src\components\matches\MatchCard.tsx:89:  finalPrediction = false,
+src\components\matches\MatchCard.tsx:96:  const hasPrediction = 
+!!match.userPrediction;
+src\components\matches\MatchCard.tsx:98:    hasPrediction ||
+
+

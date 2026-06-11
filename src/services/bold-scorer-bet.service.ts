@@ -1,3 +1,4 @@
+import { resolveScorerGoalsForPlayer } from "@/lib/player-matching";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason } from "@/lib/utils";
 import {
@@ -144,14 +145,27 @@ export async function submitBoldScorerBet(
 
 export async function calculateBoldScorerBetPointsForMatch(
   matchId: string,
-  regulationGoalsByPlayer: Map<string, number>
+  regulationGoalsByPlayer: Map<string, number>,
+  actualScorers: {
+    playerId: string;
+    player: { name: string; teamId: string };
+  }[] = []
 ) {
   const bets = await prisma.boldScorerBet.findMany({
     where: { matchId },
+    include: {
+      player: { select: { name: true, teamId: true } },
+    },
   });
 
   for (const bet of bets) {
-    const regulationGoals = regulationGoalsByPlayer.get(bet.playerId) ?? 0;
+    const regulationGoals =
+      resolveScorerGoalsForPlayer(
+        bet.playerId,
+        bet.player,
+        regulationGoalsByPlayer,
+        actualScorers
+      ) ?? 0;
     const points = calculateBoldScorerBetPoints(regulationGoals);
     await prisma.boldScorerBet.update({
       where: { id: bet.id },

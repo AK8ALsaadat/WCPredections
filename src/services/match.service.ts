@@ -130,13 +130,10 @@ export async function getUserPinnedTodayMatches(
     orderBy: { match: { matchTime: "asc" } },
   });
 
-  const today = getMatchCalendarDay(new Date());
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const matches = predictions
     .map((p) => p.match)
-    .filter(
-      (m) =>
-        m.status === "LIVE" || getMatchCalendarDay(m.matchTime) === today
-    );
+    .filter((m) => m.status === "LIVE" || new Date(m.matchTime) >= cutoff);
 
   const uniqueById = new Map(matches.map((m) => [m.id, m]));
   return enrichMatchesWithUserPredictions(

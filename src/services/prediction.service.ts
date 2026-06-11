@@ -1,5 +1,6 @@
 import type { FinishType } from "@prisma/client";
 import { revalidateTag } from "next/cache";
+import { resolveScorerGoalsForPlayer } from "@/lib/player-matching";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason, isPredictionAllowed } from "@/lib/utils";
 import type { LeagueMatchPredictionRow } from "@/types";
@@ -501,7 +502,7 @@ async function applyScorerAndBoldPoints(
     matchScorers: {
       playerId: string;
       goals: number;
-      player: { teamId: string };
+      player: { teamId: string; name: string };
     }[];
   }
 ) {
@@ -518,12 +519,21 @@ async function applyScorerAndBoldPoints(
 
   const scorerPredictions = await prisma.scorerPrediction.findMany({
     where: { matchId: match.id },
+    include: {
+      player: { select: { name: true, teamId: true } },
+    },
   });
 
   for (const sp of scorerPredictions) {
+    const actualGoals = resolveScorerGoalsForPlayer(
+      sp.playerId,
+      sp.player,
+      scorerGoalsByPlayer,
+      match.matchScorers
+    );
     const points = calculateScorerPredictionPoints(
       sp.predictedGoals,
-      scorerGoalsByPlayer.get(sp.playerId)
+      actualGoals
     );
     await prisma.scorerPrediction.update({
       where: { id: sp.id },
@@ -531,7 +541,11 @@ async function applyScorerAndBoldPoints(
     });
   }
 
-  await calculateBoldScorerBetPointsForMatch(match.id, scorerGoalsByPlayer);
+  await calculateBoldScorerBetPointsForMatch(
+    match.id,
+    scorerGoalsByPlayer,
+    match.matchScorers
+  );
 }
 
 export async function recalculateMatchScoring(matchId: string): Promise<void> {
@@ -539,7 +553,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
     where: { id: matchId },
     include: {
       matchScorers: {
-        include: { player: { select: { teamId: true } } },
+        include: { player: { select: { teamId: true, name: true } } },
       },
     },
   });
@@ -600,8 +614,18 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
     });
   }
 
-  revalidateTag("leaderboard-overall");
-  revalidateTag(`leaderboard-round-${match.roundId}`);
+  try {
+    revalidateTag("leaderboard-overall");
+    revalidateTag(`leaderboard-round-${match.roundId}`);
+    revalidateTag("matches-schedule");
+    revalidateTag(`match-${match.id}`);
+  } catch (err) {
+    // Revalidation may not be available in some background contexts (e.g. timers).
+    // Don't fail scoring because of cache revalidation errors.
+    // Log a warning for visibility.
+    // eslint-disable-next-line no-console
+    console.warn("[revalidate] skipped due to missing store:", err instanceof Error ? err.message : err);
+  }
 }
 
 export async function calculateMatchPoints(matchId: string): Promise<void> {

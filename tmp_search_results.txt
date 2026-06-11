@@ -1,0 +1,413 @@
+﻿
+node_modules\.prisma\client\index.d.ts:47: * Model ScorerPrediction
+node_modules\.prisma\client\index.d.ts:50:export type ScorerPrediction = 
+$Result.DefaultSelection<Prisma.$ScorerPredictionPayload>
+node_modules\.prisma\client\index.d.ts:57: * Model BoldScorerBet
+node_modules\.prisma\client\index.d.ts:60:export type BoldScorerBet = 
+$Result.DefaultSelection<Prisma.$BoldScorerBetPayload>
+node_modules\.prisma\client\index.d.ts:274:   * `prisma.scorerPrediction`: 
+Exposes CRUD operations for the **ScorerPrediction** model.
+node_modules\.prisma\client\index.d.ts:277:    * // Fetch zero or more 
+ScorerPredictions
+node_modules\.prisma\client\index.d.ts:278:    * const scorerPredictions = 
+await prisma.scorerPrediction.findMany()
+node_modules\.prisma\client\index.d.ts:281:  get scorerPrediction(): 
+Prisma.ScorerPredictionDelegate<ExtArgs, ClientOptions>;
+node_modules\.prisma\client\index.d.ts:287:    * // Fetch zero or more 
+MatchScorers
+node_modules\.prisma\client\index.d.ts:288:    * const matchScorers = await 
+prisma.matchScorer.findMany()
+node_modules\.prisma\client\index.d.ts:294:   * `prisma.boldScorerBet`: 
+Exposes CRUD operations for the **BoldScorerBet** model.
+node_modules\.prisma\client\index.d.ts:297:    * // Fetch zero or more 
+BoldScorerBets
+node_modules\.prisma\client\index.d.ts:298:    * const boldScorerBets = await 
+prisma.boldScorerBet.findMany()
+node_modules\.prisma\client\index.d.ts:301:  get boldScorerBet(): 
+Prisma.BoldScorerBetDelegate<ExtArgs, ClientOptions>;
+node_modules\.prisma\client\index.d.ts:749:    ScorerPrediction: 
+'ScorerPrediction',
+node_modules\.prisma\client\index.d.ts:751:    BoldScorerBet: 'BoldScorerBet'
+node_modules\.prisma\client\index.d.ts:770:      modelProps: "user" | "round" 
+| "team" | "player" | "match" | "prediction" | "scorerPrediction" | 
+"matchScorer" | "boldScorerBet"
+node_modules\.prisma\client\index.d.ts:1218:      ScorerPrediction: {
+node_modules\.prisma\client\index.d.ts:1219:        payload: 
+Prisma.$ScorerPredictionPayload<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1220:        fields: 
+Prisma.ScorerPredictionFieldRefs
+node_modules\.prisma\client\index.d.ts:1223:            args: 
+Prisma.ScorerPredictionFindUniqueArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1224:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload> | null
+node_modules\.prisma\client\index.d.ts:1227:            args: 
+Prisma.ScorerPredictionFindUniqueOrThrowArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1228:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload>
+node_modules\.prisma\client\index.d.ts:1231:            args: 
+Prisma.ScorerPredictionFindFirstArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1232:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload> | null
+node_modules\.prisma\client\index.d.ts:1235:            args: 
+Prisma.ScorerPredictionFindFirstOrThrowArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1236:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload>
+node_modules\.prisma\client\index.d.ts:1239:            args: 
+Prisma.ScorerPredictionFindManyArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1240:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload>[]
+node_modules\.prisma\client\index.d.ts:1243:            args: 
+Prisma.ScorerPredictionCreateArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1244:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload>
+node_modules\.prisma\client\index.d.ts:1247:            args: 
+Prisma.ScorerPredictionCreateManyArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1251:            args: 
+Prisma.ScorerPredictionCreateManyAndReturnArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1252:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload>[]
+node_modules\.prisma\client\index.d.ts:1255:            args: 
+Prisma.ScorerPredictionDeleteArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1256:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload>
+node_modules\.prisma\client\index.d.ts:1259:            args: 
+Prisma.ScorerPredictionUpdateArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1260:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload>
+node_modules\.prisma\client\index.d.ts:1263:            args: 
+Prisma.ScorerPredictionDeleteManyArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1267:            args: 
+Prisma.ScorerPredictionUpdateManyArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1271:            args: 
+Prisma.ScorerPredictionUpdateManyAndReturnArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1272:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload>[]
+node_modules\.prisma\client\index.d.ts:1275:            args: 
+Prisma.ScorerPredictionUpsertArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1276:            result: 
+$Utils.PayloadToResult<Prisma.$ScorerPredictionPayload>
+node_modules\.prisma\client\index.d.ts:1279:            args: 
+Prisma.ScorerPredictionAggregateArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1280:            result: 
+$Utils.Optional<AggregateScorerPrediction>
+node_modules\.prisma\client\index.d.ts:1283:            args: 
+Prisma.ScorerPredictionGroupByArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1284:            result: 
+$Utils.Optional<ScorerPredictionGroupByOutputType>[]
+node_modules\.prisma\client\index.d.ts:1287:            args: 
+Prisma.ScorerPredictionCountArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1288:            result: 
+$Utils.Optional<ScorerPredictionCountAggregateOutputType> | number
+node_modules\.prisma\client\index.d.ts:1366:      BoldScorerBet: {
+node_modules\.prisma\client\index.d.ts:1367:        payload: 
+Prisma.$BoldScorerBetPayload<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1368:        fields: 
+Prisma.BoldScorerBetFieldRefs
+node_modules\.prisma\client\index.d.ts:1371:            args: 
+Prisma.BoldScorerBetFindUniqueArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1372:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload> | null
+node_modules\.prisma\client\index.d.ts:1375:            args: 
+Prisma.BoldScorerBetFindUniqueOrThrowArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1376:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload>
+node_modules\.prisma\client\index.d.ts:1379:            args: 
+Prisma.BoldScorerBetFindFirstArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1380:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload> | null
+node_modules\.prisma\client\index.d.ts:1383:            args: 
+Prisma.BoldScorerBetFindFirstOrThrowArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1384:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload>
+node_modules\.prisma\client\index.d.ts:1387:            args: 
+Prisma.BoldScorerBetFindManyArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1388:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload>[]
+node_modules\.prisma\client\index.d.ts:1391:            args: 
+Prisma.BoldScorerBetCreateArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1392:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload>
+node_modules\.prisma\client\index.d.ts:1395:            args: 
+Prisma.BoldScorerBetCreateManyArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1399:            args: 
+Prisma.BoldScorerBetCreateManyAndReturnArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1400:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload>[]
+node_modules\.prisma\client\index.d.ts:1403:            args: 
+Prisma.BoldScorerBetDeleteArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1404:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload>
+node_modules\.prisma\client\index.d.ts:1407:            args: 
+Prisma.BoldScorerBetUpdateArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1408:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload>
+node_modules\.prisma\client\index.d.ts:1411:            args: 
+Prisma.BoldScorerBetDeleteManyArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1415:            args: 
+Prisma.BoldScorerBetUpdateManyArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1419:            args: 
+Prisma.BoldScorerBetUpdateManyAndReturnArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1420:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload>[]
+node_modules\.prisma\client\index.d.ts:1423:            args: 
+Prisma.BoldScorerBetUpsertArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1424:            result: 
+$Utils.PayloadToResult<Prisma.$BoldScorerBetPayload>
+node_modules\.prisma\client\index.d.ts:1427:            args: 
+Prisma.BoldScorerBetAggregateArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1428:            result: 
+$Utils.Optional<AggregateBoldScorerBet>
+node_modules\.prisma\client\index.d.ts:1431:            args: 
+Prisma.BoldScorerBetGroupByArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1432:            result: 
+$Utils.Optional<BoldScorerBetGroupByOutputType>[]
+node_modules\.prisma\client\index.d.ts:1435:            args: 
+Prisma.BoldScorerBetCountArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:1436:            result: 
+$Utils.Optional<BoldScorerBetCountAggregateOutputType> | number
+node_modules\.prisma\client\index.d.ts:1542:    scorerPrediction?: 
+ScorerPredictionOmit
+node_modules\.prisma\client\index.d.ts:1544:    boldScorerBet?: 
+BoldScorerBetOmit
+node_modules\.prisma\client\index.d.ts:1626:    scorerPredictions: number
+node_modules\.prisma\client\index.d.ts:1627:    boldScorerBets: number
+node_modules\.prisma\client\index.d.ts:1632:    scorerPredictions?: boolean | 
+UserCountOutputTypeCountScorerPredictionsArgs
+node_modules\.prisma\client\index.d.ts:1633:    boldScorerBets?: boolean | 
+UserCountOutputTypeCountBoldScorerBetsArgs
+node_modules\.prisma\client\index.d.ts:1657:  export type 
+UserCountOutputTypeCountScorerPredictionsArgs<ExtArgs extends 
+$Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:1658:    where?: 
+ScorerPredictionWhereInput
+node_modules\.prisma\client\index.d.ts:1664:  export type 
+UserCountOutputTypeCountBoldScorerBetsArgs<ExtArgs extends 
+$Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:1665:    where?: BoldScorerBetWhereInput
+node_modules\.prisma\client\index.d.ts:1675:    boldScorerBets: number
+node_modules\.prisma\client\index.d.ts:1680:    boldScorerBets?: boolean | 
+RoundCountOutputTypeCountBoldScorerBetsArgs
+node_modules\.prisma\client\index.d.ts:1704:  export type 
+RoundCountOutputTypeCountBoldScorerBetsArgs<ExtArgs extends 
+$Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:1705:    where?: BoldScorerBetWhereInput
+node_modules\.prisma\client\index.d.ts:1781:    scorerPredictions: number
+node_modules\.prisma\client\index.d.ts:1782:    matchScorers: number
+node_modules\.prisma\client\index.d.ts:1783:    boldScorerBets: number
+node_modules\.prisma\client\index.d.ts:1787:    scorerPredictions?: boolean | 
+PlayerCountOutputTypeCountScorerPredictionsArgs
+node_modules\.prisma\client\index.d.ts:1788:    matchScorers?: boolean | 
+PlayerCountOutputTypeCountMatchScorersArgs
+node_modules\.prisma\client\index.d.ts:1789:    boldScorerBets?: boolean | 
+PlayerCountOutputTypeCountBoldScorerBetsArgs
+node_modules\.prisma\client\index.d.ts:1806:  export type 
+PlayerCountOutputTypeCountScorerPredictionsArgs<ExtArgs extends 
+$Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:1807:    where?: 
+ScorerPredictionWhereInput
+node_modules\.prisma\client\index.d.ts:1813:  export type 
+PlayerCountOutputTypeCountMatchScorersArgs<ExtArgs extends 
+$Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:1820:  export type 
+PlayerCountOutputTypeCountBoldScorerBetsArgs<ExtArgs extends 
+$Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:1821:    where?: BoldScorerBetWhereInput
+node_modules\.prisma\client\index.d.ts:1831:    scorerPredictions: number
+node_modules\.prisma\client\index.d.ts:1832:    matchScorers: number
+node_modules\.prisma\client\index.d.ts:1833:    boldScorerBets: number
+node_modules\.prisma\client\index.d.ts:1838:    scorerPredictions?: boolean | 
+MatchCountOutputTypeCountScorerPredictionsArgs
+node_modules\.prisma\client\index.d.ts:1839:    matchScorers?: boolean | 
+MatchCountOutputTypeCountMatchScorersArgs
+node_modules\.prisma\client\index.d.ts:1840:    boldScorerBets?: boolean | 
+MatchCountOutputTypeCountBoldScorerBetsArgs
+node_modules\.prisma\client\index.d.ts:1864:  export type 
+MatchCountOutputTypeCountScorerPredictionsArgs<ExtArgs extends 
+$Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:1865:    where?: 
+ScorerPredictionWhereInput
+node_modules\.prisma\client\index.d.ts:1871:  export type 
+MatchCountOutputTypeCountMatchScorersArgs<ExtArgs extends 
+$Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:1878:  export type 
+MatchCountOutputTypeCountBoldScorerBetsArgs<ExtArgs extends 
+$Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:1879:    where?: BoldScorerBetWhereInput
+node_modules\.prisma\client\index.d.ts:2060:    scorerPredictions?: boolean | 
+User$scorerPredictionsArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:2061:    boldScorerBets?: boolean | 
+User$boldScorerBetsArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:2095:    scorerPredictions?: boolean | 
+User$scorerPredictionsArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:2096:    boldScorerBets?: boolean | 
+User$boldScorerBetsArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:2106:      scorerPredictions: 
+Prisma.$ScorerPredictionPayload<ExtArgs>[]
+node_modules\.prisma\client\index.d.ts:2107:      boldScorerBets: 
+Prisma.$BoldScorerBetPayload<ExtArgs>[]
+node_modules\.prisma\client\index.d.ts:2511:    scorerPredictions<T extends 
+User$scorerPredictionsArgs<ExtArgs> = {}>(args?: Subset<T, 
+User$scorerPredictionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<P
+risma.$ScorerPredictionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | 
+Null>
+node_modules\.prisma\client\index.d.ts:2512:    boldScorerBets<T extends 
+User$boldScorerBetsArgs<ExtArgs> = {}>(args?: Subset<T, 
+User$boldScorerBetsArgs<ExtArgs>>): 
+Prisma.PrismaPromise<$Result.GetResult<Prisma.$BoldScorerBetPayload<ExtArgs>, 
+T, "findMany", GlobalOmitOptions> | Null>
+node_modules\.prisma\client\index.d.ts:2960:   * User.scorerPredictions
+node_modules\.prisma\client\index.d.ts:2962:  export type 
+User$scorerPredictionsArgs<ExtArgs extends $Extensions.InternalArgs = 
+$Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:2964:     * Select specific fields to 
+fetch from the ScorerPrediction
+node_modules\.prisma\client\index.d.ts:2966:    select?: 
+ScorerPredictionSelect<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:2968:     * Omit specific fields from 
+the ScorerPrediction
+node_modules\.prisma\client\index.d.ts:2970:    omit?: 
+ScorerPredictionOmit<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:2974:    include?: 
+ScorerPredictionInclude<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:2975:    where?: 
+ScorerPredictionWhereInput
+node_modules\.prisma\client\index.d.ts:2976:    orderBy?: 
+ScorerPredictionOrderByWithRelationInput | 
+ScorerPredictionOrderByWithRelationInput[]
+node_modules\.prisma\client\index.d.ts:2977:    cursor?: 
+ScorerPredictionWhereUniqueInput
+node_modules\.prisma\client\index.d.ts:2980:    distinct?: 
+ScorerPredictionScalarFieldEnum | ScorerPredictionScalarFieldEnum[]
+node_modules\.prisma\client\index.d.ts:2984:   * User.boldScorerBets
+node_modules\.prisma\client\index.d.ts:2986:  export type 
+User$boldScorerBetsArgs<ExtArgs extends $Extensions.InternalArgs = 
+$Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:2988:     * Select specific fields to 
+fetch from the BoldScorerBet
+node_modules\.prisma\client\index.d.ts:2990:    select?: 
+BoldScorerBetSelect<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:2992:     * Omit specific fields from 
+the BoldScorerBet
+node_modules\.prisma\client\index.d.ts:2994:    omit?: 
+BoldScorerBetOmit<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:2998:    include?: 
+BoldScorerBetInclude<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:2999:    where?: BoldScorerBetWhereInput
+node_modules\.prisma\client\index.d.ts:3000:    orderBy?: 
+BoldScorerBetOrderByWithRelationInput | BoldScorerBetOrderByWithRelationInput[]
+node_modules\.prisma\client\index.d.ts:3001:    cursor?: 
+BoldScorerBetWhereUniqueInput
+node_modules\.prisma\client\index.d.ts:3004:    distinct?: 
+BoldScorerBetScalarFieldEnum | BoldScorerBetScalarFieldEnum[]
+node_modules\.prisma\client\index.d.ts:3191:    boldScorerBets?: boolean | 
+Round$boldScorerBetsArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:3222:    boldScorerBets?: boolean | 
+Round$boldScorerBetsArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:3232:      boldScorerBets: 
+Prisma.$BoldScorerBetPayload<ExtArgs>[]
+node_modules\.prisma\client\index.d.ts:3635:    boldScorerBets<T extends 
+Round$boldScorerBetsArgs<ExtArgs> = {}>(args?: Subset<T, 
+Round$boldScorerBetsArgs<ExtArgs>>): 
+Prisma.PrismaPromise<$Result.GetResult<Prisma.$BoldScorerBetPayload<ExtArgs>, 
+T, "findMany", GlobalOmitOptions> | Null>
+node_modules\.prisma\client\index.d.ts:4082:   * Round.boldScorerBets
+node_modules\.prisma\client\index.d.ts:4084:  export type 
+Round$boldScorerBetsArgs<ExtArgs extends $Extensions.InternalArgs = 
+$Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:4086:     * Select specific fields to 
+fetch from the BoldScorerBet
+node_modules\.prisma\client\index.d.ts:4088:    select?: 
+BoldScorerBetSelect<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:4090:     * Omit specific fields from 
+the BoldScorerBet
+node_modules\.prisma\client\index.d.ts:4092:    omit?: 
+BoldScorerBetOmit<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:4096:    include?: 
+BoldScorerBetInclude<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:4097:    where?: BoldScorerBetWhereInput
+node_modules\.prisma\client\index.d.ts:4098:    orderBy?: 
+BoldScorerBetOrderByWithRelationInput | BoldScorerBetOrderByWithRelationInput[]
+node_modules\.prisma\client\index.d.ts:4099:    cursor?: 
+BoldScorerBetWhereUniqueInput
+node_modules\.prisma\client\index.d.ts:4102:    distinct?: 
+BoldScorerBetScalarFieldEnum | BoldScorerBetScalarFieldEnum[]
+node_modules\.prisma\client\index.d.ts:5513:    scorerPredictions?: boolean | 
+Player$scorerPredictionsArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:5514:    matchScorers?: boolean | 
+Player$matchScorersArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:5515:    boldScorerBets?: boolean | 
+Player$boldScorerBetsArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:5551:    scorerPredictions?: boolean | 
+Player$scorerPredictionsArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:5552:    matchScorers?: boolean | 
+Player$matchScorersArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:5553:    boldScorerBets?: boolean | 
+Player$boldScorerBetsArgs<ExtArgs>
+node_modules\.prisma\client\index.d.ts:5567:      scorerPredictions: 
+Prisma.$ScorerPredictionPayload<ExtArgs>[]
+node_modules\.prisma\client\index.d.ts:5568:      matchScorers: 
+Prisma.$MatchScorerPayload<ExtArgs>[]
+node_modules\.prisma\client\index.d.ts:5569:      boldScorerBets: 
+Prisma.$BoldScorerBetPayload<ExtArgs>[]
+node_modules\.prisma\client\index.d.ts:5973:    scorerPredictions<T extends 
+Player$scorerPredictionsArgs<ExtArgs> = {}>(args?: Subset<T, 
+Player$scorerPredictionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult
+<Prisma.$ScorerPredictionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | 
+Null>
+node_modules\.prisma\client\index.d.ts:5974:    matchScorers<T extends 
+Player$matchScorersArgs<ExtArgs> = {}>(args?: Subset<T, 
+Player$matchScorersArgs<ExtArgs>>): 
+Prisma.PrismaPromise<$Result.GetResult<Prisma.$MatchScorerPayload<ExtArgs>, T, 
+"findMany", GlobalOmitOptions> | Null>
+node_modules\.prisma\client\index.d.ts:5975:    boldScorerBets<T extends 
+Player$boldScorerBetsArgs<ExtArgs> = {}>(args?: Subset<T, 
+Player$boldScorerBetsArgs<ExtArgs>>): 
+Prisma.PrismaPromise<$Result.GetResult<Prisma.$BoldScorerBetPayload<ExtArgs>, 
+T, "findMany", GlobalOmitOptions> | Null>
+node_modules\.prisma\client\index.d.ts:6407:   * Player.scorerPredictions
+node_modules\.prisma\client\index.d.ts:6409:  export type 
+Player$scorerPredictionsArgs<ExtArgs extends $Extensions.InternalArgs = 
+$Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:6411:     * Select specific fields to 
+fetch from the ScorerPrediction
+node_modules\.prisma\client\index.d.ts:6413:    select?: 
+ScorerPredictionSelect<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:6415:     * Omit specific fields from 
+the ScorerPrediction
+node_modules\.prisma\client\index.d.ts:6417:    omit?: 
+ScorerPredictionOmit<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:6421:    include?: 
+ScorerPredictionInclude<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:6422:    where?: 
+ScorerPredictionWhereInput
+node_modules\.prisma\client\index.d.ts:6423:    orderBy?: 
+ScorerPredictionOrderByWithRelationInput | 
+ScorerPredictionOrderByWithRelationInput[]
+node_modules\.prisma\client\index.d.ts:6424:    cursor?: 
+ScorerPredictionWhereUniqueInput
+node_modules\.prisma\client\index.d.ts:6427:    distinct?: 
+ScorerPredictionScalarFieldEnum | ScorerPredictionScalarFieldEnum[]
+node_modules\.prisma\client\index.d.ts:6431:   * Player.matchScorers
+node_modules\.prisma\client\index.d.ts:6433:  export type 
+Player$matchScorersArgs<ExtArgs extends $Extensions.InternalArgs = 
+$Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:6437:    select?: 
+MatchScorerSelect<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:6451:    distinct?: 
+MatchScorerScalarFieldEnum | MatchScorerScalarFieldEnum[]
+node_modules\.prisma\client\index.d.ts:6455:   * Player.boldScorerBets
+node_modules\.prisma\client\index.d.ts:6457:  export type 
+Player$boldScorerBetsArgs<ExtArgs extends $Extensions.InternalArgs = 
+$Extensions.DefaultArgs> = {
+node_modules\.prisma\client\index.d.ts:6459:     * Select specific fields to 
+fetch from the BoldScorerBet
+node_modules\.prisma\client\index.d.ts:6461:    select?: 
+BoldScorerBetSelect<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:6463:     * Omit specific fields from 
+the BoldScorerBet
+node_modules\.prisma\client\index.d.ts:6465:    omit?: 
+BoldScorerBetOmit<ExtArgs> | null
+node_modules\.prisma\client\index.d.ts:6469:    include?: 
+BoldScorerBetInclude<ExtArgs> | null
+
+

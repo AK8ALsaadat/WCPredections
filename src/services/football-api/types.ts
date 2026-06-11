@@ -19,6 +19,8 @@ export type ExternalMatch = {
   awayTeamName?: string;
   homeTeamShortName?: string;
   awayTeamShortName?: string;
+  homeTeamLogoUrl?: string;
+  awayTeamLogoUrl?: string;
   matchTime: Date;
   groupCode?: string | null;
   stageName?: string | null;

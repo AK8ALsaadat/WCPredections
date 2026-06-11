@@ -58,9 +58,10 @@ export function PredictionCountdown({
 }: PredictionCountdownProps) {
   const { messages: t, locale } = useI18n();
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
-  const [target, setTarget] = useState(
-    () => getPredictionCountdownTarget(matchTime)
-  );
+  const [target, setTarget] = useState<
+    | { kind: "closes" | "opens"; at: Date }
+    | null
+  >(null);
 
   useEffect(() => {
     function tick() {

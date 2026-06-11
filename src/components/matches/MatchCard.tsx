@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { formatDate, isPredictionAllowed, getPredictionLockReason } from "@/lib/utils";
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
 import { TeamLogo } from "@/components/ui/TeamLogo";
@@ -89,8 +89,8 @@ export function MatchCard({
   finalPrediction = false,
 }: MatchCardProps) {
   const { messages: t, locale } = useI18n();
-  const canPredict = isPredictionAllowed(match.matchTime, match.status);
-  const lockReason = getPredictionLockReason(match.matchTime, match.status, t);
+  const [canPredict, setCanPredict] = useState(false);
+  const [lockReason, setLockReason] = useState<string | null>(null);
   const isFinished = match.status === "FINISHED";
   const isLive = match.status === "LIVE";
   const hasPrediction = !!match.userPrediction;
@@ -113,8 +113,13 @@ export function MatchCard({
       (p) => p.player.teamId === match.awayTeam.id
     ) ?? [];
 
-  const showUserPrediction =
-    hasPrediction && !isFinished && match.userPrediction;
+  const showPredictionInfo = hasPrediction && match.userPrediction;
+  const showUserPrediction = showPredictionInfo && !isFinished;
+
+  useEffect(() => {
+    setCanPredict(isPredictionAllowed(match.matchTime, match.status));
+    setLockReason(getPredictionLockReason(match.matchTime, match.status, t));
+  }, [match.matchTime, match.status, t]);
 
   useEffect(() => {
     if (!showPredictButton || !canPredict) return;
@@ -194,7 +199,7 @@ export function MatchCard({
                   </p>
                 )}
               </div>
-            ) : isFinished && finalPrediction && showUserPrediction ? (
+            ) : isFinished && finalPrediction && showPredictionInfo ? (
               <div className="text-center">
                 <span className="text-2xl font-bold">
                   {match.homeScore} - {match.awayScore}
@@ -227,7 +232,7 @@ export function MatchCard({
             ) : (
               <span className="text-lg font-medium text-muted">{t.matches.vs}</span>
             )}
-            {match.userPrediction?.isDouble && showUserPrediction && (
+            {match.userPrediction?.isDouble && showPredictionInfo && (
               <span className="mt-0.5 text-[10px] font-semibold text-warning">2x</span>
             )}
             <span className="mt-1 text-xs text-muted">

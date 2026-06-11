@@ -1,0 +1,74 @@
+﻿C:\Users\aboaz\Projects\football-predictions\src\app\api\admin\sync\route.ts:4:import { syncMatchesFromApi } from "@/services/football-api";
+C:\Users\aboaz\Projects\football-predictions\src\app\api\admin\sync\route.ts:20:leagueId: data.leagueId ?? process.env.FOOTBALL_LEAGUE_ID,
+C:\Users\aboaz\Projects\football-predictions\src\app\api\admin\sync\route.ts:21:season: data.season ?? process.env.FOOTBALL_SEASON,
+C:\Users\aboaz\Projects\football-predictions\src\app\api\cron\revalidate-leaderboard\route.ts:7:const cronSecret = process.env.CRON_SECRET;
+C:\Users\aboaz\Projects\football-predictions\src\app\api\cron\sync\route.ts:10:const cronSecret = process.env.CRON_SECRET;
+C:\Users\aboaz\Projects\football-predictions\src\app\api\health\route.ts:3:import { resolveFootballApiProviderName } from "@/services/football-api/types";
+C:\Users\aboaz\Projects\football-predictions\src\app\api\health\route.ts:24:footballApi: resolveFootballApiProviderName(),
+C:\Users\aboaz\Projects\football-predictions\src\app\api\health\route.ts:25:autoSync: process.env.ENABLE_AUTO_SYNC !== "false",
+C:\Users\aboaz\Projects\football-predictions\src\app\api\matches\[id]\predictions\route.ts:3:import { ensureMatchSyncedFromApiQuick } from "@/services/football-api";
+C:\Users\aboaz\Projects\football-predictions\src\app\api\matches\[id]\route.ts:5:import { ensureMatchSyncedFromApiQuick } from "@/services/football-api";
+C:\Users\aboaz\Projects\football-predictions\src\app\api\matches\route.ts:7:import { syncStalePredictedMatchesQuick } from "@/services/football-api";
+C:\Users\aboaz\Projects\football-predictions\src\components\layout\SportScoreAttribution.tsx:1:import { resolveFootballApiProviderName } from "@/services/football-api/types";
+C:\Users\aboaz\Projects\football-predictions\src\components\layout\SportScoreAttribution.tsx:4:if (resolveFootballApiProviderName() !== "sportscore") return null;
+C:\Users\aboaz\Projects\football-predictions\src\lib\auth.ts:19:return (process.env.ADMIN_USERNAMES ?? "")
+C:\Users\aboaz\Projects\football-predictions\src\lib\prisma.ts:10:log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+C:\Users\aboaz\Projects\football-predictions\src\lib\rounds.ts:3:return process.env.WORLD_CUP_ROUND_NAME ?? "بطولة الاستراحة - كأس العالم 26";
+C:\Users\aboaz\Projects\football-predictions\src\lib\session-config.ts:9:const SESSION_DAYS = Number(process.env.SESSION_MAX_AGE_DAYS ?? "365");
+C:\Users\aboaz\Projects\football-predictions\src\lib\session-config.ts:13:const sessionSecret = process.env.SESSION_SECRET;
+C:\Users\aboaz\Projects\football-predictions\src\lib\session-config.ts:14:if (!sessionSecret && process.env.NODE_ENV === "production") {
+C:\Users\aboaz\Projects\football-predictions\src\lib\session-config.ts:24:secure: process.env.NODE_ENV === "production",
+C:\Users\aboaz\Projects\football-predictions\src\lib\utils.ts:50:process.env.SYNC_TIMEZONE ?? process.env.PREDICTION_TIMEZONE ?? "Asia/Riyadh";
+C:\Users\aboaz\Projects\football-predictions\src\lib\wc-dates.ts:1:import type { ExternalMatch } from "@/services/football-api/types";
+C:\Users\aboaz\Projects\football-predictions\src\lib\wc-dates.ts:8:return process.env.FOOTBALL_REMAP_TO_WC26 === "true";
+C:\Users\aboaz\Projects\football-predictions\src\lib\wc-dates.ts:15:process.env.FOOTBALL_WC_SOURCE_START,
+C:\Users\aboaz\Projects\football-predictions\src\lib\wc-dates.ts:19:process.env.FOOTBALL_WC26_START,
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\api-football.provider.ts:61:process.env.API_FOOTBALL_BASE_URL ??
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\api-football.provider.ts:63:this.apiKey = process.env.API_FOOTBALL_KEY ?? "";
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\football-data.provider.ts:48:process.env.FOOTBALL_DATA_BASE_URL ??
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\football-data.provider.ts:50:this.apiKey = process.env.FOOTBALL_DATA_API_KEY ?? "";
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\index.ts:11:import { resolveFootballApiProviderName } from "./types";
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\index.ts:14:const provider = resolveFootballApiProviderName();
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\index.ts:515:process.env.SYNC_PLAYERS === "false" || provider.name === "sportscore";
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\sportscore.provider.ts:107:process.env.SPORTSCORE_BASE_URL ?? "https://sportscore.com";
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\sportscore.provider.ts:109:process.env.SPORTSCORE_COMPETITION_SLUG ?? "fifa-world-cup";
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\sportscore.provider.ts:111:process.env.SPORTSCORE_SRC ??
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\sportscore.provider.ts:112:process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "") ??
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\types.ts:45:export function resolveFootballApiProviderName(): string {
+C:\Users\aboaz\Projects\football-predictions\src\services\football-api\types.ts:46:return (process.env.FOOTBALL_API_PROVIDER ?? "api-football").trim();
+C:\Users\aboaz\Projects\football-predictions\src\services\api-football-lineup.service.ts:28:!!process.env.API_FOOTBALL_KEY &&
+C:\Users\aboaz\Projects\football-predictions\src\services\api-football-lineup.service.ts:29:process.env.LINEUP_USE_API_FOOTBALL !== "false"
+C:\Users\aboaz\Projects\football-predictions\src\services\api-football-lineup.service.ts:38:process.env.API_FOOTBALL_BASE_URL ?? "https://v3.football.api-sports.io";
+C:\Users\aboaz\Projects\football-predictions\src\services\api-football-lineup.service.ts:39:const apiKey = process.env.API_FOOTBALL_KEY!;
+C:\Users\aboaz\Projects\football-predictions\src\services\match-players.service.ts:103:const apiKey = process.env.FOOTBALL_DATA_API_KEY;
+C:\Users\aboaz\Projects\football-predictions\src\services\match-players.service.ts:105:process.env.FOOTBALL_DATA_BASE_URL ?? "https://api.football-data.org/v4";
+C:\Users\aboaz\Projects\football-predictions\src\services\match-players.service.ts:299:!!process.env.FOOTBALL_DATA_API_KEY &&
+C:\Users\aboaz\Projects\football-predictions\src\services\match-players.service.ts:300:process.env.LINEUP_USE_FOOTBALL_DATA !== "false"
+C:\Users\aboaz\Projects\football-predictions\src\services\match-players.service.ts:615:if (process.env.FOOTBALL_API_PROVIDER !== "football-data") {
+C:\Users\aboaz\Projects\football-predictions\src\services\match-scorers.service.ts:3:import { getFootballApiProvider } from "@/services/football-api";
+C:\Users\aboaz\Projects\football-predictions\src\services\match-scorers.service.ts:4:import type { SyncOptions } from "@/services/football-api/types";
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:6:} from "@/services/football-api";
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:7:import { resolveFootballApiProviderName } from "@/services/football-api/types";
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:22:if (process.env.SYNC_QUIET_HOURS === "false") return false;
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:24:const timeZone = process.env.SYNC_TIMEZONE ?? "Asia/Riyadh";
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:25:const start = Number(process.env.SYNC_QUIET_START ?? "10");
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:26:const end = Number(process.env.SYNC_QUIET_END ?? "16");
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:39:const provider = resolveFootballApiProviderName();
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:44:(process.env.SPORTSCORE_COMPETITION_SLUG ?? "fifa-world-cup").trim(),
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:45:season: (process.env.FOOTBALL_SEASON ?? "2026").trim(),
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:51:process.env.FOOTBALL_LEAGUE_ID ?? (provider === "football-data" ? "WC" : "1");
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:53:process.env.FOOTBALL_SEASON ?? (provider === "football-data" ? "2026" : "2022");
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:57:leagueId: process.env.FOOTBALL_LEAGUE_ID ?? "WC",
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:58:season: process.env.FOOTBALL_SEASON ?? "2026",
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:61:if (process.env.FOOTBALL_SYNC_USE_DATE_RANGE === "true") {
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:75:if (process.env.FOOTBALL_SYNC_USE_DATE_RANGE === "true") {
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:88:const wcName = process.env.WORLD_CUP_ROUND_NAME ?? "بطولة الاستراحة - كأس العالم 26";
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:111:const timeZone = process.env.SYNC_TIMEZONE ?? "Asia/Riyadh";
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:112:const start = process.env.SYNC_QUIET_START ?? "10";
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:113:const end = process.env.SYNC_QUIET_END ?? "16";
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:164:if (syncInterval || process.env.ENABLE_AUTO_SYNC === "false") return;
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:166:const minutes = Number(process.env.SYNC_INTERVAL_MINUTES ?? "30");
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:184:const quietStart = process.env.SYNC_QUIET_START ?? "10";
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:185:const quietEnd = process.env.SYNC_QUIET_END ?? "16";
+C:\Users\aboaz\Projects\football-predictions\src\services\sync.service.ts:186:const timeZone = process.env.SYNC_TIMEZONE ?? "Asia/Riyadh";
+C:\Users\aboaz\Projects\football-predictions\src\instrumentation.ts:2:if (process.env.NEXT_RUNTIME === "nodejs" && process.env.ENABLE_AUTO_SYNC !== "false") {

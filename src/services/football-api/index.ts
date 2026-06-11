@@ -4,6 +4,7 @@ import { applyRemappedMatchState } from "@/lib/wc-dates";
 import { advanceKnockoutTeams } from "@/services/knockout-advancement.service";
 import { syncMatchScorersFromApi } from "@/services/match-scorers.service";
 import { recalculateMatchScoring } from "@/services/prediction.service";
+import { publish } from '@/lib/broadcaster';
 import { ApiFootballProvider } from "./api-football.provider";
 import { FootballDataProvider } from "./football-data.provider";
 import { SportScoreProvider } from "./sportscore.provider";
@@ -93,12 +94,23 @@ async function syncPlayers(
 
 async function resolveTeamId(
   apiTeamId: string,
-  fallback?: { name: string; shortName?: string }
+  fallback?: { name: string; shortName?: string; logoUrl?: string }
 ): Promise<string | null> {
   const team = await prisma.team.findUnique({
     where: { apiTeamId },
   });
-  if (team) return team.id;
+  if (team) {
+    if (
+      fallback?.logoUrl &&
+      fallback.logoUrl !== team.logoUrl
+    ) {
+      await prisma.team.update({
+        where: { id: team.id },
+        data: { logoUrl: fallback.logoUrl },
+      });
+    }
+    return team.id;
+  }
 
   if (fallback?.name) {
     const byName = await prisma.team.findFirst({
@@ -109,7 +121,10 @@ async function resolveTeamId(
     if (byName) {
       await prisma.team.update({
         where: { id: byName.id },
-        data: { apiTeamId },
+        data: {
+          apiTeamId,
+          logoUrl: fallback.logoUrl ?? byName.logoUrl,
+        },
       });
       return byName.id;
     }
@@ -124,11 +139,13 @@ async function resolveTeamId(
       name: fallback.name,
       shortName:
         fallback.shortName ?? fallback.name.slice(0, 3).toUpperCase(),
+      logoUrl: fallback.logoUrl,
     },
     update: {
       name: fallback.name,
       shortName:
         fallback.shortName ?? fallback.name.slice(0, 3).toUpperCase(),
+      logoUrl: fallback.logoUrl ?? undefined,
     },
   });
 
@@ -308,10 +325,12 @@ async function syncMatch(
   const homeTeamId = await resolveTeamId(mapped.homeTeamApiId, {
     name: mapped.homeTeamName ?? "يُحدد لاحقاً",
     shortName: mapped.homeTeamShortName,
+    logoUrl: mapped.homeTeamLogoUrl,
   });
   const awayTeamId = await resolveTeamId(mapped.awayTeamApiId, {
     name: mapped.awayTeamName ?? "يُحدد لاحقاً",
     shortName: mapped.awayTeamShortName,
+    logoUrl: mapped.awayTeamLogoUrl,
   });
 
   if (!homeTeamId || !awayTeamId) {
@@ -370,6 +389,12 @@ async function syncMatch(
   if (shouldSyncScorers) {
     try {
       await syncMatchScorersFromApi(match.id, mapped.apiId, options);
+      // Publish immediate update about match scorers and basic match info
+      try {
+        const ms = await prisma.matchScorer.findMany({ where: { matchId: match.id }, include: { player: true } });
+        publish({ type: 'match-scorers-updated', data: { matchId: match.id, matchScorers: ms } });
+        publish({ type: 'match-updated', data: { matchId: match.id, status: match.status, homeScore: match.homeScore, awayScore: match.awayScore } });
+      } catch {}
     } catch (error) {
       console.warn(
         `[مزامنة هدافين] تخطي مباراة ${mapped.apiId}:`,
@@ -386,6 +411,10 @@ async function syncMatch(
   if (canRecalculate && shouldSyncScorers) {
     try {
       await recalculateMatchScoring(match.id);
+      // Broadcast match scoring update to connected clients (real-time UI)
+      try {
+        publish({ type: 'match-scoring-updated', data: { matchId: match.id } });
+      } catch {}
     } catch (error) {
       console.warn(
         `[مزامنة نقاط] تخطي مباراة ${match.id}:`,
@@ -614,6 +643,7 @@ export async function syncStalePredictedMatches(
       predictions: { some: {} },
       OR: [
         { status: "LIVE" },
+        { status: "FINISHED" },
         { status: "SCHEDULED", matchTime: { lte: now } },
       ],
     },
@@ -639,7 +669,7 @@ export async function syncStalePredictedMatches(
 }
 
 export async function ensureMatchSyncedFromApiQuick(matchId: string) {
-  return withTimeout(ensureMatchSyncedFromApi(matchId), 4_000, { synced: false });
+  return withTimeout(ensureMatchSyncedFromApi(matchId), 8_000, { synced: false });
 }
 
 export async function syncStalePredictedMatchesQuick(
@@ -648,7 +678,7 @@ export async function syncStalePredictedMatchesQuick(
 ) {
   return withTimeout(
     syncStalePredictedMatches(roundId, options),
-    5_000,
+    10_000,
     { synced: 0 }
   );
 }

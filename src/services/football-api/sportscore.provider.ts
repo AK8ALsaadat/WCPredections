@@ -165,12 +165,13 @@ export class SportScoreProvider implements FootballApiProvider {
       if (table.group.toLowerCase().includes("third placed")) continue;
 
       for (const row of table.rows) {
-        teams.set(row.team_slug, {
-          apiId: row.team_slug,
-          name: row.team,
-          shortName: row.team.slice(0, 3).toUpperCase(),
-          logoUrl: row.team_logo,
-        });
+          teams.set(row.team_slug, {
+            apiId: row.team_slug,
+            name: row.team,
+            shortName: row.team.slice(0, 3).toUpperCase(),
+            logoUrl:
+              row.team_logo ?? `https://countryflagsapi.com/png/${encodeURIComponent(row.team)}`,
+          });
       }
     }
 
@@ -268,6 +269,8 @@ export class SportScoreProvider implements FootballApiProvider {
       awayTeamName: item.away,
       homeTeamShortName: item.home.slice(0, 3),
       awayTeamShortName: item.away.slice(0, 3),
+      homeTeamLogoUrl: item.home_logo,
+      awayTeamLogoUrl: item.away_logo,
       matchTime: new Date(item.time),
       groupCode: sameGroup ? homeGroup : null,
       stageName: isKnockout ? "Knockout Stage" : "Group Stage",

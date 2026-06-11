@@ -1,3 +1,4 @@
+import { resolvePlayerInSquad } from "@/lib/player-matching";
 import { prisma } from "@/lib/prisma";
 import { getFootballApiProvider } from "@/services/football-api";
 import type { SyncOptions } from "@/services/football-api/types";
@@ -14,8 +15,8 @@ export async function syncMatchScorersFromApi(
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     select: {
-      homeTeam: { select: { id: true, apiTeamId: true } },
-      awayTeam: { select: { id: true, apiTeamId: true } },
+      homeTeam: { select: { id: true, apiTeamId: true, name: true } },
+      awayTeam: { select: { id: true, apiTeamId: true, name: true } },
     },
   });
 
@@ -44,17 +45,38 @@ export async function syncMatchScorersFromApi(
         teamId = team?.id ?? null;
       }
 
+      if (!teamId && match) {
+        const slugifyTeamName = (text: string) =>
+          text
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+
+        const homeSlug = slugifyTeamName(match.homeTeam.name);
+        const awaySlug = slugifyTeamName(match.awayTeam.name);
+
+        if (teamApiId === homeSlug) {
+          teamId = match.homeTeam.id;
+        } else if (teamApiId === awaySlug) {
+          teamId = match.awayTeam.id;
+        }
+      }
+
       if (teamId) {
-        const byName = await prisma.player.findFirst({
-          where: {
-            teamId,
-            name: { equals: playerName, mode: "insensitive" },
-          },
-          select: { id: true },
+        const squad = await prisma.player.findMany({
+          where: { teamId },
+          select: { id: true, name: true, apiPlayerId: true },
         });
 
-        if (byName) {
-          player = byName;
+        const matched = resolvePlayerInSquad(squad, {
+          apiPlayerId: playerApiId,
+          playerName,
+        });
+
+        if (matched) {
+          player = matched;
         } else {
           const created = await prisma.player.upsert({
             where: {
