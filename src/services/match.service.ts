@@ -7,7 +7,7 @@ import {
 import { getTournamentRoundName } from "@/lib/rounds";
 import type { MatchStatus } from "@prisma/client";
 import { getBoldScorerBetStatus } from "@/services/bold-scorer-bet.service";
-import { calculateMatchPoints } from "@/services/prediction.service";
+import { recalculateMatchScoring } from "@/services/prediction.service";
 import { getRoundUsageLimits } from "@/services/round-usage.service";
 
 const teamSelect = {
@@ -488,8 +488,12 @@ export async function updateMatchResult(
     }
   }
 
-  if (match.status === "FINISHED" && match.homeScore !== null && match.awayScore !== null) {
-    await calculateMatchPoints(matchId);
+  if (
+    (match.status === "LIVE" || match.status === "FINISHED") &&
+    match.homeScore !== null &&
+    match.awayScore !== null
+  ) {
+    await recalculateMatchScoring(matchId);
   }
 
   return match;

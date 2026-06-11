@@ -47,6 +47,15 @@ export function isMatchFinishedForScoring(match: Match): boolean {
   );
 }
 
+/** نقاط الهدافين والبطاقة الجريئة — أثناء المباراة أو بعدها */
+export function isMatchEligibleForScorerPoints(match: Match): boolean {
+  return (
+    (match.status === "LIVE" || match.status === "FINISHED") &&
+    match.homeScore !== null &&
+    match.awayScore !== null
+  );
+}
+
 export type MatchScorerRow = {
   playerId: string;
   goals: number;

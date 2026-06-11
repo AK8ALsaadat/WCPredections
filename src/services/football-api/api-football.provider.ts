@@ -1,5 +1,11 @@
+import {
+  aggregateGoalsFromEvents,
+  goalsMapToList,
+  type ParsedFixtureEvent,
+} from "@/lib/fixture-events";
 import type {
   ExternalMatch,
+  ExternalMatchScorer,
   ExternalPlayer,
   ExternalTeam,
   FootballApiProvider,
@@ -187,5 +193,26 @@ export class ApiFootballProvider implements FootballApiProvider {
         penaltyWinnerTeamApiId,
       };
     });
+  }
+
+  async fetchMatchScorers(
+    fixtureApiId: string,
+    _options: SyncOptions
+  ): Promise<ExternalMatchScorer[]> {
+    const response = await this.fetch<
+      {
+        type: string;
+        detail: string;
+        player: { id: number | null } | null;
+      }[]
+    >("/fixtures/events", { fixture: fixtureApiId });
+
+    const events: ParsedFixtureEvent[] = response.map((item) => ({
+      type: item.type,
+      detail: item.detail ?? "",
+      playerApiId: item.player?.id != null ? String(item.player.id) : null,
+    }));
+
+    return goalsMapToList(aggregateGoalsFromEvents(events));
   }
 }

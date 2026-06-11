@@ -6,7 +6,6 @@ import { asFinishType } from "@/lib/finish-type";
 import {
   buildLeaguePendingBreakdown,
   buildMatchPointsBreakdown,
-  getMatchTotalUserPoints,
   leagueRowToBreakdownInput,
   type LeagueMatchResultContext,
 } from "@/lib/match-points-breakdown";
@@ -31,6 +30,7 @@ type LeaguePredictionsListProps = {
   awayShortName: string;
   isKnockout: boolean;
   isFinished: boolean;
+  matchStatus: string;
   matchResult?: LeagueMatchResultContext | null;
   currentUserId?: string;
 };
@@ -296,6 +296,7 @@ function LeaguePredictionRow({
   index,
   isMe,
   isFinished,
+  matchStatus,
   isKnockout,
   matchResult,
   homeTeamId,
@@ -310,6 +311,7 @@ function LeaguePredictionRow({
   index: number;
   isMe: boolean;
   isFinished: boolean;
+  matchStatus: string;
   isKnockout: boolean;
   matchResult?: LeagueMatchResultContext | null;
   homeTeamId: string;
@@ -321,7 +323,10 @@ function LeaguePredictionRow({
   t: Messages;
 }) {
   const [open, setOpen] = useState(false);
-  const showResults = isFinished && !!matchResult;
+  const isLive = matchStatus === "LIVE";
+  const hasScoringContext = !!matchResult && (isFinished || isLive);
+  const showScorerResults = hasScoringContext;
+  const showScoreResults = isFinished && !!matchResult;
 
   const homeScorers = row.scorerPredictions.filter(
     (p) => p.player.teamId === homeTeamId
@@ -331,12 +336,15 @@ function LeaguePredictionRow({
   );
 
   const breakdownInput =
-    showResults && matchResult
+    hasScoringContext && matchResult
       ? leagueRowToBreakdownInput(row, matchResult)
       : null;
 
   const breakdown = breakdownInput
-    ? buildMatchPointsBreakdown(breakdownInput, t, { showMisses: true })
+    ? buildMatchPointsBreakdown(breakdownInput, t, {
+        showMisses: true,
+        scorersOnly: isLive && !isFinished,
+      })
     : buildLeaguePendingBreakdown(
         row,
         {
@@ -349,9 +357,7 @@ function LeaguePredictionRow({
         t
       );
 
-  const totalPoints = breakdownInput
-    ? getMatchTotalUserPoints(breakdownInput)
-    : 0;
+  const totalPoints = breakdown.total;
 
   const hasBreakdown = breakdown.lines.length > 0;
 
@@ -387,8 +393,8 @@ function LeaguePredictionRow({
           predAway={row.prediction?.predAway}
           homeScorers={homeScorers}
           awayScorers={awayScorers}
-          scorePoints={showResults ? row.prediction?.points : undefined}
-          showResults={showResults}
+          scorePoints={showScoreResults ? row.prediction?.points : undefined}
+          showResults={showScorerResults}
         />
       </div>
 
@@ -440,7 +446,12 @@ function LeaguePredictionRow({
           </button>
           {open && (
             <div className="mt-2 rounded-lg border border-card-border/60 bg-background/30 p-3">
-              {!showResults && (
+              {isLive && !isFinished && (
+                <p className="mb-2 text-[10px] text-warning">
+                  {t.pointsBreakdown.liveScorerHint}
+                </p>
+              )}
+              {!hasScoringContext && (
                 <p className="mb-2 text-[10px] text-warning">
                   {t.pointsBreakdown.pendingHint}
                 </p>
@@ -495,6 +506,7 @@ export function LeaguePredictionsList({
   awayShortName,
   isKnockout,
   isFinished,
+  matchStatus,
   matchResult,
   currentUserId,
 }: LeaguePredictionsListProps) {
@@ -528,6 +540,7 @@ export function LeaguePredictionsList({
             index={index}
             isMe={row.userId === currentUserId}
             isFinished={isFinished}
+            matchStatus={matchStatus}
             isKnockout={isKnockout}
             matchResult={matchResult}
             homeTeamId={homeTeamId}

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { syncMatchesFromApi } from "@/services/football-api";
-import { calculateMatchPoints } from "@/services/prediction.service";
+import { recalculateMatchScoring } from "@/services/prediction.service";
 import { addDays, format } from "date-fns";
 
 function getHourInTimezone(timeZone: string): number {
@@ -109,18 +109,23 @@ export async function syncActiveRoundFromApi() {
 
   const result = await syncMatchesFromApi(round.id, options);
 
-  const finishedMatches = await prisma.match.findMany({
-    where: { roundId: round.id, status: "FINISHED" },
+  const scorableMatches = await prisma.match.findMany({
+    where: {
+      roundId: round.id,
+      status: { in: ["LIVE", "FINISHED"] },
+      homeScore: { not: null },
+      awayScore: { not: null },
+    },
     select: { id: true },
   });
 
   let pointsRecalculated = 0;
-  for (const match of finishedMatches) {
+  for (const match of scorableMatches) {
     try {
-      await calculateMatchPoints(match.id);
+      await recalculateMatchScoring(match.id);
       pointsRecalculated++;
     } catch {
-      // تخطي المباريات بدون نتائج
+      // تخطي المباريات غير الجاهزة للاحتساب
     }
   }
 
@@ -138,7 +143,7 @@ let syncInterval: ReturnType<typeof setInterval> | null = null;
 export function startAutoSync() {
   if (syncInterval || process.env.ENABLE_AUTO_SYNC === "false") return;
 
-  const minutes = Number(process.env.SYNC_INTERVAL_MINUTES ?? "60");
+  const minutes = Number(process.env.SYNC_INTERVAL_MINUTES ?? "30");
   const intervalMs = minutes * 60 * 1000;
 
   const run = async () => {

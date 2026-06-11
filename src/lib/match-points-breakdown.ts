@@ -14,6 +14,8 @@ export type PointsBreakdownLine = {
 export type BuildMatchPointsBreakdownOptions = {
   /** عرض كل البنود بما فيها الأخطاء وصفر النقاط */
   showMisses?: boolean;
+  /** أثناء المباراة — الهدافين والبطاقة الجريئة فقط */
+  scorersOnly?: boolean;
 };
 
 export type MatchPointsBreakdownInput = {
@@ -150,16 +152,19 @@ export function buildMatchPointsBreakdown(
   options?: BuildMatchPointsBreakdownOptions
 ): { total: number; lines: PointsBreakdownLine[] } {
   const showMisses = options?.showMisses ?? false;
+  const scorersOnly = options?.scorersOnly ?? false;
   const lines: PointsBreakdownLine[] = [];
 
-  const scoreLine = scoreBreakdownLine(input, messages, showMisses);
-  if (scoreLine) lines.push(scoreLine);
+  if (!scorersOnly) {
+    const scoreLine = scoreBreakdownLine(input, messages, showMisses);
+    if (scoreLine) lines.push(scoreLine);
 
-  const finishLine = finishTypeLine(input, messages, showMisses);
-  if (finishLine) lines.push(finishLine);
+    const finishLine = finishTypeLine(input, messages, showMisses);
+    if (finishLine) lines.push(finishLine);
 
-  const penalty = penaltyLine(input, messages, showMisses);
-  if (penalty) lines.push(penalty);
+    const penalty = penaltyLine(input, messages, showMisses);
+    if (penalty) lines.push(penalty);
+  }
 
   for (const sp of input.userScorerPredictions ?? []) {
     if (!showMisses && sp.points === 0) continue;
@@ -194,7 +199,10 @@ export function buildMatchPointsBreakdown(
     }
   }
 
-  const total = getMatchTotalUserPoints(input);
+  const total = scorersOnly
+    ? (input.userScorerPredictions?.reduce((s, sp) => s + sp.points, 0) ?? 0) +
+      (input.userBoldScorerBet?.points ?? 0)
+    : getMatchTotalUserPoints(input);
 
   return { total, lines };
 }

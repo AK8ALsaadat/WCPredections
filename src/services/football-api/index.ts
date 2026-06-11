@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { applyRemappedMatchState } from "@/lib/wc-dates";
 import { advanceKnockoutTeams } from "@/services/knockout-advancement.service";
-import { calculateMatchPoints } from "@/services/prediction.service";
+import { syncMatchScorersFromApi } from "@/services/match-scorers.service";
+import { recalculateMatchScoring } from "@/services/prediction.service";
 import { ApiFootballProvider } from "./api-football.provider";
 import { FootballDataProvider } from "./football-data.provider";
 import type { ExternalMatch, FootballApiProvider, SyncOptions } from "./types";
@@ -116,7 +117,8 @@ async function resolveTeamId(
 
 async function syncMatch(
   external: ExternalMatch,
-  roundId: string
+  roundId: string,
+  options: SyncOptions = {}
 ): Promise<{ created: boolean; updated: boolean; finished: boolean }> {
   const mapped = applyRemappedMatchState(external);
   const homeTeamId = await resolveTeamId(mapped.homeTeamApiId, {
@@ -182,13 +184,34 @@ async function syncMatch(
       existing.awayScore !== mapped.awayScore ||
       existing.status !== mapped.status);
 
-  if (
-    isNowFinished &&
+  const shouldSyncScorers =
+    mapped.status === "LIVE" || mapped.status === "FINISHED";
+
+  if (shouldSyncScorers) {
+    try {
+      await syncMatchScorersFromApi(match.id, mapped.apiId, options);
+    } catch (error) {
+      console.warn(
+        `[مزامنة هدافين] تخطي مباراة ${mapped.apiId}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
+
+  const canRecalculate =
     match.homeScore !== null &&
     match.awayScore !== null &&
-    (!wasFinished || scoresChanged)
-  ) {
-    await calculateMatchPoints(match.id);
+    (mapped.status === "LIVE" || isNowFinished);
+
+  if (canRecalculate && shouldSyncScorers) {
+    try {
+      await recalculateMatchScoring(match.id);
+    } catch (error) {
+      console.warn(
+        `[مزامنة نقاط] تخطي مباراة ${match.id}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
   }
 
   return {
@@ -219,7 +242,7 @@ export async function syncMatchesFromApi(
   let pointsCalculated = 0;
 
   for (const external of externalMatches) {
-    const result = await syncMatch(external, roundId);
+    const result = await syncMatch(external, roundId, options);
     if (result.created) created++;
     if (result.updated) updated++;
     if (result.finished) pointsCalculated++;

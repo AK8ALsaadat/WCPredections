@@ -248,6 +248,8 @@ export const en = {
     pendingFinishType: "Predicted finish type",
     pendingPenalty: "Predicted penalty shootout winner",
     pendingHint: "Points are calculated after the match ends",
+    liveScorerHint:
+      "Scorer points update during the match — VAR cancellations remove points automatically",
     total: "Total",
     hideDetails: "Hide details",
   },

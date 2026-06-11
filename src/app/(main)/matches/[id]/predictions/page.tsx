@@ -79,7 +79,12 @@ export default function LeagueMatchPredictionsPage() {
     match.awayScore != null;
   const withDouble = predictions.filter((p) => p.prediction?.isDouble).length;
   const withBold = predictions.filter((p) => p.boldScorerBet).length;
-  const matchResult = isFinished
+  const hasScoringContext =
+    match.homeScore != null &&
+    match.awayScore != null &&
+    (match.status === "FINISHED" || match.status === "LIVE");
+
+  const matchResult = hasScoringContext
     ? {
         homeScore: match.homeScore!,
         awayScore: match.awayScore!,
@@ -210,6 +215,7 @@ export default function LeagueMatchPredictionsPage() {
         awayShortName={match.awayTeam.shortName}
         isKnockout={match.isKnockout}
         isFinished={isFinished}
+        matchStatus={match.status}
         matchResult={matchResult}
         currentUserId={currentUserId}
       />

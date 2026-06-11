@@ -1,3 +1,4 @@
+import type { FinishType } from "@prisma/client";
 import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason, isPredictionAllowed } from "@/lib/utils";
@@ -9,6 +10,7 @@ import {
   calculateScorePredictionPoints,
   calculateScorerPredictionPoints,
   getScorerGoalsForPoints,
+  isMatchEligibleForScorerPoints,
   isMatchFinishedForScoring,
 } from "@/services/scoring.service";
 
@@ -474,68 +476,36 @@ export async function submitMatchPredictionBundle(
   return { prediction, scorers, boldBet };
 }
 
-export async function calculateMatchPoints(matchId: string): Promise<void> {
-  const match = await prisma.match.findUniqueOrThrow({
-    where: { id: matchId },
-    include: {
-      matchScorers: {
-        include: { player: { select: { teamId: true } } },
-      },
-    },
-  });
-
-  if (!isMatchFinishedForScoring(match)) {
-    throw new Error("Match is not finished or scores are missing");
+async function applyScorerAndBoldPoints(
+  match: {
+    id: string;
+    roundId: string;
+    homeTeamId: string;
+    awayTeamId: string;
+    homeScore: number;
+    awayScore: number;
+    actualFinishType: FinishType | null;
+    matchScorers: {
+      playerId: string;
+      goals: number;
+      player: { teamId: string };
+    }[];
   }
-
-  const predictions = await prisma.prediction.findMany({
-    where: { matchId },
-  });
-
-  for (const prediction of predictions) {
-    const scorePoints = calculateScorePredictionPoints(
-      prediction.predHome,
-      prediction.predAway,
-      match.homeScore!,
-      match.awayScore!,
-      prediction.isDouble
-    );
-
-    const finishTypePoints = match.isKnockout
-      ? calculateFinishTypePoints(
-          prediction.predictedFinishType,
-          match.actualFinishType
-        )
-      : 0;
-
-    const penaltyWinnerPoints =
-      match.isKnockout && match.actualFinishType === "PENALTIES"
-        ? calculatePenaltyWinnerPoints(
-            prediction.predictedPenaltyWinnerTeamId,
-            match.penaltyWinnerTeamId
-          )
-        : 0;
-
-    await prisma.prediction.update({
-      where: { id: prediction.id },
-      data: { points: scorePoints, finishTypePoints, penaltyWinnerPoints },
-    });
-  }
-
-  const scorerPredictions = await prisma.scorerPrediction.findMany({
-    where: { matchId },
-  });
-
+) {
   const scorerGoalsByPlayer = getScorerGoalsForPoints(
     {
       actualFinishType: match.actualFinishType,
       homeTeamId: match.homeTeamId,
       awayTeamId: match.awayTeamId,
-      homeScore: match.homeScore!,
-      awayScore: match.awayScore!,
+      homeScore: match.homeScore,
+      awayScore: match.awayScore,
     },
     match.matchScorers
   );
+
+  const scorerPredictions = await prisma.scorerPrediction.findMany({
+    where: { matchId: match.id },
+  });
 
   for (const sp of scorerPredictions) {
     const points = calculateScorerPredictionPoints(
@@ -548,20 +518,96 @@ export async function calculateMatchPoints(matchId: string): Promise<void> {
     });
   }
 
-  await calculateBoldScorerBetPointsForMatch(matchId, scorerGoalsByPlayer);
+  await calculateBoldScorerBetPointsForMatch(match.id, scorerGoalsByPlayer);
+}
+
+export async function recalculateMatchScoring(matchId: string): Promise<void> {
+  const match = await prisma.match.findUniqueOrThrow({
+    where: { id: matchId },
+    include: {
+      matchScorers: {
+        include: { player: { select: { teamId: true } } },
+      },
+    },
+  });
+
+  const finished = isMatchFinishedForScoring(match);
+  const canScoreScorers = isMatchEligibleForScorerPoints(match);
+
+  if (!finished && !canScoreScorers) {
+    throw new Error("Match is not eligible for scoring");
+  }
+
+  if (finished) {
+    const predictions = await prisma.prediction.findMany({
+      where: { matchId },
+    });
+
+    for (const prediction of predictions) {
+      const scorePoints = calculateScorePredictionPoints(
+        prediction.predHome,
+        prediction.predAway,
+        match.homeScore!,
+        match.awayScore!,
+        prediction.isDouble
+      );
+
+      const finishTypePoints = match.isKnockout
+        ? calculateFinishTypePoints(
+            prediction.predictedFinishType,
+            match.actualFinishType
+          )
+        : 0;
+
+      const penaltyWinnerPoints =
+        match.isKnockout && match.actualFinishType === "PENALTIES"
+          ? calculatePenaltyWinnerPoints(
+              prediction.predictedPenaltyWinnerTeamId,
+              match.penaltyWinnerTeamId
+            )
+          : 0;
+
+      await prisma.prediction.update({
+        where: { id: prediction.id },
+        data: { points: scorePoints, finishTypePoints, penaltyWinnerPoints },
+      });
+    }
+  }
+
+  if (canScoreScorers) {
+    await applyScorerAndBoldPoints({
+      id: match.id,
+      roundId: match.roundId,
+      homeTeamId: match.homeTeamId,
+      awayTeamId: match.awayTeamId,
+      homeScore: match.homeScore!,
+      awayScore: match.awayScore!,
+      actualFinishType: match.actualFinishType,
+      matchScorers: match.matchScorers,
+    });
+  }
 
   revalidateTag("leaderboard-overall");
   revalidateTag(`leaderboard-round-${match.roundId}`);
 }
 
+export async function calculateMatchPoints(matchId: string): Promise<void> {
+  await recalculateMatchScoring(matchId);
+}
+
 export async function calculateRoundPoints(roundId: string): Promise<void> {
   const matches = await prisma.match.findMany({
-    where: { roundId, status: "FINISHED" },
+    where: {
+      roundId,
+      status: { in: ["LIVE", "FINISHED"] },
+      homeScore: { not: null },
+      awayScore: { not: null },
+    },
     select: { id: true },
   });
 
   for (const match of matches) {
-    await calculateMatchPoints(match.id);
+    await recalculateMatchScoring(match.id);
   }
 }
 

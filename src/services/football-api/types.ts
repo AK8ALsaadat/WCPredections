@@ -38,9 +38,18 @@ export type SyncOptions = {
   dateTo?: string;
 };
 
+export type ExternalMatchScorer = {
+  playerApiId: string;
+  goals: number;
+};
+
 export interface FootballApiProvider {
   name: string;
   fetchTeams(options: SyncOptions): Promise<ExternalTeam[]>;
   fetchPlayers(teamApiId: string, options: SyncOptions): Promise<ExternalPlayer[]>;
   fetchMatches(options: SyncOptions): Promise<ExternalMatch[]>;
+  fetchMatchScorers(
+    fixtureApiId: string,
+    options: SyncOptions
+  ): Promise<ExternalMatchScorer[]>;
 }

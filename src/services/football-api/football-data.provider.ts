@@ -1,5 +1,6 @@
 import type {
   ExternalMatch,
+  ExternalMatchScorer,
   ExternalPlayer,
   ExternalTeam,
   FootballApiProvider,
@@ -161,5 +162,30 @@ export class FootballDataProvider implements FootballApiProvider {
         match.status === "FINISHED" ? "NINETY_MINUTES" : null,
     };
     });
+  }
+
+  async fetchMatchScorers(
+    fixtureApiId: string,
+    _options: SyncOptions
+  ): Promise<ExternalMatchScorer[]> {
+    const data = await this.fetch<{
+      goals?: {
+        scorer: { id: number | null } | null;
+      }[];
+    }>(`/matches/${fixtureApiId}`);
+
+    const goals = new Map<string, number>();
+
+    for (const goal of data.goals ?? []) {
+      const playerApiId =
+        goal.scorer?.id != null ? String(goal.scorer.id) : null;
+      if (!playerApiId) continue;
+      goals.set(playerApiId, (goals.get(playerApiId) ?? 0) + 1);
+    }
+
+    return Array.from(goals.entries()).map(([playerApiId, count]) => ({
+      playerApiId,
+      goals: count,
+    }));
   }
 }
