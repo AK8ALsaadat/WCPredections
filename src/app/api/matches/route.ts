@@ -44,7 +44,11 @@ export async function GET(request: Request) {
 
     const matches = await enrichMatchesWithUserPredictions(raw, user?.userId);
 
-    return apiSuccess(matches);
+    return apiSuccess(matches, 200, {
+      headers: {
+        "Cache-Control": "private, no-cache",
+      },
+    });
   } catch (error) {
     return handleApiError(error);
   }

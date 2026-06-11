@@ -1,4 +1,4 @@
-import { addHours, subHours } from "date-fns";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { applyRemappedMatchState } from "@/lib/wc-dates";
 import { advanceKnockoutTeams } from "@/services/knockout-advancement.service";
@@ -233,6 +233,11 @@ async function syncMatch(
     }
   }
 
+  if (mapped.status === "LIVE" || mapped.status === "FINISHED") {
+    revalidateTag("matches-schedule");
+    revalidateTag(`match-${match.id}`);
+  }
+
   return {
     created: !existing,
     updated: !!existing,
@@ -244,14 +249,24 @@ async function fetchSportScoreUpdatesForRound(
   provider: SportScoreProvider,
   roundId: string
 ): Promise<ExternalMatch[]> {
-  const now = new Date();
-  const dbMatches = await prisma.match.findMany({
+  const externals = new Map<string, ExternalMatch>();
+  const now = Date.now();
+
+  const push = (match: ExternalMatch) => {
+    if (match.status === "LIVE" || match.status === "FINISHED") {
+      externals.set(match.apiId, match);
+    }
+  };
+
+  for (const match of await provider.fetchMatchesQuick()) {
+    push(match);
+  }
+
+  const candidates = await prisma.match.findMany({
     where: {
       roundId,
-      matchTime: {
-        gte: subHours(now, 6),
-        lte: addHours(now, 3),
-      },
+      predictions: { some: {} },
+      status: { in: ["SCHEDULED", "LIVE", "FINISHED"] },
     },
     include: {
       homeTeam: { select: { name: true } },
@@ -259,35 +274,47 @@ async function fetchSportScoreUpdatesForRound(
     },
   });
 
-  const externals: ExternalMatch[] = [];
-  const seen = new Set<string>();
+  const nearest = candidates
+    .sort(
+      (a, b) =>
+        Math.abs(a.matchTime.getTime() - now) -
+        Math.abs(b.matchTime.getTime() - now)
+    )
+    .slice(0, 16);
 
-  for (const row of dbMatches) {
-    const slugCandidates = [
-      row.apiMatchId,
-      await provider.buildSlugFromTeams(
-        row.homeTeam.name,
-        row.awayTeam.name
-      ),
-    ].filter((slug): slug is string => Boolean(slug));
+  const slugJobs: string[] = [];
+  for (const row of nearest) {
+    const built = await provider.buildSlugFromTeams(
+      row.homeTeam.name,
+      row.awayTeam.name
+    );
+    if (row.apiMatchId?.includes("-vs-")) {
+      slugJobs.push(row.apiMatchId);
+    }
+    slugJobs.push(built);
+  }
 
-    for (const slug of slugCandidates) {
-      if (seen.has(slug)) continue;
+  const uniqueSlugs = [...new Set(slugJobs)].filter(
+    (slug) => !externals.has(slug)
+  );
 
-      try {
-        const external = await provider.fetchMatchBySlug(slug);
-        if (external) {
-          seen.add(external.apiId);
-          externals.push(external);
-          break;
+  for (let i = 0; i < uniqueSlugs.length; i += 4) {
+    const batch = uniqueSlugs.slice(i, i + 4);
+    const results = await Promise.all(
+      batch.map(async (slug) => {
+        try {
+          return await provider.fetchMatchBySlug(slug);
+        } catch {
+          return null;
         }
-      } catch {
-        // جرّب الـ slug التالي
-      }
+      })
+    );
+    for (const external of results) {
+      if (external) push(external);
     }
   }
 
-  return externals;
+  return Array.from(externals.values());
 }
 
 export async function syncMatchesFromApi(
@@ -334,7 +361,18 @@ export async function syncMatchesFromApi(
     if (result.finished) pointsCalculated++;
   }
 
-  const knockoutAdvancement = await advanceKnockoutTeams(roundId);
+  const knockoutAdvancement = isSportScoreQuick
+    ? {
+        groupStageComplete: false,
+        qualifiedThirdGroups: [] as string[],
+        annexMatched: false,
+        knockoutMatchesUpdated: 0,
+      }
+    : await advanceKnockoutTeams(roundId);
+
+  if (updated > 0 || created > 0) {
+    revalidateTag("matches-schedule");
+  }
 
   return {
     provider: provider.name,

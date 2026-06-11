@@ -1,3 +1,4 @@
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { syncMatchesFromApi } from "@/services/football-api";
 import { resolveFootballApiProviderName } from "@/services/football-api/types";
@@ -139,6 +140,10 @@ export async function syncActiveRoundFromApi() {
       // تخطي المباريات غير الجاهزة للاحتساب
     }
   }
+
+  revalidateTag("matches-schedule");
+  revalidatePath("/matches");
+  revalidatePath("/dashboard");
 
   return {
     ...result,

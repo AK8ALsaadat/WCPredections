@@ -280,7 +280,7 @@ export class SportScoreProvider implements FootballApiProvider {
     };
   }
 
-  private async fetchMatchesQuick(): Promise<ExternalMatch[]> {
+  async fetchMatchesQuick(): Promise<ExternalMatch[]> {
     const [widget, tables] = await Promise.all([
       this.fetch<{ matches: SportScoreMatchSummary[] }>(
         "/api/widget/matches/",

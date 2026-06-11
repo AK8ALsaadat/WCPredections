@@ -147,7 +147,7 @@ export async function getScheduleMatches(roundId?: string) {
   return unstable_cache(
     () => fetchScheduleMatches(roundId),
     ["schedule-matches", cacheKey],
-    { revalidate: 45, tags: ["matches-schedule"] }
+    { revalidate: 15, tags: ["matches-schedule"] }
   )();
 }
 
