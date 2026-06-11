@@ -624,8 +624,12 @@ export async function getLeagueMatchPredictions(matchId: string) {
       awayScore: true,
       actualFinishType: true,
       penaltyWinnerTeamId: true,
-      homeTeam: { select: { id: true, name: true, shortName: true } },
-      awayTeam: { select: { id: true, name: true, shortName: true } },
+      homeTeam: {
+        select: { id: true, name: true, shortName: true, logoUrl: true },
+      },
+      awayTeam: {
+        select: { id: true, name: true, shortName: true, logoUrl: true },
+      },
       penaltyWinnerTeam: { select: { id: true, name: true, shortName: true } },
     },
   });

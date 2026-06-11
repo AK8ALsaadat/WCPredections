@@ -93,7 +93,7 @@ export default function LeagueMatchPredictionsPage() {
     : null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 pb-8">
+    <div className="w-full space-y-4 pb-4 md:space-y-6 md:pb-8">
       <Link
         href={`/matches/${matchId}`}
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -101,7 +101,7 @@ export default function LeagueMatchPredictionsPage() {
         ← {t.matches.backToMatch}
       </Link>
 
-      <header className="relative overflow-hidden rounded-2xl border border-card-border bg-gradient-to-b from-primary/10 via-card to-card p-6 shadow-xl shadow-black/25">
+      <header className="relative overflow-hidden rounded-xl border border-card-border bg-gradient-to-b from-primary/10 via-card to-card p-4 shadow-xl shadow-black/25 md:rounded-2xl md:p-6">
         <div
           className="pointer-events-none absolute -end-16 -top-16 h-48 w-48 rounded-full bg-primary/10 blur-3xl"
           aria-hidden
@@ -115,21 +115,28 @@ export default function LeagueMatchPredictionsPage() {
           {t.matches.allPredictionsTitle}
         </p>
 
-        <div className="mt-5 flex items-center justify-between gap-4">
-          <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
+        <div
+          className="mt-4 flex items-center justify-between gap-2 md:mt-5 md:gap-4"
+          dir="ltr"
+        >
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
             <TeamLogo {...match.homeTeam} size="lg" />
-            <span className="font-bold">{match.homeTeam.shortName}</span>
+            <span className="truncate text-sm font-bold md:text-base">
+              {match.homeTeam.shortName}
+            </span>
           </div>
 
-          <div className="shrink-0 px-2 text-center">
+          <div className="shrink-0 px-1 text-center md:px-2">
             {isFinished ? (
-              <div className="text-3xl font-bold tabular-nums">
+              <div className="text-2xl font-bold tabular-nums md:text-3xl">
                 {match.homeScore}
-                <span className="mx-2 text-muted">-</span>
+                <span className="mx-1 text-muted md:mx-2">-</span>
                 {match.awayScore}
               </div>
             ) : (
-              <span className="text-2xl font-light text-muted">{t.matches.vs}</span>
+              <span className="text-xl font-light text-muted md:text-2xl">
+                {t.matches.vs}
+              </span>
             )}
             {isFinished && (
               <p className="mt-1 text-[10px] font-medium text-primary">
@@ -146,13 +153,15 @@ export default function LeagueMatchPredictionsPage() {
             )}
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
             <TeamLogo {...match.awayTeam} size="lg" />
-            <span className="font-bold">{match.awayTeam.shortName}</span>
+            <span className="truncate text-sm font-bold md:text-base">
+              {match.awayTeam.shortName}
+            </span>
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-3 gap-2 border-t border-card-border/60 pt-4 text-center">
+        <div className="mt-4 grid grid-cols-3 gap-1.5 border-t border-card-border/60 pt-3 text-center md:mt-6 md:gap-2 md:pt-4">
           <div className="rounded-xl bg-background/40 px-2 py-2">
             <p className="text-lg font-bold text-primary">{predictions.length}</p>
             <p className="text-[10px] text-muted">
@@ -172,7 +181,7 @@ export default function LeagueMatchPredictionsPage() {
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted md:gap-3 md:text-xs">
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 ring-1 ring-card-border">
           <span className="rounded bg-warning/20 px-1 text-[10px] font-bold text-warning">
             2×
@@ -195,8 +204,8 @@ export default function LeagueMatchPredictionsPage() {
         rows={predictions}
         homeTeamId={match.homeTeam.id}
         awayTeamId={match.awayTeam.id}
-        homeTeamName={match.homeTeam.name}
-        awayTeamName={match.awayTeam.name}
+        homeTeam={match.homeTeam}
+        awayTeam={match.awayTeam}
         homeShortName={match.homeTeam.shortName}
         awayShortName={match.awayTeam.shortName}
         isKnockout={match.isKnockout}
