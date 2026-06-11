@@ -4,8 +4,8 @@ import {
   writeClientCache,
 } from "@/lib/client-page-cache";
 
-const MATCH_FRESH_MS = 120_000;
-const LINEUP_FRESH_MS = 300_000;
+const MATCH_FRESH_MS = 300_000;
+const LINEUP_FRESH_MS = 600_000;
 
 const inflight = new Map<string, Promise<void>>();
 
@@ -17,6 +17,37 @@ export function predictLineupCacheKey(matchId: string) {
   return `predict:lineup:${matchId}`;
 }
 
+type ListMatchSeed = {
+  id: string;
+  matchTime: string | Date;
+  isKnockout: boolean;
+  homeTeam: {
+    id: string;
+    name: string;
+    shortName: string;
+    logoUrl?: string | null;
+  };
+  awayTeam: {
+    id: string;
+    name: string;
+    shortName: string;
+    logoUrl?: string | null;
+  };
+  userPrediction?: {
+    predHome: number;
+    predAway: number;
+    isDouble: boolean;
+    predictedFinishType?: string | null;
+    predictedPenaltyWinnerTeamId?: string | null;
+  } | null;
+  userScorerPredictions?: { playerId: string; predictedGoals: number }[];
+  userBoldScorerBet?: {
+    playerId?: string;
+    points: number;
+    player: { name: string };
+  } | null;
+};
+
 async function fetchPredictMatch(matchId: string) {
   const res = await fetch(`/api/matches/${matchId}?predict=true`, {
     credentials: "same-origin",
@@ -24,7 +55,10 @@ async function fetchPredictMatch(matchId: string) {
   if (!res.ok) return;
   const data = await res.json();
   if (data.success) {
-    writeClientCache(predictMatchCacheKey(matchId), data.data);
+    writeClientCache(predictMatchCacheKey(matchId), {
+      ...data.data,
+      _complete: true,
+    });
   }
 }
 
@@ -39,7 +73,58 @@ async function fetchPredictLineup(matchId: string) {
   }
 }
 
-/** يحمّل بيانات التوقع مسبقاً عند المرور على رابط التوقع */
+type PredictMatchCache = {
+  _complete?: boolean;
+};
+
+/** يزرع كاش سريع من بيانات بطاقة المباراة قبل فتح صفحة التوقع */
+export function seedPredictMatchFromList(match: ListMatchSeed) {
+  const existing = readClientCache<Record<string, unknown>>(
+    predictMatchCacheKey(match.id)
+  );
+  if (existing?._complete) return;
+
+  const matchTime =
+    typeof match.matchTime === "string"
+      ? match.matchTime
+      : match.matchTime.toISOString();
+
+  const seeded = {
+    ...(existing ?? {}),
+    id: match.id,
+    matchTime,
+    isKnockout: match.isKnockout,
+    homeTeam: match.homeTeam,
+    awayTeam: match.awayTeam,
+    userPrediction: match.userPrediction
+      ? {
+          predHome: match.userPrediction.predHome,
+          predAway: match.userPrediction.predAway,
+          isDouble: match.userPrediction.isDouble,
+          predictedFinishType:
+            match.userPrediction.predictedFinishType ?? null,
+          predictedPenaltyWinnerTeamId:
+            match.userPrediction.predictedPenaltyWinnerTeamId ?? null,
+        }
+      : null,
+    userScorerPredictions:
+      match.userScorerPredictions?.map((sp) => ({
+        playerId: sp.playerId,
+        predictedGoals: sp.predictedGoals ?? 1,
+      })) ?? [],
+    userBoldScorerBet: match.userBoldScorerBet?.playerId
+      ? {
+          playerId: match.userBoldScorerBet.playerId,
+          points: match.userBoldScorerBet.points,
+          player: { name: match.userBoldScorerBet.player.name },
+        }
+      : null,
+  };
+
+  writeClientCache(predictMatchCacheKey(match.id), seeded);
+}
+
+/** يحمّل بيانات التوقع مسبقاً — فور ظهور الرابط أو لمسه */
 export function prefetchPredictData(matchId: string) {
   const matchFresh = isClientCacheFresh(
     predictMatchCacheKey(matchId),
@@ -82,9 +167,17 @@ export function writePredictLineupCache<T>(matchId: string, data: T) {
 }
 
 export function isPredictMatchCacheFresh(matchId: string) {
-  return isClientCacheFresh(predictMatchCacheKey(matchId), MATCH_FRESH_MS);
+  const cached = readPredictMatchCache<PredictMatchCache>(matchId);
+  return (
+    cached?._complete === true &&
+    isClientCacheFresh(predictMatchCacheKey(matchId), MATCH_FRESH_MS)
+  );
 }
 
 export function isPredictLineupCacheFresh(matchId: string) {
   return isClientCacheFresh(predictLineupCacheKey(matchId), LINEUP_FRESH_MS);
+}
+
+export function hasPredictMatchCache(matchId: string) {
+  return readPredictMatchCache(matchId) != null;
 }

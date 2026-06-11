@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { prefetchPredictData } from "@/lib/predict-prefetch";
 
 type PredictNavLinkProps = {
@@ -15,6 +15,10 @@ export function PredictNavLink({
   children,
   className,
 }: PredictNavLinkProps) {
+  useEffect(() => {
+    prefetchPredictData(matchId);
+  }, [matchId]);
+
   return (
     <Link
       href={`/predict/${matchId}`}
@@ -22,6 +26,7 @@ export function PredictNavLink({
       className={className}
       onMouseEnter={() => prefetchPredictData(matchId)}
       onFocus={() => prefetchPredictData(matchId)}
+      onTouchStart={() => prefetchPredictData(matchId)}
     >
       {children}
     </Link>

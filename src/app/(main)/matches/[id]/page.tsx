@@ -13,6 +13,10 @@ import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import { MatchPointsBreakdown } from "@/components/matches/MatchPointsBreakdown";
 import { asFinishType } from "@/lib/finish-type";
 import { formatDate, isPredictionAllowed } from "@/lib/utils";
+import {
+  prefetchPredictData,
+  seedPredictMatchFromList,
+} from "@/lib/predict-prefetch";
 import { ar } from "@/lib/i18n/ar";
 import { FINISH_TYPE_LABELS, MATCH_STATUS_LABELS } from "@/types";
 
@@ -29,6 +33,39 @@ export default function MatchDetailPage() {
       .then((data) => {
         if (data.success) {
           setMatch(data.data);
+          const m = data.data as {
+            id: string;
+            matchTime: string;
+            isKnockout: boolean;
+            homeTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
+            awayTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
+            userPrediction?: {
+              predHome: number;
+              predAway: number;
+              isDouble: boolean;
+              predictedFinishType?: string | null;
+              predictedPenaltyWinnerTeamId?: string | null;
+            } | null;
+            userScorerPredictions?: {
+              player: { id: string };
+              predictedGoals: number;
+            }[];
+          };
+          if (isPredictionAllowed(m.matchTime)) {
+            seedPredictMatchFromList({
+              id: m.id,
+              matchTime: m.matchTime,
+              isKnockout: m.isKnockout,
+              homeTeam: m.homeTeam,
+              awayTeam: m.awayTeam,
+              userPrediction: m.userPrediction ?? null,
+              userScorerPredictions: m.userScorerPredictions?.map((sp) => ({
+                playerId: sp.player.id,
+                predictedGoals: sp.predictedGoals,
+              })),
+            });
+            prefetchPredictData(matchId);
+          }
         } else {
           setError(data.error);
         }

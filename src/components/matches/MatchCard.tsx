@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { formatDate, isPredictionAllowed, getPredictionLockReason } from "@/lib/utils";
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
 import { TeamLogo } from "@/components/ui/TeamLogo";
@@ -10,6 +11,10 @@ import { asFinishType } from "@/lib/finish-type";
 import { MATCH_STATUS_LABELS } from "@/types";
 import { ar } from "@/lib/i18n/ar";
 import { PredictNavLink } from "@/components/matches/PredictNavLink";
+import {
+  prefetchPredictData,
+  seedPredictMatchFromList,
+} from "@/lib/predict-prefetch";
 
 type ScorerPick = {
   predictedGoals: number;
@@ -103,6 +108,33 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
 
   const showUserPrediction =
     hasPrediction && !isFinished && !isLive && match.userPrediction;
+
+  useEffect(() => {
+    if (!showPredictButton || !canPredict) return;
+
+    seedPredictMatchFromList({
+      id: match.id,
+      matchTime: match.matchTime,
+      isKnockout: match.isKnockout,
+      homeTeam: match.homeTeam,
+      awayTeam: match.awayTeam,
+      userPrediction: match.userPrediction
+        ? {
+            predHome: match.userPrediction.predHome,
+            predAway: match.userPrediction.predAway,
+            isDouble: match.userPrediction.isDouble,
+            predictedFinishType: match.userPrediction.predictedFinishType,
+            predictedPenaltyWinnerTeamId:
+              match.userPrediction.predictedPenaltyWinnerTeamId,
+          }
+        : null,
+      userScorerPredictions: match.userScorerPredictions?.map((sp) => ({
+        playerId: sp.player.id,
+        predictedGoals: sp.predictedGoals,
+      })),
+    });
+    prefetchPredictData(match.id);
+  }, [showPredictButton, canPredict, match]);
 
   return (
     <Card className="transition-colors hover:border-primary/30">

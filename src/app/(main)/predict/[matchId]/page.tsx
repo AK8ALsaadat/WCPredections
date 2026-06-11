@@ -116,6 +116,51 @@ type LineupData = {
   awayShortName: string;
 };
 
+type FormState = {
+  predHome: number;
+  predAway: number;
+  isDouble: boolean;
+  finishType: string;
+  penaltyWinner: string;
+  scorerPicks: ScorerPicks;
+  boldPlayerId: string;
+  boldEnabled: boolean;
+};
+
+const EMPTY_FORM: FormState = {
+  predHome: 0,
+  predAway: 0,
+  isDouble: false,
+  finishType: "",
+  penaltyWinner: "",
+  scorerPicks: {},
+  boldPlayerId: "",
+  boldEnabled: false,
+};
+
+function formStateFromMatch(m: MatchData | null): FormState {
+  if (!m) return EMPTY_FORM;
+
+  const state = { ...EMPTY_FORM };
+  if (m.userPrediction) {
+    state.predHome = m.userPrediction.predHome;
+    state.predAway = m.userPrediction.predAway;
+    state.isDouble = m.userPrediction.isDouble;
+    state.finishType = m.userPrediction.predictedFinishType ?? "";
+    state.penaltyWinner = m.userPrediction.predictedPenaltyWinnerTeamId ?? "";
+  }
+  if (m.userScorerPredictions?.length) {
+    for (const sp of m.userScorerPredictions) {
+      state.scorerPicks[sp.playerId] = sp.predictedGoals ?? 1;
+    }
+  }
+  if (m.userBoldScorerBet?.playerId) {
+    state.boldPlayerId = m.userBoldScorerBet.playerId;
+    state.boldEnabled = true;
+  }
+  return state;
+}
+
 function applySavedPrediction(m: MatchData, setters: {
   setPredHome: (v: number) => void;
   setPredAway: (v: number) => void;
@@ -126,24 +171,15 @@ function applySavedPrediction(m: MatchData, setters: {
   setBoldPlayerId: (v: string) => void;
   setBoldEnabled: (v: boolean) => void;
 }) {
-  if (m.userPrediction) {
-    setters.setPredHome(m.userPrediction.predHome);
-    setters.setPredAway(m.userPrediction.predAway);
-    setters.setIsDouble(m.userPrediction.isDouble);
-    setters.setFinishType(m.userPrediction.predictedFinishType ?? "");
-    setters.setPenaltyWinner(m.userPrediction.predictedPenaltyWinnerTeamId ?? "");
-  }
-  if (m.userScorerPredictions?.length) {
-    const picks: ScorerPicks = {};
-    for (const sp of m.userScorerPredictions) {
-      picks[sp.playerId] = sp.predictedGoals ?? 1;
-    }
-    setters.setScorerPicks(picks);
-  }
-  if (m.userBoldScorerBet?.playerId) {
-    setters.setBoldPlayerId(m.userBoldScorerBet.playerId);
-    setters.setBoldEnabled(true);
-  }
+  const state = formStateFromMatch(m);
+  setters.setPredHome(state.predHome);
+  setters.setPredAway(state.predAway);
+  setters.setIsDouble(state.isDouble);
+  setters.setFinishType(state.finishType);
+  setters.setPenaltyWinner(state.penaltyWinner);
+  setters.setScorerPicks(state.scorerPicks);
+  setters.setBoldPlayerId(state.boldPlayerId);
+  setters.setBoldEnabled(state.boldEnabled);
 }
 
 export default function PredictPage() {
@@ -167,14 +203,19 @@ export default function PredictPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [predHome, setPredHome] = useState(0);
-  const [predAway, setPredAway] = useState(0);
-  const [isDouble, setIsDouble] = useState(false);
-  const [finishType, setFinishType] = useState("");
-  const [penaltyWinner, setPenaltyWinner] = useState("");
-  const [scorerPicks, setScorerPicks] = useState<ScorerPicks>({});
-  const [boldEnabled, setBoldEnabled] = useState(false);
-  const [boldPlayerId, setBoldPlayerId] = useState<string>("");
+  const initialForm = formStateFromMatch(
+    readPredictMatchCache<MatchData>(matchId)
+  );
+  const [predHome, setPredHome] = useState(initialForm.predHome);
+  const [predAway, setPredAway] = useState(initialForm.predAway);
+  const [isDouble, setIsDouble] = useState(initialForm.isDouble);
+  const [finishType, setFinishType] = useState(initialForm.finishType);
+  const [penaltyWinner, setPenaltyWinner] = useState(initialForm.penaltyWinner);
+  const [scorerPicks, setScorerPicks] = useState<ScorerPicks>(
+    initialForm.scorerPicks
+  );
+  const [boldEnabled, setBoldEnabled] = useState(initialForm.boldEnabled);
+  const [boldPlayerId, setBoldPlayerId] = useState(initialForm.boldPlayerId);
 
   const teamSets = useMemo(() => {
     if (!lineup) return { home: new Set<string>(), away: new Set<string>() };
@@ -200,9 +241,14 @@ export default function PredictPage() {
     const cachedMatch = readPredictMatchCache<MatchData>(matchId);
     const cachedLineup = readPredictLineupCache<LineupData>(matchId);
 
+    setMatch(cachedMatch);
+    setLineup(cachedLineup);
+    setLoading(!cachedMatch);
+    setLineupLoading(!cachedLineup);
+    setError("");
+    setSuccess("");
+
     if (cachedMatch) {
-      setMatch(cachedMatch);
-      setLoading(false);
       applySavedPrediction(cachedMatch, {
         setPredHome,
         setPredAway,
@@ -213,11 +259,15 @@ export default function PredictPage() {
         setBoldPlayerId,
         setBoldEnabled,
       });
-    }
-
-    if (cachedLineup) {
-      setLineup(cachedLineup);
-      setLineupLoading(false);
+    } else {
+      setPredHome(0);
+      setPredAway(0);
+      setIsDouble(false);
+      setFinishType("");
+      setPenaltyWinner("");
+      setScorerPicks({});
+      setBoldPlayerId("");
+      setBoldEnabled(false);
     }
   }, [matchId]);
 
@@ -282,7 +332,7 @@ export default function PredictPage() {
         }
 
         const payload = data.data as MatchData;
-        writePredictMatchCache(matchId, payload);
+        writePredictMatchCache(matchId, { ...payload, _complete: true });
         setMatch(payload);
         setError("");
 

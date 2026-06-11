@@ -7,7 +7,10 @@ import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Select } from "@/components/ui/Select";
 import { Pagination } from "@/components/ui/Pagination";
 import { formatDayHeader, getPredictionTimezone, isPredictionAllowed } from "@/lib/utils";
-import { prefetchPredictData } from "@/lib/predict-prefetch";
+import {
+  prefetchPredictData,
+  seedPredictMatchFromList,
+} from "@/lib/predict-prefetch";
 import {
   isClientCacheFresh,
   readClientCache,
@@ -151,8 +154,30 @@ export default function MatchesPage() {
   useEffect(() => {
     matches
       .filter((m) => isPredictionAllowed(m.matchTime))
-      .slice(0, 6)
-      .forEach((m) => prefetchPredictData(m.id));
+      .forEach((m) => {
+        seedPredictMatchFromList({
+          id: m.id,
+          matchTime: m.matchTime,
+          isKnockout: m.isKnockout,
+          homeTeam: m.homeTeam,
+          awayTeam: m.awayTeam,
+          userPrediction: m.userPrediction
+            ? {
+                predHome: m.userPrediction.predHome,
+                predAway: m.userPrediction.predAway,
+                isDouble: m.userPrediction.isDouble,
+                predictedFinishType: m.userPrediction.predictedFinishType,
+                predictedPenaltyWinnerTeamId:
+                  m.userPrediction.predictedPenaltyWinnerTeamId,
+              }
+            : null,
+          userScorerPredictions: m.userScorerPredictions?.map((sp) => ({
+            playerId: sp.player.id,
+            predictedGoals: sp.predictedGoals,
+          })),
+        });
+        prefetchPredictData(m.id);
+      });
   }, [matches]);
 
   const grouped = matches.reduce<Record<string, Match[]>>((acc, match) => {
