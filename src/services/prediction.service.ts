@@ -320,126 +320,122 @@ export async function submitMatchPredictionBundle(
     if (!boldPlayer) {
       throw new Error("اختيار لاعب غير صالح للبطاقة الجريئة");
     }
+  }
 
-    const existingBold = await prisma.boldScorerBet.findUnique({
-      where: { userId_roundId: { userId, roundId: match.roundId } },
+  // Sequential writes — interactive $transaction breaks on Supabase PgBouncer (pooler).
+  if (isDouble) {
+    const doublesUsed = await prisma.prediction.count({
+      where: {
+        userId,
+        isDouble: true,
+        id: existing?.id ? { not: existing.id } : undefined,
+        match: { roundId: match.roundId },
+      },
     });
-    if (existingBold && existingBold.matchId !== data.matchId) {
+    if (doublesUsed >= MAX_DOUBLES_PER_ROUND) {
       throw new Error(
-        "استخدمت بطاقتك الجريئة في مباراة ثانية هالجولة — مرة واحدة بس"
+        `يمكنك استخدام ${MAX_DOUBLES_PER_ROUND} مضاعفات فقط في كل جولة`
       );
     }
   }
 
-  return prisma.$transaction(async (tx) => {
-    if (isDouble) {
-      const doublesUsed = await tx.prediction.count({
-        where: {
-          userId,
-          isDouble: true,
-          id: existing?.id ? { not: existing.id } : undefined,
-          match: { roundId: match.roundId },
-        },
-      });
-      if (doublesUsed >= MAX_DOUBLES_PER_ROUND) {
-        throw new Error(
-          `يمكنك استخدام ${MAX_DOUBLES_PER_ROUND} مضاعفات فقط في كل جولة`
-        );
-      }
-    }
+  const storedBold = await prisma.boldScorerBet.findUnique({
+    where: { userId_roundId: { userId, roundId: match.roundId } },
+  });
 
-    const prediction = await tx.prediction.upsert({
+  if (storedBold?.matchId === data.matchId) {
+    if (!data.boldPlayerId) {
+      throw new Error("ما تقدر تلغي البطاقة الجريئة بعد تفعيلها");
+    }
+    if (data.boldPlayerId !== storedBold.playerId) {
+      throw new Error("ما تقدر تغيّر لاعب البطاقة الجريئة بعد تفعيلها");
+    }
+  } else if (
+    data.boldPlayerId &&
+    storedBold &&
+    storedBold.matchId !== data.matchId
+  ) {
+    throw new Error(
+      "استخدمت بطاقتك الجريئة في مباراة ثانية هالجولة — مرة واحدة بس"
+    );
+  }
+
+  const prediction = await prisma.prediction.upsert({
+    where: {
+      userId_matchId: { userId, matchId: data.matchId },
+    },
+    create: {
+      userId,
+      matchId: data.matchId,
+      predHome: data.predHome,
+      predAway: data.predAway,
+      isDouble,
+      predictedFinishType: data.predictedFinishType ?? null,
+      predictedPenaltyWinnerTeamId:
+        data.predictedPenaltyWinnerTeamId ?? null,
+    },
+    update: {
+      predHome: data.predHome,
+      predAway: data.predAway,
+      isDouble,
+      predictedFinishType: data.predictedFinishType ?? null,
+      predictedPenaltyWinnerTeamId:
+        data.predictedPenaltyWinnerTeamId ?? null,
+    },
+    include: {
+      match: {
+        include: {
+          homeTeam: true,
+          awayTeam: true,
+          round: true,
+        },
+      },
+    },
+  });
+
+  await prisma.scorerPrediction.deleteMany({
+    where: { userId, matchId: data.matchId },
+  });
+  if (data.picks.length > 0) {
+    await prisma.scorerPrediction.createMany({
+      data: data.picks.map((pick) => ({
+        userId,
+        matchId: data.matchId,
+        playerId: pick.playerId,
+        predictedGoals: pick.goals,
+      })),
+    });
+  }
+
+  let boldBet = null;
+  if (data.boldPlayerId) {
+    boldBet = await prisma.boldScorerBet.upsert({
       where: {
-        userId_matchId: { userId, matchId: data.matchId },
+        userId_roundId: { userId, roundId: match.roundId },
       },
       create: {
         userId,
+        roundId: match.roundId,
         matchId: data.matchId,
-        predHome: data.predHome,
-        predAway: data.predAway,
-        isDouble,
-        predictedFinishType: data.predictedFinishType ?? null,
-        predictedPenaltyWinnerTeamId:
-          data.predictedPenaltyWinnerTeamId ?? null,
+        playerId: data.boldPlayerId,
       },
       update: {
-        predHome: data.predHome,
-        predAway: data.predAway,
-        isDouble,
-        predictedFinishType: data.predictedFinishType ?? null,
-        predictedPenaltyWinnerTeamId:
-          data.predictedPenaltyWinnerTeamId ?? null,
+        matchId: data.matchId,
+        playerId: data.boldPlayerId,
+        points: 0,
       },
       include: {
-        match: {
-          include: {
-            homeTeam: true,
-            awayTeam: true,
-            round: true,
-          },
-        },
+        player: { select: { id: true, name: true } },
       },
     });
+  }
 
-    await tx.scorerPrediction.deleteMany({
-      where: { userId, matchId: data.matchId },
-    });
-    if (data.picks.length > 0) {
-      await tx.scorerPrediction.createMany({
-        data: data.picks.map((pick) => ({
-          userId,
-          matchId: data.matchId,
-          playerId: pick.playerId,
-          predictedGoals: pick.goals,
-        })),
-      });
-    }
-
-    const existingBold = await tx.boldScorerBet.findUnique({
-      where: { userId_roundId: { userId, roundId: match.roundId } },
-    });
-
-    if (existingBold?.matchId === data.matchId) {
-      if (!data.boldPlayerId) {
-        throw new Error("ما تقدر تلغي البطاقة الجريئة بعد تفعيلها");
-      }
-      if (data.boldPlayerId !== existingBold.playerId) {
-        throw new Error("ما تقدر تغيّر لاعب البطاقة الجريئة بعد تفعيلها");
-      }
-    }
-
-    let boldBet = null;
-    if (!data.boldPlayerId) {
-      // لا حذف — تم التحقق أعلاه
-    } else {
-      boldBet = await tx.boldScorerBet.upsert({
-        where: {
-          userId_roundId: { userId, roundId: match.roundId },
-        },
-        create: {
-          userId,
-          roundId: match.roundId,
-          matchId: data.matchId,
-          playerId: data.boldPlayerId,
-        },
-        update: {
-          matchId: data.matchId,
-          playerId: data.boldPlayerId,
-          points: 0,
-        },
-        include: {
-          player: { select: { id: true, name: true } },
-        },
-      });
-    }
-
-    const scorers = await tx.scorerPrediction.findMany({
-      where: { userId, matchId: data.matchId },
-      include: { player: true },
-    });
-
-    return { prediction, scorers, boldBet };
+  const scorers = await prisma.scorerPrediction.findMany({
+    where: { userId, matchId: data.matchId },
+    include: { player: true },
   });
+
+  return { prediction, scorers, boldBet };
 }
 
 export async function calculateMatchPoints(matchId: string): Promise<void> {
