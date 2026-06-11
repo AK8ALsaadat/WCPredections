@@ -169,14 +169,29 @@ async function validateScorerPicks(
 
   let homeGoals = 0;
   let awayGoals = 0;
+  let homeScorers = 0;
+  let awayScorers = 0;
   for (const pick of picks) {
     const player = players.find((p) => p.id === pick.playerId);
     if (!player) continue;
     if (player.teamId === match.homeTeamId) {
       homeGoals += pick.goals;
+      homeScorers++;
     } else {
       awayGoals += pick.goals;
+      awayScorers++;
     }
+  }
+
+  if (homeScorers > predHome) {
+    throw new Error(
+      `عدد هدافي ${match.homeTeam.shortName} (${homeScorers}) زاد عن أهدافه المتوقعة (${predHome})`
+    );
+  }
+  if (awayScorers > predAway) {
+    throw new Error(
+      `عدد هدافي ${match.awayTeam.shortName} (${awayScorers}) زاد عن أهدافه المتوقعة (${predAway})`
+    );
   }
 
   if (homeGoals > predHome) {

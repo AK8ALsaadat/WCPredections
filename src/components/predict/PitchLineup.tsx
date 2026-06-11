@@ -21,6 +21,8 @@ type PitchLineupProps = {
   };
   lineupStatus: LineupSource;
   scorerPicks: ScorerPicks;
+  canSelectPlayer?: (playerId: string) => boolean;
+  maxGoalsForPlayer?: (playerId: string) => number;
   onToggle: (playerId: string) => void;
   onGoalsChange: (playerId: string, goals: number) => void;
   labels: {
@@ -76,10 +78,12 @@ function statusNoteClass(status: LineupSource) {
 
 function GoalsStepper({
   goals,
+  maxGoals,
   onChange,
   label,
 }: {
   goals: number;
+  maxGoals: number;
   onChange: (goals: number) => void;
   label: string;
 }) {
@@ -98,8 +102,8 @@ function GoalsStepper({
       <span className="min-w-[1.25rem] text-center text-sm font-bold">{goals}</span>
       <button
         type="button"
-        onClick={() => onChange(Math.min(9, goals + 1))}
-        disabled={goals >= 9}
+        onClick={() => onChange(Math.min(maxGoals, goals + 1))}
+        disabled={goals >= maxGoals}
         className="flex h-7 w-7 items-center justify-center rounded border border-card-border bg-card text-sm font-bold disabled:opacity-40"
         aria-label="+"
       >
@@ -117,12 +121,14 @@ function PlayerDot({
   player,
   goals,
   selected,
+  selectable,
   onToggle,
   style,
 }: {
   player: MatchPlayerView;
   goals: number;
   selected: boolean;
+  selectable: boolean;
   onToggle: () => void;
   style: React.CSSProperties;
 }) {
@@ -132,10 +138,13 @@ function PlayerDot({
     <button
       type="button"
       onClick={onToggle}
+      disabled={!selected && !selectable}
       style={style}
-      className={`absolute z-10 flex w-[72px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 transition-transform hover:scale-105 ${
-        selected ? "scale-105" : ""
-      }`}
+      className={`absolute z-10 flex w-[72px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 transition-transform ${
+        !selected && !selectable
+          ? "cursor-not-allowed opacity-45"
+          : "hover:scale-105"
+      } ${selected ? "scale-105" : ""}`}
     >
       <span className="relative">
         <span
@@ -169,11 +178,13 @@ function PlayerDot({
 function BenchRow({
   players,
   scorerPicks,
+  canSelectPlayer,
   onToggle,
   label,
 }: {
   players: MatchPlayerView[];
   scorerPicks: ScorerPicks;
+  canSelectPlayer?: (id: string) => boolean;
   onToggle: (id: string) => void;
   label: string;
 }) {
@@ -185,16 +196,20 @@ function BenchRow({
       <div className="flex flex-wrap gap-2">
         {players.map((player) => {
           const selected = player.id in scorerPicks;
+          const selectable = selected || (canSelectPlayer?.(player.id) ?? true);
           const goals = scorerPicks[player.id] ?? 1;
           return (
             <button
               key={player.id}
               type="button"
               onClick={() => onToggle(player.id)}
+              disabled={!selectable}
               className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
                 selected
                   ? "border-primary bg-primary/15 text-primary"
-                  : "border-card-border bg-card hover:border-primary/40"
+                  : selectable
+                    ? "border-card-border bg-card hover:border-primary/40"
+                    : "cursor-not-allowed border-card-border/60 bg-card/50 text-muted opacity-60"
               }`}
             >
               {player.shirtNumber != null && (
@@ -217,12 +232,14 @@ function BenchRow({
 function SelectedScorersPanel({
   picks,
   playersById,
+  maxGoalsForPlayer,
   onGoalsChange,
   onToggle,
   labels,
 }: {
   picks: ScorerPicks;
   playersById: Map<string, MatchPlayerView>;
+  maxGoalsForPlayer?: (playerId: string) => number;
   onGoalsChange: (playerId: string, goals: number) => void;
   onToggle: (playerId: string) => void;
   labels: PitchLineupProps["labels"];
@@ -252,6 +269,7 @@ function SelectedScorersPanel({
               <div className="flex items-center gap-3">
                 <GoalsStepper
                   goals={goals}
+                  maxGoals={maxGoalsForPlayer?.(playerId) ?? 9}
                   onChange={(g) => onGoalsChange(playerId, g)}
                   label={labels.goalsLabel}
                 />
@@ -276,6 +294,8 @@ export function PitchLineup({
   away,
   lineupStatus,
   scorerPicks,
+  canSelectPlayer,
+  maxGoalsForPlayer,
   onToggle,
   onGoalsChange,
   labels,
@@ -351,6 +371,10 @@ export function PitchLineup({
               player={player}
               goals={scorerPicks[player.id] ?? 1}
               selected={player.id in scorerPicks}
+              selectable={
+                player.id in scorerPicks ||
+                (canSelectPlayer?.(player.id) ?? true)
+              }
               onToggle={() => onToggle(player.id)}
               style={{ left: `${x}%`, top: `${y}%` }}
             />
@@ -362,6 +386,10 @@ export function PitchLineup({
               player={player}
               goals={scorerPicks[player.id] ?? 1}
               selected={player.id in scorerPicks}
+              selectable={
+                player.id in scorerPicks ||
+                (canSelectPlayer?.(player.id) ?? true)
+              }
               onToggle={() => onToggle(player.id)}
               style={{ left: `${x}%`, top: `${y}%` }}
             />
@@ -373,12 +401,14 @@ export function PitchLineup({
         <BenchRow
           players={homeBench}
           scorerPicks={scorerPicks}
+          canSelectPlayer={canSelectPlayer}
           onToggle={onToggle}
           label={`${labels.bench} — ${home.teamName}`}
         />
         <BenchRow
           players={awayBench}
           scorerPicks={scorerPicks}
+          canSelectPlayer={canSelectPlayer}
           onToggle={onToggle}
           label={`${labels.bench} — ${away.teamName}`}
         />
@@ -387,6 +417,7 @@ export function PitchLineup({
       <SelectedScorersPanel
         picks={scorerPicks}
         playersById={playersById}
+        maxGoalsForPlayer={maxGoalsForPlayer}
         onGoalsChange={onGoalsChange}
         onToggle={onToggle}
         labels={labels}

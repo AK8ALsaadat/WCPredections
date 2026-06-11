@@ -247,12 +247,13 @@ export const en = {
     scoreFirstHint: "Set the score first, then pick scorers",
     scorerPrediction: "Scorer prediction",
     scorerHint:
-      "Pick players who score in regular/extra time — shootout goals after 120 min don't count",
+      "Each team: max scorers = predicted goals (e.g. 2-1 → at most 2 home scorers) — shootout goals don't count",
     scorerHintNoGoals: "0-0 score — no scorers needed",
     scorersRequired: "Pick scorers matching your predicted score",
     scorersNeedLineup:
       "Your score has goals — wait for lineup or change the score to save",
-    scorersExceeded: "Scorer goals exceed your predicted score for a team",
+    scorersExceeded:
+      "Too many scorers or too many goals for a team's predicted score",
     goalsUnit: "goals",
     exceeded: "over limit",
     selectedScorers: "Selected scorers",

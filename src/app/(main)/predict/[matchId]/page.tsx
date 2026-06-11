@@ -36,8 +36,11 @@ import {
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import {
   buildPlayerTeamSets,
+  canAddScorer,
   getScorerBudgetStatus,
+  maxGoalsForPlayer,
   picksToArray,
+  pruneScorerPicksToBudget,
   type ScorerPicks,
 } from "@/lib/scorer-prediction";
 import type {
@@ -268,6 +271,22 @@ export default function PredictPage() {
   const scorerCount = Object.keys(scorerPicks).length;
 
   useEffect(() => {
+    setScorerPicks((prev) => {
+      const pruned = pruneScorerPicksToBudget(
+        prev,
+        teamSets.home,
+        teamSets.away,
+        predHome,
+        predAway
+      );
+      return Object.keys(pruned).length === Object.keys(prev).length &&
+        Object.entries(pruned).every(([id, goals]) => prev[id] === goals)
+        ? prev
+        : pruned;
+    });
+  }, [predHome, predAway, teamSets]);
+
+  useEffect(() => {
     const cachedMatch = readPredictMatchCache<MatchData>(matchId);
     const cachedLineup = readPredictLineupCache<LineupData>(matchId);
 
@@ -443,6 +462,18 @@ export default function PredictPage() {
         delete next[playerId];
         return next;
       }
+      if (
+        !canAddScorer(
+          prev,
+          playerId,
+          teamSets.home,
+          teamSets.away,
+          predHome,
+          predAway
+        )
+      ) {
+        return prev;
+      }
       return { ...prev, [playerId]: 1 };
     });
   }
@@ -450,8 +481,39 @@ export default function PredictPage() {
   function setScorerGoals(playerId: string, goals: number) {
     setScorerPicks((prev) => {
       if (!(playerId in prev)) return prev;
-      return { ...prev, [playerId]: Math.max(1, Math.min(9, goals)) };
+      const cap = maxGoalsForPlayer(
+        prev,
+        playerId,
+        teamSets.home,
+        teamSets.away,
+        predHome,
+        predAway
+      );
+      return { ...prev, [playerId]: Math.max(1, Math.min(cap, goals)) };
     });
+  }
+
+  function canSelectScorer(playerId: string) {
+    if (playerId in scorerPicks) return true;
+    return canAddScorer(
+      scorerPicks,
+      playerId,
+      teamSets.home,
+      teamSets.away,
+      predHome,
+      predAway
+    );
+  }
+
+  function getMaxGoalsForPlayer(playerId: string) {
+    return maxGoalsForPlayer(
+      scorerPicks,
+      playerId,
+      teamSets.home,
+      teamSets.away,
+      predHome,
+      predAway
+    );
   }
 
   function handleDoubleToggle(checked: boolean) {
@@ -1003,6 +1065,8 @@ export default function PredictPage() {
                 }}
                 lineupStatus={lineup.lineupStatus ?? "estimated"}
                 scorerPicks={scorerPicks}
+                canSelectPlayer={canSelectScorer}
+                maxGoalsForPlayer={getMaxGoalsForPlayer}
                 onToggle={toggleScorer}
                 onGoalsChange={setScorerGoals}
                 labels={{

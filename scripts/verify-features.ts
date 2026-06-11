@@ -19,7 +19,9 @@ import {
   getMatchTotalUserPoints,
 } from "../src/lib/match-points-breakdown";
 import {
+  canAddScorer,
   computeTeamGoalTotals,
+  countTeamScorers,
   getScorerBudgetStatus,
 } from "../src/lib/scorer-prediction";
 import { asFinishType } from "../src/lib/finish-type";
@@ -213,6 +215,19 @@ ok(
 const budget = getScorerBudgetStatus({ p1: 3 }, home, away, 2, 1);
 ok("تجاوز الميزانية", budget.homeExceeded && budget.anyExceeded);
 ok("ضمن الميزانية", !getScorerBudgetStatus({ p1: 1 }, home, away, 2, 1).anyExceeded);
+
+ok(
+  "ما يضيف هداف ثالث لمنتخب متوقع له هدفين",
+  !canAddScorer({ p1: 1, p2: 1 }, "pX", home, away, 2, 1)
+);
+ok(
+  "يضيف هداف ثاني لمنتخب متوقع له هدفين",
+  canAddScorer({ p1: 1 }, "p2", home, away, 2, 1)
+);
+ok(
+  "عدد هدافي المنتخب",
+  countTeamScorers({ p1: 1, p2: 1 }, home, away).homeCount === 2
+);
 
 console.log("\n=== ترتيب الجولة ===");
 const entries: LeaderboardEntry[] = [
