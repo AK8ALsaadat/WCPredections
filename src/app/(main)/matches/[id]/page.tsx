@@ -208,6 +208,14 @@ export default function MatchDetailPage() {
             </PredictNavLink>
           </div>
         )}
+
+        {!canPredict && (
+          <div className="flex justify-center border-t border-card-border pt-4">
+            <Link href={`/matches/${m.id}/predictions`}>
+              <Button variant="secondary">{t.matches.viewAllPredictions}</Button>
+            </Link>
+          </div>
+        )}
       </Card>
 
       {breakdownInput && (

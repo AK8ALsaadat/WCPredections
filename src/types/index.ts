@@ -36,6 +36,30 @@ export type ScorerPredictionWithPlayer = ScorerPrediction & {
   player: Pick<Player, "id" | "name" | "teamId">;
 };
 
+export type LeagueMatchPredictionRow = {
+  userId: string;
+  username: string;
+  prediction: {
+    predHome: number;
+    predAway: number;
+    isDouble: boolean;
+    predictedFinishType: string | null;
+    predictedPenaltyWinnerTeamId: string | null;
+    points?: number;
+    finishTypePoints?: number;
+    penaltyWinnerPoints?: number;
+  } | null;
+  scorerPredictions: {
+    player: { id: string; name: string; teamId: string };
+    predictedGoals: number;
+    points?: number;
+  }[];
+  boldScorerBet: {
+    player: { id: string; name: string };
+    points?: number;
+  } | null;
+};
+
 export type LeaderboardEntry = {
   rank: number;
   userId: string;

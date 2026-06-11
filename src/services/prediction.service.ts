@@ -1,6 +1,7 @@
 import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getPredictionLockReason } from "@/lib/utils";
+import { getPredictionLockReason, isPredictionAllowed } from "@/lib/utils";
+import type { LeagueMatchPredictionRow } from "@/types";
 import { calculateBoldScorerBetPointsForMatch } from "@/services/bold-scorer-bet.service";
 import {
   calculateFinishTypePoints,
@@ -595,4 +596,112 @@ export async function getUserPredictionHistory(userId: string) {
   });
 
   return { predictions, scorerPredictions, boldScorerBets };
+}
+
+export async function getLeagueMatchPredictions(matchId: string) {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      matchTime: true,
+      status: true,
+      isKnockout: true,
+      homeTeam: { select: { id: true, name: true, shortName: true } },
+      awayTeam: { select: { id: true, name: true, shortName: true } },
+    },
+  });
+
+  if (!match) return null;
+
+  if (isPredictionAllowed(match.matchTime, match.status)) {
+    throw new Error("Predictions still open");
+  }
+
+  const [predictions, scorerPredictions, boldBets] = await Promise.all([
+    prisma.prediction.findMany({
+      where: { matchId },
+      include: { user: { select: { id: true, username: true } } },
+    }),
+    prisma.scorerPrediction.findMany({
+      where: { matchId },
+      include: {
+        user: { select: { id: true, username: true } },
+        player: { select: { id: true, name: true, teamId: true } },
+      },
+    }),
+    prisma.boldScorerBet.findMany({
+      where: { matchId },
+      include: {
+        user: { select: { id: true, username: true } },
+        player: { select: { id: true, name: true } },
+      },
+    }),
+  ]);
+
+  const rows = new Map<string, LeagueMatchPredictionRow>();
+
+  for (const prediction of predictions) {
+    rows.set(prediction.userId, {
+      userId: prediction.userId,
+      username: prediction.user.username,
+      prediction: {
+        predHome: prediction.predHome,
+        predAway: prediction.predAway,
+        isDouble: prediction.isDouble,
+        predictedFinishType: prediction.predictedFinishType,
+        predictedPenaltyWinnerTeamId: prediction.predictedPenaltyWinnerTeamId,
+        points: prediction.points,
+        finishTypePoints: prediction.finishTypePoints,
+        penaltyWinnerPoints: prediction.penaltyWinnerPoints,
+      },
+      scorerPredictions: [],
+      boldScorerBet: null,
+    });
+  }
+
+  for (const scorer of scorerPredictions) {
+    const existing = rows.get(scorer.userId) ?? {
+      userId: scorer.userId,
+      username: scorer.user.username,
+      prediction: null,
+      scorerPredictions: [],
+      boldScorerBet: null,
+    };
+    existing.scorerPredictions.push({
+      player: scorer.player,
+      predictedGoals: scorer.predictedGoals,
+      points: scorer.points,
+    });
+    rows.set(scorer.userId, existing);
+  }
+
+  for (const bold of boldBets) {
+    const existing = rows.get(bold.userId) ?? {
+      userId: bold.userId,
+      username: bold.user.username,
+      prediction: null,
+      scorerPredictions: [],
+      boldScorerBet: null,
+    };
+    existing.boldScorerBet = {
+      player: bold.player,
+      points: bold.points,
+    };
+    rows.set(bold.userId, existing);
+  }
+
+  const entries = Array.from(rows.values()).sort((a, b) =>
+    a.username.localeCompare(b.username)
+  );
+
+  return {
+    match: {
+      id: matchId,
+      matchTime: match.matchTime,
+      status: match.status,
+      isKnockout: match.isKnockout,
+      homeTeam: match.homeTeam,
+      awayTeam: match.awayTeam,
+    },
+    predictions: entries,
+  };
 }

@@ -143,8 +143,10 @@ const matchLineupCache = new Map<
   { data: Awaited<ReturnType<typeof buildMatchLineup>>; expiresAt: number }
 >();
 const MATCH_LINEUP_CACHE_MS = 5 * 60 * 1000;
+const MATCH_LINEUP_PROBABLE_CACHE_MS = 45 * 1000;
 const MATCH_SHELL_REVALIDATE_SECONDS = 60;
 const MATCH_LINEUP_REVALIDATE_SECONDS = 300;
+const MATCH_LINEUP_PROBABLE_REVALIDATE_SECONDS = 45;
 
 async function fetchMatchShell(matchId: string) {
   return prisma.match.findUnique({
@@ -204,27 +206,61 @@ async function buildMatchLineup(matchId: string) {
   };
 }
 
-function getCachedMatchLineup(matchId: string) {
+function getCachedMatchLineup(matchId: string, probable = false) {
   return unstable_cache(
     () => buildMatchLineup(matchId),
-    ["match-lineup", matchId],
+    ["match-lineup", matchId, probable ? "probable" : "default"],
     {
-      revalidate: MATCH_LINEUP_REVALIDATE_SECONDS,
+      revalidate: probable
+        ? MATCH_LINEUP_PROBABLE_REVALIDATE_SECONDS
+        : MATCH_LINEUP_REVALIDATE_SECONDS,
       tags: [`lineup-${matchId}`],
     }
   )();
 }
 
-export async function getMatchLineup(matchId: string) {
+export function clearMatchLineupMemoryCache(matchId: string) {
+  matchLineupCache.delete(matchId);
+}
+
+export async function getMatchLineup(
+  matchId: string,
+  options?: { fresh?: boolean }
+) {
+  if (options?.fresh) {
+    clearMatchLineupMemoryCache(matchId);
+    const { invalidateCacheKey } = await import("@/lib/api-cache");
+    const match = await prisma.match.findUnique({
+      where: { id: matchId },
+      select: { apiMatchId: true },
+    });
+    if (match?.apiMatchId) {
+      invalidateCacheKey(`fd:/matches/${match.apiMatchId}:unfold`);
+    }
+    return buildMatchLineup(matchId);
+  }
+
   const hit = matchLineupCache.get(matchId);
   if (hit && hit.expiresAt > Date.now()) {
     return hit.data;
   }
 
-  const data = await getCachedMatchLineup(matchId);
+  const shell = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { matchTime: true },
+  });
+  const nearKickoff =
+    shell?.matchTime &&
+    shell.matchTime.getTime() - Date.now() <= 6 * 60 * 60 * 1000;
+
+  const data = await getCachedMatchLineup(matchId, Boolean(nearKickoff));
   if (data) {
     const ttl =
-      data.lineupStatus === "official" ? 3 * 60 * 1000 : MATCH_LINEUP_CACHE_MS;
+      data.lineupStatus === "official"
+        ? 3 * 60 * 1000
+        : nearKickoff
+          ? MATCH_LINEUP_PROBABLE_CACHE_MS
+          : MATCH_LINEUP_CACHE_MS;
     matchLineupCache.set(matchId, {
       data,
       expiresAt: Date.now() + ttl,

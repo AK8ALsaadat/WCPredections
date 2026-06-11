@@ -62,11 +62,48 @@ function lastNameKey(name: string): string {
   return parts[parts.length - 1] ?? name;
 }
 
-async function fetchFootballData<T>(
+function footballDataCacheKey(
   endpoint: string,
   options?: { unfoldLineups?: boolean }
+) {
+  return options?.unfoldLineups ? `fd:${endpoint}:unfold` : `fd:${endpoint}`;
+}
+
+function lineupFetchTtlMs(matchTime?: Date | null): number {
+  if (!matchTime) return 15 * 60 * 1000;
+  const msUntilKickoff = matchTime.getTime() - Date.now();
+  if (msUntilKickoff <= 0 && msUntilKickoff > -2 * 60 * 60 * 1000) {
+    return 30 * 1000;
+  }
+  if (msUntilKickoff > 0 && msUntilKickoff <= 6 * 60 * 60 * 1000) {
+    return 45 * 1000;
+  }
+  return 15 * 60 * 1000;
+}
+
+function shouldBypassLineupCache(matchTime?: Date | null): boolean {
+  if (!matchTime) return false;
+  const msUntilKickoff = matchTime.getTime() - Date.now();
+  return msUntilKickoff > -30 * 60 * 1000 && msUntilKickoff <= 3 * 60 * 60 * 1000;
+}
+
+async function fetchFootballData<T>(
+  endpoint: string,
+  options?: {
+    unfoldLineups?: boolean;
+    ttlMs?: number;
+    skipCache?: boolean;
+  }
 ): Promise<T> {
-  return cachedFetch(`fd:${endpoint}`, async () => {
+  const key = footballDataCacheKey(endpoint, options);
+  if (options?.skipCache) {
+    const { invalidateCacheKey } = await import("@/lib/api-cache");
+    invalidateCacheKey(key);
+  }
+
+  return cachedFetch(
+    key,
+    async () => {
     const apiKey = process.env.FOOTBALL_DATA_API_KEY;
     const baseUrl =
       process.env.FOOTBALL_DATA_BASE_URL ?? "https://api.football-data.org/v4";
@@ -88,7 +125,9 @@ async function fetchFootballData<T>(
     }
 
     return res.json() as Promise<T>;
-  });
+    },
+    options?.ttlMs ?? 15 * 60 * 1000
+  );
 }
 
 async function batchUpsertPlayers(
@@ -586,10 +625,15 @@ export async function getMatchPlayersFromApi(match: {
   }
 
   try {
+    const nearKickoff = shouldBypassLineupCache(match.matchTime ?? null);
     const apiMatch = await fetchFootballData<{
       homeTeam: ApiTeamPlayers & { id: number; name?: string };
       awayTeam: ApiTeamPlayers & { id: number; name?: string };
-    }>(`/matches/${match.apiMatchId}`, { unfoldLineups: true });
+    }>(`/matches/${match.apiMatchId}`, {
+      unfoldLineups: true,
+      ttlMs: lineupFetchTtlMs(match.matchTime ?? null),
+      skipCache: nearKickoff,
+    });
 
     const [home, away] = await Promise.all([
       getTeamPlayersForMatch(

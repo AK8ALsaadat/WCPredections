@@ -42,7 +42,8 @@ import type {
   MatchPlayerView,
 } from "@/services/match-players.service";
 
-const LINEUP_REFRESH_MS = 180_000;
+const LINEUP_REFRESH_MS = 60_000;
+const LINEUP_REFRESH_PROBABLE_MS = 45_000;
 
 const PitchLineup = dynamic(
   () =>
@@ -283,15 +284,26 @@ export default function PredictPage() {
       if (cancelled) return;
       if (!silent && !readPredictLineupCache(matchId)) setLineupLoading(true);
 
-      if (!silent && isPredictLineupCacheFresh(matchId)) {
+      const cachedLineup = readPredictLineupCache<LineupData>(matchId);
+      if (
+        !silent &&
+        isPredictLineupCacheFresh(matchId) &&
+        cachedLineup?.lineupStatus === "official"
+      ) {
         setLineupLoading(false);
         return;
       }
 
+      const needsFresh =
+        silent || !cachedLineup || cachedLineup.lineupStatus !== "official";
+
       try {
-        const res = await clientFetch(`/api/matches/${matchId}/lineup`, {
-          signal: abort.signal,
-        });
+        const res = await clientFetch(
+          `/api/matches/${matchId}/lineup${needsFresh ? "?fresh=1" : ""}`,
+          {
+            signal: abort.signal,
+          }
+        );
         if (!res) return;
         const data = await res.json();
         if (cancelled) return;
@@ -362,16 +374,40 @@ export default function PredictPage() {
     void loadMatch();
     void loadLineup();
 
-    const interval = setInterval(() => {
-      void loadLineup(true);
-    }, LINEUP_REFRESH_MS);
-
     return () => {
       cancelled = true;
       abort.abort();
-      clearInterval(interval);
     };
   }, [matchId]);
+
+  useEffect(() => {
+    const refreshMs =
+      lineup?.lineupStatus === "official"
+        ? LINEUP_REFRESH_MS
+        : LINEUP_REFRESH_PROBABLE_MS;
+    const interval = setInterval(() => {
+      void (async () => {
+        const cachedLineup = readPredictLineupCache<LineupData>(matchId);
+        const needsFresh =
+          !cachedLineup || cachedLineup.lineupStatus !== "official";
+        try {
+          const res = await clientFetch(
+            `/api/matches/${matchId}/lineup${needsFresh ? "?fresh=1" : ""}`
+          );
+          if (!res) return;
+          const data = await res.json();
+          if (data.success) {
+            const payload = data.data as LineupData;
+            writePredictLineupCache(matchId, payload);
+            setLineup(payload);
+          }
+        } catch {
+          /* ignore poll errors */
+        }
+      })();
+    }, refreshMs);
+    return () => clearInterval(interval);
+  }, [matchId, lineup?.lineupStatus]);
 
   function toggleScorer(playerId: string) {
     setScorerPicks((prev) => {

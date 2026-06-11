@@ -8,6 +8,17 @@ import {
 
 const MATCH_FRESH_MS = 300_000;
 const LINEUP_FRESH_MS = 600_000;
+const LINEUP_PROBABLE_FRESH_MS = 45_000;
+
+type LineupCacheMeta = {
+  lineupStatus?: "official" | "probable" | "estimated";
+};
+
+function lineupFreshMs(lineup?: LineupCacheMeta | null) {
+  return lineup?.lineupStatus === "official"
+    ? LINEUP_FRESH_MS
+    : LINEUP_PROBABLE_FRESH_MS;
+}
 
 const inflight = new Map<string, Promise<void>>();
 
@@ -65,7 +76,10 @@ async function fetchPredictMatch(matchId: string) {
 }
 
 async function fetchPredictLineup(matchId: string) {
-  const res = await fetch(`/api/matches/${matchId}/lineup`, {
+  const cached = readClientCache<LineupCacheMeta>(predictLineupCacheKey(matchId));
+  const freshParam =
+    cached?.lineupStatus && cached.lineupStatus !== "official" ? "?fresh=1" : "";
+  const res = await fetch(`/api/matches/${matchId}/lineup${freshParam}`, {
     credentials: "same-origin",
   });
   if (!res.ok) return;
@@ -132,9 +146,12 @@ export function prefetchPredictData(matchId: string) {
     predictMatchCacheKey(matchId),
     MATCH_FRESH_MS
   );
+  const cachedLineup = readClientCache<LineupCacheMeta>(
+    predictLineupCacheKey(matchId)
+  );
   const lineupFresh = isClientCacheFresh(
     predictLineupCacheKey(matchId),
-    LINEUP_FRESH_MS
+    lineupFreshMs(cachedLineup)
   );
   if (matchFresh && lineupFresh) return Promise.resolve();
 
@@ -177,7 +194,8 @@ export function isPredictMatchCacheFresh(matchId: string) {
 }
 
 export function isPredictLineupCacheFresh(matchId: string) {
-  return isClientCacheFresh(predictLineupCacheKey(matchId), LINEUP_FRESH_MS);
+  const cached = readPredictLineupCache<LineupCacheMeta>(matchId);
+  return isClientCacheFresh(predictLineupCacheKey(matchId), lineupFreshMs(cached));
 }
 
 export function hasPredictMatchCache(matchId: string) {
