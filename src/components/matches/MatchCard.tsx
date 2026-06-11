@@ -308,15 +308,16 @@ export function MatchCard({
         </div>
       )}
 
-      {isFinished &&
+      {(isFinished || isLive) &&
         hasMatchPoints &&
-        match.homeScore != null &&
-        match.awayScore != null && (
+        (isLive ||
+          (match.homeScore != null && match.awayScore != null)) && (
           <div className="mt-3">
             <MatchPointsBreakdown
               compact
-              homeScore={match.homeScore}
-              awayScore={match.awayScore}
+              scorersOnly={isLive && !isFinished}
+              homeScore={match.homeScore ?? 0}
+              awayScore={match.awayScore ?? 0}
               isKnockout={match.isKnockout}
               actualFinishType={asFinishType(match.actualFinishType)}
               penaltyWinnerTeamId={match.penaltyWinnerTeamId}

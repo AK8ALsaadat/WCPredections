@@ -133,7 +133,10 @@ export async function getUserPinnedTodayMatches(
   const today = getMatchCalendarDay(new Date());
   const matches = predictions
     .map((p) => p.match)
-    .filter((m) => getMatchCalendarDay(m.matchTime) === today);
+    .filter(
+      (m) =>
+        m.status === "LIVE" || getMatchCalendarDay(m.matchTime) === today
+    );
 
   const uniqueById = new Map(matches.map((m) => [m.id, m]));
   return enrichMatchesWithUserPredictions(
@@ -143,12 +146,7 @@ export async function getUserPinnedTodayMatches(
 }
 
 export async function getScheduleMatches(roundId?: string) {
-  const cacheKey = roundId ?? "all";
-  return unstable_cache(
-    () => fetchScheduleMatches(roundId),
-    ["schedule-matches", cacheKey],
-    { revalidate: 15, tags: ["matches-schedule"] }
-  )();
+  return fetchScheduleMatches(roundId);
 }
 
 export async function getUpcomingMatches(roundId?: string) {

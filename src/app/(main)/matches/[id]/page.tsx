@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -28,52 +28,70 @@ export default function MatchDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetch(`/api/matches/${matchId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) {
-          setMatch(data.data);
-          const m = data.data as {
-            id: string;
-            matchTime: string;
-            isKnockout: boolean;
-            homeTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
-            awayTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
-            userPrediction?: {
-              predHome: number;
-              predAway: number;
-              isDouble: boolean;
-              predictedFinishType?: string | null;
-              predictedPenaltyWinnerTeamId?: string | null;
-            } | null;
-            userScorerPredictions?: {
-              player: { id: string };
-              predictedGoals: number;
-            }[];
-          };
-          if (isPredictionAllowed(m.matchTime)) {
-            seedPredictMatchFromList({
-              id: m.id,
-              matchTime: m.matchTime,
-              isKnockout: m.isKnockout,
-              homeTeam: m.homeTeam,
-              awayTeam: m.awayTeam,
-              userPrediction: m.userPrediction ?? null,
-              userScorerPredictions: m.userScorerPredictions?.map((sp) => ({
-                playerId: sp.player.id,
-                predictedGoals: sp.predictedGoals,
-              })),
-            });
-            prefetchPredictData(matchId);
+  const loadMatch = useCallback(
+    (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true);
+      return fetch(`/api/matches/${matchId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) {
+            setMatch(data.data);
+            const m = data.data as {
+              id: string;
+              matchTime: string;
+              isKnockout: boolean;
+              homeTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
+              awayTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
+              userPrediction?: {
+                predHome: number;
+                predAway: number;
+                isDouble: boolean;
+                predictedFinishType?: string | null;
+                predictedPenaltyWinnerTeamId?: string | null;
+              } | null;
+              userScorerPredictions?: {
+                player: { id: string };
+                predictedGoals: number;
+              }[];
+            };
+            if (isPredictionAllowed(m.matchTime)) {
+              seedPredictMatchFromList({
+                id: m.id,
+                matchTime: m.matchTime,
+                isKnockout: m.isKnockout,
+                homeTeam: m.homeTeam,
+                awayTeam: m.awayTeam,
+                userPrediction: m.userPrediction ?? null,
+                userScorerPredictions: m.userScorerPredictions?.map((sp) => ({
+                  playerId: sp.player.id,
+                  predictedGoals: sp.predictedGoals,
+                })),
+              });
+              prefetchPredictData(matchId);
+            }
+          } else {
+            setError(data.error);
           }
-        } else {
-          setError(data.error);
-        }
-      })
-      .catch(() => setError(t.errors.loadFailed))
-      .finally(() => setLoading(false));
-  }, [matchId]);
+        })
+        .catch(() => setError(t.errors.loadFailed))
+        .finally(() => {
+          if (!opts?.silent) setLoading(false);
+        });
+    },
+    [matchId]
+  );
+
+  useEffect(() => {
+    void loadMatch();
+  }, [loadMatch]);
+
+  useEffect(() => {
+    if (match?.status !== "LIVE") return;
+    const interval = setInterval(() => {
+      void loadMatch({ silent: true });
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [match?.status, loadMatch]);
 
   if (loading) return <LoadingPage />;
   if (error || !match) return <ErrorMessage message={error || t.matches.notFound} />;
@@ -114,6 +132,7 @@ export default function MatchDetailPage() {
 
   const canPredict = isPredictionAllowed(m.matchTime, m.status);
   const isFinished = m.status === "FINISHED";
+  const isLive = m.status === "LIVE";
   const penaltyWinnerName =
     m.penaltyWinnerTeamId === m.homeTeam.id
       ? m.homeTeam.name
@@ -218,7 +237,10 @@ export default function MatchDetailPage() {
       </Card>
 
       {breakdownInput && (
-        <MatchPointsBreakdown {...breakdownInput} />
+        <MatchPointsBreakdown
+          {...breakdownInput}
+          scorersOnly={isLive && !isFinished}
+        />
       )}
 
       {m.userPrediction && !isFinished && (
@@ -248,7 +270,9 @@ export default function MatchDetailPage() {
         </Card>
       )}
 
-      {isFinished && m.userScorerPredictions && m.userScorerPredictions.length > 0 && (
+      {(isFinished || isLive) &&
+        m.userScorerPredictions &&
+        m.userScorerPredictions.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>{t.matches.scorers}</CardTitle>

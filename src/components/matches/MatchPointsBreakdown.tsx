@@ -13,17 +13,24 @@ type MatchPointsBreakdownProps = MatchPointsBreakdownInput & {
   penaltyWinnerName?: string | null;
   compact?: boolean;
   className?: string;
+  /** أثناء المباراة — الهدافين والبطاقة الجريئة فقط */
+  scorersOnly?: boolean;
 };
 
 export function MatchPointsBreakdown({
   compact = false,
   className = "",
+  scorersOnly = false,
   ...input
 }: MatchPointsBreakdownProps) {
   const { messages: t } = useI18n();
   const [open, setOpen] = useState(false);
-  const total = getMatchTotalUserPoints(input);
-  const { lines } = buildMatchPointsBreakdown(input, t, { showMisses: true });
+  const breakdown = buildMatchPointsBreakdown(input, t, {
+    showMisses: true,
+    scorersOnly,
+  });
+  const total = breakdown.total;
+  const { lines } = breakdown;
 
   if (
     !input.userPrediction &&

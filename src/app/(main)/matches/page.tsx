@@ -41,7 +41,8 @@ type MatchesPageCache = {
   meta: MatchesPageMeta;
 };
 
-const REFRESH_MS = 300_000;
+const REFRESH_MS = 30_000;
+const MATCHES_CACHE_FRESH_MS = 15_000;
 
 function matchesCacheKey(roundId: string, page: number) {
   return `matches:${roundId || "all"}:${page}`;
@@ -94,7 +95,13 @@ export default function MatchesPage() {
         applyCache(cached, targetPage);
       }
 
-      if (cached && !opts?.force && isClientCacheFresh(requestKey)) {
+      const hasLiveInCache = cached?.matches.some((m) => m.status === "LIVE");
+      if (
+        cached &&
+        !opts?.force &&
+        !hasLiveInCache &&
+        isClientCacheFresh(requestKey, MATCHES_CACHE_FRESH_MS)
+      ) {
         return;
       }
 
@@ -198,13 +205,18 @@ export default function MatchesPage() {
     return () => abort.abort();
   }, [applyCache, cacheKey, loadMatches, page, selectedRound]);
 
+  const hasLiveMatches = [...pinnedMatches, ...matches].some(
+    (m) => m.status === "LIVE"
+  );
+
   useEffect(() => {
+    const intervalMs = hasLiveMatches ? 15_000 : REFRESH_MS;
     const interval = setInterval(
       () => loadMatches(page, selectedRound, { force: true }),
-      REFRESH_MS
+      intervalMs
     );
     return () => clearInterval(interval);
-  }, [loadMatches, page, selectedRound]);
+  }, [hasLiveMatches, loadMatches, page, selectedRound]);
 
   useEffect(() => {
     [...pinnedMatches, ...matches]

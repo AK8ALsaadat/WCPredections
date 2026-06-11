@@ -1,4 +1,6 @@
 import { apiSuccess, apiError, handleApiError } from "@/lib/api";
+
+export const dynamic = "force-dynamic";
 import { getCurrentUser } from "@/lib/session";
 import {
   getMatchById,
@@ -32,7 +34,9 @@ export async function GET(
       });
     }
 
-    return apiSuccess(match);
+    return apiSuccess(match, 200, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     return handleApiError(error);
   }
