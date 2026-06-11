@@ -95,6 +95,52 @@ function FeatureBadges({
   );
 }
 
+function TeamPredictionColumn({
+  teamName,
+  goals,
+  scorers,
+  align = "start",
+  scorePoints,
+  isFinished,
+}: {
+  teamName: string;
+  goals?: number;
+  scorers: LeagueMatchPredictionRow["scorerPredictions"];
+  align?: "start" | "end";
+  scorePoints?: number | null;
+  isFinished?: boolean;
+}) {
+  return (
+    <div
+      className={`flex flex-col gap-1 ${
+        align === "end" ? "items-end text-end" : "items-start text-start"
+      }`}
+    >
+      <p className="text-[10px] font-medium text-muted md:hidden">{teamName}</p>
+      {goals != null ? (
+        <span
+          className="text-xl font-bold tabular-nums tracking-tight"
+          dir="ltr"
+        >
+          {goals}
+        </span>
+      ) : (
+        <span className="text-lg text-muted">—</span>
+      )}
+      <ScorerChips scorers={scorers} align={align} />
+      {isFinished && scorePoints != null && align === "start" && (
+        <span
+          className={`text-[10px] font-bold ${
+            scorePoints > 0 ? "text-primary" : "text-danger"
+          }`}
+        >
+          {scorePoints > 0 ? `✓ +${scorePoints}` : "✗ 0"}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ScorerChips({
   scorers,
   align = "start",
@@ -259,7 +305,7 @@ function LeaguePredictionRow({
             : "bg-background/20"
       }`}
     >
-      <div className="md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
+      <div className="md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-3">
         <div className="mb-3 flex min-w-0 items-center gap-2 md:mb-0">
           <FeatureBadges row={row} isKnockout={isKnockout} t={t} />
           <div className="min-w-0 flex-1">
@@ -291,41 +337,24 @@ function LeaguePredictionRow({
         </div>
 
         <div className="mb-2 md:mb-0">
-          <p className="mb-1 text-[10px] font-medium text-muted md:hidden">
-            {homeTeamName}
-          </p>
-          <ScorerChips scorers={homeScorers} />
-        </div>
-
-        <div className="mb-2 flex justify-center md:mb-0">
-          {row.prediction ? (
-            <div className="flex min-w-[4.5rem] flex-col items-center rounded-xl bg-background/50 px-3 py-2 ring-1 ring-card-border">
-              <span className="text-xl font-bold tabular-nums tracking-tight">
-                {row.prediction.predHome}
-                <span className="mx-1 text-muted">-</span>
-                {row.prediction.predAway}
-              </span>
-              {isFinished &&
-                matchResult &&
-                row.prediction.points != null &&
-                (row.prediction.points > 0 ? (
-                  <span className="mt-1 text-[10px] font-bold text-primary">
-                    ✓ +{row.prediction.points}
-                  </span>
-                ) : (
-                  <span className="mt-1 text-[10px] text-danger">✗ 0</span>
-                ))}
-            </div>
-          ) : (
-            <span className="text-lg text-muted">—</span>
-          )}
+          <TeamPredictionColumn
+            teamName={homeTeamName}
+            goals={row.prediction?.predHome}
+            scorers={homeScorers}
+            scorePoints={
+              isFinished && matchResult ? row.prediction?.points : undefined
+            }
+            isFinished={isFinished && !!matchResult}
+          />
         </div>
 
         <div>
-          <p className="mb-1 text-end text-[10px] font-medium text-muted md:hidden">
-            {awayTeamName}
-          </p>
-          <ScorerChips scorers={awayScorers} align="end" />
+          <TeamPredictionColumn
+            teamName={awayTeamName}
+            goals={row.prediction?.predAway}
+            scorers={awayScorers}
+            align="end"
+          />
         </div>
       </div>
 
@@ -396,10 +425,9 @@ export function LeaguePredictionsList({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-card-border bg-card/80 shadow-lg shadow-black/20">
-      <div className="hidden border-b border-card-border bg-background/40 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-3 md:px-5">
+      <div className="hidden border-b border-card-border bg-background/40 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] md:gap-3 md:px-5">
         <span>{t.matches.scoreboardPlayer}</span>
-        <span className="text-center">{homeShortName}</span>
-        <span className="text-center">{t.matches.scoreboardScore}</span>
+        <span>{homeShortName}</span>
         <span className="text-end">{awayShortName}</span>
       </div>
 
