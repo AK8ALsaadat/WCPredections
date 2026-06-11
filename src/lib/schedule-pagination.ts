@@ -64,13 +64,14 @@ export function paginateSchedule<T extends SchedulableMatch>(
   const openPages = Math.ceil(open.length / pageSize);
   const otherPages = Math.ceil(other.length / pageSize);
   const totalPages = openPages + otherPages;
+  const clampedPage = Math.min(safePage, totalPages);
 
-  if (safePage <= openPages) {
-    const start = (safePage - 1) * pageSize;
+  if (clampedPage <= openPages) {
+    const start = (clampedPage - 1) * pageSize;
     return {
       items: open.slice(start, start + pageSize),
       meta: {
-        page: safePage,
+        page: clampedPage,
         totalPages,
         totalItems: open.length + other.length,
         pageKind: "open",
@@ -79,12 +80,12 @@ export function paginateSchedule<T extends SchedulableMatch>(
     };
   }
 
-  const otherPage = safePage - openPages;
+  const otherPage = clampedPage - openPages;
   const start = (otherPage - 1) * pageSize;
   return {
     items: other.slice(start, start + pageSize),
     meta: {
-      page: safePage,
+      page: clampedPage,
       totalPages,
       totalItems: open.length + other.length,
       pageKind: "other",

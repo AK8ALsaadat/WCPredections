@@ -15,6 +15,8 @@ import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
 import { clientFetch, isAbortError } from "@/lib/client-fetch";
 import {
+  invalidateMatchesListCaches,
+  invalidatePredictCaches,
   isPredictLineupCacheFresh,
   isPredictMatchCacheFresh,
   readPredictLineupCache,
@@ -451,6 +453,20 @@ export default function PredictPage() {
       return;
     }
 
+    if (match?.isKnockout && !finishType) {
+      setError(t.predict.selectFinish);
+      return;
+    }
+
+    if (
+      match?.isKnockout &&
+      finishType === "PENALTIES" &&
+      !penaltyWinner
+    ) {
+      setError(t.predict.selectWinner);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -475,6 +491,8 @@ export default function PredictPage() {
         return;
       }
 
+      invalidatePredictCaches(matchId);
+      invalidateMatchesListCaches();
       setSuccess(t.matches.predictionSubmitted);
       setTimeout(() => router.push(`/matches/${matchId}`), 1500);
     } catch {

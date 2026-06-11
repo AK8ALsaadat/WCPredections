@@ -127,24 +127,20 @@ async function batchUpsertPlayers(
     );
   });
 
-  if (stale.length > 0) {
-    await prisma.$transaction(
-      stale.map((p) =>
-        prisma.player.update({
-          where: {
-            teamId_apiPlayerId: {
-              teamId,
-              apiPlayerId: String(p.id),
-            },
-          },
-          data: {
-            name: p.name,
-            position: p.position ?? null,
-            shirtNumber: p.shirtNumber ?? null,
-          },
-        })
-      )
-    );
+  for (const p of stale) {
+    await prisma.player.update({
+      where: {
+        teamId_apiPlayerId: {
+          teamId,
+          apiPlayerId: String(p.id),
+        },
+      },
+      data: {
+        name: p.name,
+        position: p.position ?? null,
+        shirtNumber: p.shirtNumber ?? null,
+      },
+    });
   }
 
   const saved = await prisma.player.findMany({

@@ -6,7 +6,12 @@ import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Select } from "@/components/ui/Select";
 import { Pagination } from "@/components/ui/Pagination";
-import { formatDayHeader, getPredictionTimezone, isPredictionAllowed } from "@/lib/utils";
+import {
+  formatDayHeader,
+  getMatchCalendarDay,
+  getPredictionTimezone,
+  isPredictionAllowed,
+} from "@/lib/utils";
 import {
   prefetchPredictData,
   seedPredictMatchFromList,
@@ -225,9 +230,7 @@ export default function MatchesPage() {
   }, [matches]);
 
   const grouped = matches.reduce<Record<string, Match[]>>((acc, match) => {
-    const d = new Date(match.matchTime);
-    d.setHours(0, 0, 0, 0);
-    const key = d.toISOString();
+    const key = getMatchCalendarDay(match.matchTime);
     if (!acc[key]) acc[key] = [];
     acc[key].push(match);
     return acc;
@@ -307,7 +310,7 @@ export default function MatchesPage() {
             {sortedDays.map((dayKey) => (
               <section key={dayKey}>
                 <h3 className="mb-4 border-b border-card-border pb-2 text-base font-semibold text-foreground">
-                  {formatDayHeader(dayKey, locale)}
+                  {formatDayHeader(`${dayKey}T12:00:00`, locale)}
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   {grouped[dayKey].map((match) => (

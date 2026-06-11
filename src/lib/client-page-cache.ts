@@ -69,6 +69,36 @@ export function writeClientCache<T>(key: string, data: T): void {
   writeSessionEntry(key, entry);
 }
 
+export function removeClientCache(key: string): void {
+  store.delete(key);
+  removeSessionEntry(key);
+}
+
+export function invalidateClientCachePrefix(prefix: string): void {
+  for (const key of store.keys()) {
+    if (key.startsWith(prefix)) {
+      store.delete(key);
+      removeSessionEntry(key);
+    }
+  }
+
+  if (!canUseSessionStorage()) return;
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const storageKey = sessionStorage.key(i);
+      if (storageKey?.startsWith(`${SS_PREFIX}${prefix}`)) {
+        keysToRemove.push(storageKey);
+      }
+    }
+    for (const storageKey of keysToRemove) {
+      sessionStorage.removeItem(storageKey);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function isClientCacheFresh(
   key: string,
   freshMs = DEFAULT_FRESH_MS

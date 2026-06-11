@@ -55,6 +55,14 @@ export function getPredictionTimezone(): string {
   return PREDICTION_TIMEZONE;
 }
 
+/** يوم المباراة بتوقيت نافذة التوقع (الرياض) — للتجميع في الجدول */
+export function getMatchCalendarDay(
+  matchTime: Date | string,
+  timeZone = PREDICTION_TIMEZONE
+): string {
+  return getCalendarDayInTz(new Date(matchTime), timeZone);
+}
+
 export function isMatchStarted(matchTime: Date | string): boolean {
   return new Date(matchTime) <= new Date();
 }

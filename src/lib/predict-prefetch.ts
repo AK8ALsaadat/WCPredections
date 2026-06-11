@@ -1,6 +1,8 @@
 import {
+  invalidateClientCachePrefix,
   isClientCacheFresh,
   readClientCache,
+  removeClientCache,
   writeClientCache,
 } from "@/lib/client-page-cache";
 
@@ -180,4 +182,16 @@ export function isPredictLineupCacheFresh(matchId: string) {
 
 export function hasPredictMatchCache(matchId: string) {
   return readPredictMatchCache(matchId) != null;
+}
+
+/** بعد حفظ التوقع — امسح الكاش حتى ما يظهر بيانات قديمة */
+export function invalidatePredictCaches(matchId: string) {
+  removeClientCache(predictMatchCacheKey(matchId));
+  removeClientCache(predictLineupCacheKey(matchId));
+  inflight.delete(matchId);
+}
+
+/** امسح كاش صفحة المباريات بعد تعديل توقع */
+export function invalidateMatchesListCaches() {
+  invalidateClientCachePrefix("matches:");
 }

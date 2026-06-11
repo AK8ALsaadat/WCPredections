@@ -194,6 +194,49 @@ async function validateScorerPicks(
   }
 }
 
+async function replaceScorerPredictions(
+  userId: string,
+  matchId: string,
+  picks: { playerId: string; goals: number }[]
+) {
+  const existing = await prisma.scorerPrediction.findMany({
+    where: { userId, matchId },
+    select: { playerId: true },
+  });
+  const newIds = new Set(picks.map((p) => p.playerId));
+  const toRemove = existing
+    .map((row) => row.playerId)
+    .filter((playerId) => !newIds.has(playerId));
+
+  if (toRemove.length > 0) {
+    await prisma.scorerPrediction.deleteMany({
+      where: { userId, matchId, playerId: { in: toRemove } },
+    });
+  }
+
+  for (const pick of picks) {
+    await prisma.scorerPrediction.upsert({
+      where: {
+        userId_matchId_playerId: {
+          userId,
+          matchId,
+          playerId: pick.playerId,
+        },
+      },
+      create: {
+        userId,
+        matchId,
+        playerId: pick.playerId,
+        predictedGoals: pick.goals,
+      },
+      update: {
+        predictedGoals: pick.goals,
+        points: 0,
+      },
+    });
+  }
+}
+
 export async function submitScorerPredictions(
   userId: string,
   matchId: string,
@@ -227,18 +270,7 @@ export async function submitScorerPredictions(
     picks
   );
 
-  await prisma.scorerPrediction.deleteMany({
-    where: { userId, matchId },
-  });
-
-  await prisma.scorerPrediction.createMany({
-    data: picks.map((pick) => ({
-      userId,
-      matchId,
-      playerId: pick.playerId,
-      predictedGoals: pick.goals,
-    })),
-  });
+  await replaceScorerPredictions(userId, matchId, picks);
 
   return prisma.scorerPrediction.findMany({
     where: { userId, matchId },
@@ -393,19 +425,7 @@ export async function submitMatchPredictionBundle(
     },
   });
 
-  await prisma.scorerPrediction.deleteMany({
-    where: { userId, matchId: data.matchId },
-  });
-  if (data.picks.length > 0) {
-    await prisma.scorerPrediction.createMany({
-      data: data.picks.map((pick) => ({
-        userId,
-        matchId: data.matchId,
-        playerId: pick.playerId,
-        predictedGoals: pick.goals,
-      })),
-    });
-  }
+  await replaceScorerPredictions(userId, data.matchId, data.picks);
 
   let boldBet = null;
   if (data.boldPlayerId) {
