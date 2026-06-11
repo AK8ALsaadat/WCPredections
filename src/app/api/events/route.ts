@@ -1,33 +1,36 @@
 import { NextResponse } from 'next/server';
 import { subscribe } from '@/lib/broadcaster';
 
+type EventPayload = {
+  type: string;
+  data: unknown;
+};
+
 export async function GET() {
-  const stream = new ReadableStream({
+  let unsub: (() => void) | undefined;
+  let keepAlive: ReturnType<typeof setInterval> | undefined;
+
+  const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const encoder = new TextEncoder();
 
-      const send = (payload: { type: string; data: any }) => {
+      const send = (payload: EventPayload) => {
         const s = `event: ${payload.type}\ndata: ${JSON.stringify(payload.data)}\n\n`;
         controller.enqueue(encoder.encode(s));
       };
 
-      const unsub = subscribe(send);
+      unsub = subscribe(send);
 
-      // keep-alive comment every 20s
-      const keepAlive = setInterval(() => {
+      keepAlive = setInterval(() => {
         controller.enqueue(encoder.encode(': keep-alive\n\n'));
       }, 20_000);
 
-      controller.enqueue(
-        encoder.encode('retry: 2000\n\n')
-      );
+      controller.enqueue(encoder.encode('retry: 2000\n\n'));
+    },
 
-      // cleanup on cancel
-      controller.signal.addEventListener('abort', () => {
-        clearInterval(keepAlive);
-        unsub();
-        controller.close();
-      });
+    cancel() {
+      if (keepAlive) clearInterval(keepAlive);
+      if (unsub) unsub();
     },
   });
 

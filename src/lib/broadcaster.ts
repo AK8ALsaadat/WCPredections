@@ -1,4 +1,7 @@
-type EventPayload = { type: string; data: any };
+type EventPayload = {
+  type: string;
+  data: unknown;
+};
 
 const clients = new Set<(payload: EventPayload) => void>();
 
@@ -11,10 +14,13 @@ export function publish(payload: EventPayload) {
   for (const fn of clients) {
     try {
       fn(payload);
-    } catch (e) {
+    } catch {
       // ignore
     }
   }
 }
 
-export default { subscribe, publish };
+export default {
+  subscribe,
+  publish,
+};
