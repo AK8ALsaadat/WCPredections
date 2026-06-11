@@ -11,6 +11,7 @@ import {
   formatDayHeader,
   getMatchCalendarDay,
   getPredictionTimezone,
+  isMatchStarted,
   isPredictionAllowed,
 } from "@/lib/utils";
 import {
@@ -18,6 +19,7 @@ import {
   seedPredictMatchFromList,
 } from "@/lib/predict-prefetch";
 import {
+  invalidateClientCachePrefix,
   isClientCacheFresh,
   readClientCache,
   writeClientCache,
@@ -68,6 +70,8 @@ export default function MatchesPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [dataSourceLabel, setDataSourceLabel] = useState(t.matches.dataSource);
+  const [liveMatchesCount, setLiveMatchesCount] = useState(0);
 
   const predictionTimezone = getPredictionTimezone();
   const cacheKey = matchesCacheKey(selectedRound, page);
@@ -174,6 +178,20 @@ export default function MatchesPage() {
   );
 
   useEffect(() => {
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.success) return;
+        if (data.data.footballApi === "sportscore") {
+          setDataSourceLabel(t.matches.dataSourceSportScore);
+        }
+        const live = data.data.liveMatches?.length ?? 0;
+        setLiveMatchesCount(live);
+      })
+      .catch(() => {});
+  }, [t.matches.dataSource, t.matches.dataSourceSportScore]);
+
+  useEffect(() => {
     const cachedRounds = readClientCache<Round[]>("rounds");
     if (cachedRounds) setRounds(cachedRounds);
 
@@ -188,6 +206,19 @@ export default function MatchesPage() {
   }, []);
 
   useEffect(() => {
+    for (const key of ["matches:all:1", `matches:${selectedRound || "all"}:${page}`]) {
+      const cached = readClientCache<MatchesPageCache>(key);
+      const hasStaleScheduled = [...(cached?.matches ?? []), ...(cached?.pinnedMatches ?? [])].some(
+        (m) => m.status === "SCHEDULED" && isMatchStarted(m.matchTime)
+      );
+      if (hasStaleScheduled) {
+        invalidateClientCachePrefix("matches:");
+        break;
+      }
+    }
+  }, [page, selectedRound]);
+
+  useEffect(() => {
     const abort = new AbortController();
     const cached = readClientCache<MatchesPageCache>(cacheKey);
 
@@ -199,6 +230,7 @@ export default function MatchesPage() {
 
     void loadMatches(page, selectedRound, {
       showLoader: !cached,
+      force: true,
       signal: abort.signal,
     });
 
@@ -274,7 +306,13 @@ export default function MatchesPage() {
             <p className="mt-1 text-xs text-muted">
               {t.matches.lastUpdate}:{" "}
               {lastUpdate.toLocaleTimeString(locale === "en" ? "en-US" : "ar-SA")}{" "}
-              · {t.matches.dataSource}
+              · {dataSourceLabel}
+              {liveMatchesCount > 0 && (
+                <span className="mr-1 font-medium text-primary">
+                  {" "}
+                  · {t.matches.liveMatchesConnected(liveMatchesCount)}
+                </span>
+              )}
               {refreshing && (
                 <span className="mr-2 text-primary"> · {t.matches.refreshing}</span>
               )}

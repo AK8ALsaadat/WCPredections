@@ -1,6 +1,9 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { syncMatchesFromApi } from "@/services/football-api";
+import {
+  reconcileDuplicateMatchesInRound,
+  syncMatchesFromApi,
+} from "@/services/football-api";
 import { resolveFootballApiProviderName } from "@/services/football-api/types";
 import { recalculateMatchScoring } from "@/services/prediction.service";
 import { addDays, format } from "date-fns";
@@ -120,6 +123,7 @@ export async function syncActiveRoundFromApi() {
   const options = getWorldCupSyncOptions();
 
   const result = await syncMatchesFromApi(round.id, options);
+  await reconcileDuplicateMatchesInRound(round.id);
 
   const scorableMatches = await prisma.match.findMany({
     where: {

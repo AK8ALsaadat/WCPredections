@@ -163,6 +163,9 @@ export const ar = {
     syncHint: "انتظر المزامنة أو اطلب من المشرف تشغيلها من لوحة الإدارة",
     lastUpdate: "آخر تحديث",
     dataSource: "بيانات رسمية من football-data.org",
+    dataSourceSportScore: "بيانات حية من SportScore",
+    liveMatchesConnected: (n: number) =>
+      n === 1 ? "مباراة حية متصلة" : `${n} مباريات حية متصلة`,
     knockoutBadge: "إقصائي",
     vs: "ضد",
     predict: "توقّع",

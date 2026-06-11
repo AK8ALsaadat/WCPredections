@@ -161,9 +161,16 @@ export function MatchCard({
           {!canPredict && !isFinished && !isLive && (
             <span className="rounded bg-card-border px-2 py-0.5">{t.matches.locked}</span>
           )}
-          <span className={isLive ? "font-semibold text-primary" : ""}>
-            {t.status[match.status as keyof typeof t.status] ?? match.status}
-          </span>
+          {isLive && (
+            <span className="rounded bg-primary/20 px-2 py-0.5 font-semibold text-primary animate-pulse">
+              {t.status.LIVE}
+            </span>
+          )}
+          {!isLive && (
+            <span>
+              {t.status[match.status as keyof typeof t.status] ?? match.status}
+            </span>
+          )}
         </div>
       </div>
 

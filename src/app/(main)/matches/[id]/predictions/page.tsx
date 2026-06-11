@@ -8,7 +8,7 @@ import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { LeaguePredictionsList } from "@/components/matches/LeaguePredictionsList";
 import { asFinishType } from "@/lib/finish-type";
-import { formatDate } from "@/lib/utils";
+import { formatDate, isMatchStarted } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import type { LeagueMatchPredictionRow } from "@/types";
 
@@ -72,14 +72,17 @@ export default function LeagueMatchPredictionsPage() {
   }, [matchId, t.errors.loadFailed]);
 
   useEffect(() => {
-    if (data?.match.status !== "LIVE") return;
+    const shouldPoll =
+      data?.match.status === "LIVE" ||
+      (data?.match.matchTime && isMatchStarted(data.match.matchTime));
+    if (!shouldPoll) return;
 
     const timer = setInterval(() => {
       loadPredictions().catch(() => {});
     }, 30_000);
 
     return () => clearInterval(timer);
-  }, [data?.match.status, matchId]);
+  }, [data?.match.status, data?.match.matchTime, matchId]);
 
   if (loading) return <LoadingPage />;
   if (error || !data) {

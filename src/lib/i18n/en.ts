@@ -166,6 +166,9 @@ export const en = {
     syncHint: "Wait for sync or ask an admin to run it from the dashboard",
     lastUpdate: "Last updated",
     dataSource: "Official data from football-data.org",
+    dataSourceSportScore: "Live data from SportScore",
+    liveMatchesConnected: (n: number) =>
+      n === 1 ? "1 live match connected" : `${n} live matches connected`,
     knockoutBadge: "Knockout",
     vs: "vs",
     predict: "Predict",

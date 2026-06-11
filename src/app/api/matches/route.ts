@@ -4,6 +4,7 @@ import {
   SCHEDULE_PAGE_SIZE,
 } from "@/lib/schedule-pagination";
 import { getCurrentUser } from "@/lib/session";
+import { syncStalePredictedMatches } from "@/services/football-api";
 import {
   getUpcomingMatches,
   getAllMatches,
@@ -28,6 +29,11 @@ export async function GET(request: Request) {
     );
 
     const user = await getCurrentUser();
+
+    if (schedule) {
+      await syncStalePredictedMatches(roundId);
+    }
+
     const raw = schedule
       ? await getScheduleMatches(roundId)
       : upcoming

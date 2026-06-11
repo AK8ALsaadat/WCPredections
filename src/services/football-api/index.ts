@@ -135,6 +135,170 @@ async function resolveTeamId(
   return created.id;
 }
 
+async function findExistingMatch(
+  roundId: string,
+  mapped: ExternalMatch,
+  homeTeamId: string,
+  awayTeamId: string
+) {
+  let existing = await prisma.match.findUnique({
+    where: { apiMatchId: mapped.apiId },
+  });
+  if (existing) return existing;
+
+  existing = await prisma.match.findFirst({
+    where: { roundId, homeTeamId, awayTeamId },
+  });
+  if (existing) return existing;
+
+  if (mapped.homeTeamName && mapped.awayTeamName) {
+    existing = await prisma.match.findFirst({
+      where: {
+        roundId,
+        homeTeam: {
+          name: { equals: mapped.homeTeamName, mode: "insensitive" },
+        },
+        awayTeam: {
+          name: { equals: mapped.awayTeamName, mode: "insensitive" },
+        },
+      },
+    });
+  }
+
+  return existing;
+}
+
+async function mergeMatchIntoCanonical(canonicalId: string, duplicateId: string) {
+  if (canonicalId === duplicateId) return;
+
+  const dupPreds = await prisma.prediction.findMany({
+    where: { matchId: duplicateId },
+  });
+  for (const p of dupPreds) {
+    const conflict = await prisma.prediction.findUnique({
+      where: {
+        userId_matchId: { userId: p.userId, matchId: canonicalId },
+      },
+    });
+    if (conflict) {
+      await prisma.prediction.delete({ where: { id: p.id } });
+    } else {
+      await prisma.prediction.update({
+        where: { id: p.id },
+        data: { matchId: canonicalId },
+      });
+    }
+  }
+
+  const dupScorers = await prisma.scorerPrediction.findMany({
+    where: { matchId: duplicateId },
+  });
+  for (const s of dupScorers) {
+    const conflict = await prisma.scorerPrediction.findUnique({
+      where: {
+        userId_matchId_playerId: {
+          userId: s.userId,
+          matchId: canonicalId,
+          playerId: s.playerId,
+        },
+      },
+    });
+    if (conflict) {
+      await prisma.scorerPrediction.delete({ where: { id: s.id } });
+    } else {
+      await prisma.scorerPrediction.update({
+        where: { id: s.id },
+        data: { matchId: canonicalId },
+      });
+    }
+  }
+
+  await prisma.boldScorerBet.updateMany({
+    where: { matchId: duplicateId },
+    data: { matchId: canonicalId },
+  });
+
+  const dupMatchScorers = await prisma.matchScorer.findMany({
+    where: { matchId: duplicateId },
+  });
+  for (const ms of dupMatchScorers) {
+    const conflict = await prisma.matchScorer.findUnique({
+      where: {
+        matchId_playerId: { matchId: canonicalId, playerId: ms.playerId },
+      },
+    });
+    if (conflict) {
+      await prisma.matchScorer.delete({ where: { id: ms.id } });
+    } else {
+      await prisma.matchScorer.update({
+        where: { id: ms.id },
+        data: { matchId: canonicalId },
+      });
+    }
+  }
+
+  await prisma.match.delete({ where: { id: duplicateId } });
+}
+
+export async function reconcileDuplicateMatchesInRound(roundId: string) {
+  const matches = await prisma.match.findMany({
+    where: { roundId },
+    include: {
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+      _count: {
+        select: {
+          predictions: true,
+          scorerPredictions: true,
+        },
+      },
+    },
+  });
+
+  const byPair = new Map<string, typeof matches>();
+  for (const m of matches) {
+    const key = `${m.homeTeam.name.toLowerCase()}|${m.awayTeam.name.toLowerCase()}`;
+    const list = byPair.get(key) ?? [];
+    list.push(m);
+    byPair.set(key, list);
+  }
+
+  let merged = 0;
+  for (const group of byPair.values()) {
+    if (group.length < 2) continue;
+
+    const rank = (m: (typeof group)[0]) => {
+      if (m.status === "LIVE") return 1_000;
+      if (m.status === "FINISHED") return 900;
+      return m._count.predictions + m._count.scorerPredictions;
+    };
+
+    group.sort(
+      (a, b) =>
+        rank(b) - rank(a) || b.updatedAt.getTime() - a.updatedAt.getTime()
+    );
+
+    const canonical = group[0];
+    for (const dup of group.slice(1)) {
+      await mergeMatchIntoCanonical(canonical.id, dup.id);
+      merged++;
+    }
+
+    if (
+      canonical.status === "LIVE" ||
+      canonical.status === "FINISHED"
+    ) {
+      try {
+        await recalculateMatchScoring(canonical.id);
+      } catch {
+        // غير جاهزة للاحتساب بعد
+      }
+    }
+  }
+
+  return { merged };
+}
+
 async function syncMatch(
   external: ExternalMatch,
   roundId: string,
@@ -161,15 +325,12 @@ async function syncMatch(
     );
   }
 
-  let existing = await prisma.match.findUnique({
-    where: { apiMatchId: mapped.apiId },
-  });
-
-  if (!existing) {
-    existing = await prisma.match.findFirst({
-      where: { roundId, homeTeamId, awayTeamId },
-    });
-  }
+  const existing = await findExistingMatch(
+    roundId,
+    mapped,
+    homeTeamId,
+    awayTeamId
+  );
 
   const wasFinished = existing?.status === "FINISHED";
   const isNowFinished = mapped.status === "FINISHED";
@@ -370,6 +531,8 @@ export async function syncMatchesFromApi(
       }
     : await advanceKnockoutTeams(roundId);
 
+  await reconcileDuplicateMatchesInRound(roundId);
+
   if (updated > 0 || created > 0) {
     revalidateTag("matches-schedule");
   }
@@ -384,6 +547,85 @@ export async function syncMatchesFromApi(
     totalMatches: externalMatches.length,
     knockoutAdvancement,
   };
+}
+
+export async function ensureMatchSyncedFromApi(matchId: string) {
+  const provider = getFootballApiProvider();
+  if (provider.name !== "sportscore") return { synced: false };
+
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: {
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+    },
+  });
+  if (!match) return { synced: false };
+
+  const ss = provider as SportScoreProvider;
+  const slug = match.apiMatchId?.includes("-vs-")
+    ? match.apiMatchId
+    : await ss.buildSlugFromTeams(match.homeTeam.name, match.awayTeam.name);
+
+  try {
+    const external = await ss.fetchMatchBySlug(slug);
+    if (!external) return { synced: false };
+
+    await syncMatch(external, match.roundId, { quickSync: true });
+    await reconcileDuplicateMatchesInRound(match.roundId);
+    return { synced: true };
+  } catch (error) {
+    console.warn(
+      `[مزامنة مباراة] تخطي ${matchId}:`,
+      error instanceof Error ? error.message : error
+    );
+    return { synced: false };
+  }
+}
+
+export async function syncStalePredictedMatches(roundId?: string) {
+  const provider = getFootballApiProvider();
+  if (provider.name !== "sportscore") return { synced: 0 };
+
+  let targetRoundId = roundId;
+  if (!targetRoundId) {
+    const round = await prisma.round.findFirst({
+      orderBy: { startsAt: "desc" },
+      select: { id: true },
+    });
+    targetRoundId = round?.id;
+  }
+  if (!targetRoundId) return { synced: 0 };
+
+  const now = new Date();
+  const stale = await prisma.match.findMany({
+    where: {
+      roundId: targetRoundId,
+      predictions: { some: {} },
+      OR: [
+        { status: "LIVE" },
+        { status: "SCHEDULED", matchTime: { lte: now } },
+      ],
+    },
+    include: {
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+    },
+    take: 12,
+  });
+
+  let synced = 0;
+  for (const row of stale) {
+    const result = await ensureMatchSyncedFromApi(row.id);
+    if (result.synced) synced++;
+  }
+
+  if (synced > 0) {
+    await reconcileDuplicateMatchesInRound(targetRoundId);
+    revalidateTag("matches-schedule");
+  }
+
+  return { synced };
 }
 
 export type { SyncOptions, ExternalMatch, FootballApiProvider };
