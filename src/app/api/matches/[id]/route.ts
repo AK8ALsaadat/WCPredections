@@ -2,7 +2,7 @@ import { apiSuccess, apiError, handleApiError } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 import { getCurrentUser } from "@/lib/session";
-import { ensureMatchSyncedFromApi } from "@/services/football-api";
+import { ensureMatchSyncedFromApiQuick } from "@/services/football-api";
 import {
   getMatchById,
   getMatchByIdForPredict,
@@ -20,7 +20,7 @@ export async function GET(
     const user = await getCurrentUser();
 
     if (!forPredict) {
-      await ensureMatchSyncedFromApi(id);
+      await ensureMatchSyncedFromApiQuick(id);
     }
 
     const match = forPredict

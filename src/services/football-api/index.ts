@@ -549,6 +549,13 @@ export async function syncMatchesFromApi(
   };
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs)),
+  ]);
+}
+
 export async function ensureMatchSyncedFromApi(matchId: string) {
   const provider = getFootballApiProvider();
   if (provider.name !== "sportscore") return { synced: false };
@@ -629,6 +636,21 @@ export async function syncStalePredictedMatches(
   }
 
   return { synced };
+}
+
+export async function ensureMatchSyncedFromApiQuick(matchId: string) {
+  return withTimeout(ensureMatchSyncedFromApi(matchId), 4_000, { synced: false });
+}
+
+export async function syncStalePredictedMatchesQuick(
+  roundId?: string,
+  options?: { maxMatches?: number }
+) {
+  return withTimeout(
+    syncStalePredictedMatches(roundId, options),
+    5_000,
+    { synced: 0 }
+  );
 }
 
 export type { SyncOptions, ExternalMatch, FootballApiProvider };
