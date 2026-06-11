@@ -222,6 +222,95 @@ export type LeagueMatchResultContext = {
   penaltyWinnerName?: string | null;
 };
 
+export function buildLeaguePendingBreakdown(
+  row: {
+    prediction: {
+      predHome: number;
+      predAway: number;
+      isDouble: boolean;
+      predictedFinishType?: string | null;
+      predictedPenaltyWinnerTeamId?: string | null;
+    } | null;
+    scorerPredictions: {
+      predictedGoals: number;
+      player: { name: string };
+    }[];
+    boldScorerBet: {
+      player: { name: string };
+    } | null;
+  },
+  options: {
+    isKnockout: boolean;
+    homeTeamId: string;
+    awayTeamId: string;
+    homeShortName: string;
+    awayShortName: string;
+  },
+  messages: Messages
+): { total: number; lines: PointsBreakdownLine[] } {
+  const lines: PointsBreakdownLine[] = [];
+  const p = row.prediction;
+
+  if (p) {
+    const multiplier = p.isDouble
+      ? ` (${messages.pointsBreakdown.doubled})`
+      : "";
+    lines.push({
+      id: "score",
+      label: messages.pointsBreakdown.pendingScore + multiplier,
+      detail: messages.pointsBreakdown.pendingScoreDetail(p.predHome, p.predAway),
+      points: 0,
+    });
+  }
+
+  if (options.isKnockout && p?.predictedFinishType) {
+    lines.push({
+      id: "finish-type",
+      label: messages.pointsBreakdown.pendingFinishType,
+      detail: messages.pointsBreakdown.finishTypeDetail(p.predictedFinishType),
+      points: 0,
+    });
+  }
+
+  if (p?.predictedPenaltyWinnerTeamId) {
+    const penaltyShort =
+      p.predictedPenaltyWinnerTeamId === options.homeTeamId
+        ? options.homeShortName
+        : p.predictedPenaltyWinnerTeamId === options.awayTeamId
+          ? options.awayShortName
+          : null;
+    lines.push({
+      id: "penalty",
+      label: messages.pointsBreakdown.pendingPenalty,
+      detail: penaltyShort ?? undefined,
+      points: 0,
+    });
+  }
+
+  for (const sp of row.scorerPredictions) {
+    lines.push({
+      id: `scorer-${sp.player.name}`,
+      label: messages.pointsBreakdown.pendingScorer(sp.player.name),
+      detail:
+        sp.predictedGoals > 1
+          ? messages.pointsBreakdown.scorerGoalsDetail(sp.predictedGoals)
+          : undefined,
+      points: 0,
+    });
+  }
+
+  if (row.boldScorerBet) {
+    lines.push({
+      id: "bold-scorer",
+      label: messages.pointsBreakdown.pendingBold(row.boldScorerBet.player.name),
+      detail: messages.pointsBreakdown.boldScorerDetail,
+      points: 0,
+    });
+  }
+
+  return { total: 0, lines };
+}
+
 export function leagueRowToBreakdownInput(
   row: {
     prediction: {

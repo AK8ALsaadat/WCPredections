@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { LeagueMatchPredictionRow } from "@/types";
 import { asFinishType } from "@/lib/finish-type";
 import {
+  buildLeaguePendingBreakdown,
   buildMatchPointsBreakdown,
   getMatchTotalUserPoints,
   leagueRowToBreakdownInput,
@@ -95,40 +96,49 @@ function FeatureBadges({
   );
 }
 
-function TeamPredictionColumn({
-  teamName,
-  goals,
-  scorers,
-  align = "start",
+function PredictionScoreboard({
+  homeTeamName,
+  awayTeamName,
+  predHome,
+  predAway,
+  homeScorers,
+  awayScorers,
   scorePoints,
-  isFinished,
+  showResults,
 }: {
-  teamName: string;
-  goals?: number;
-  scorers: LeagueMatchPredictionRow["scorerPredictions"];
-  align?: "start" | "end";
+  homeTeamName: string;
+  awayTeamName: string;
+  predHome?: number;
+  predAway?: number;
+  homeScorers: LeagueMatchPredictionRow["scorerPredictions"];
+  awayScorers: LeagueMatchPredictionRow["scorerPredictions"];
   scorePoints?: number | null;
-  isFinished?: boolean;
+  showResults: boolean;
 }) {
+  const hasScore = predHome != null && predAway != null;
+
   return (
-    <div
-      className={`flex flex-col gap-1 ${
-        align === "end" ? "items-end text-end" : "items-start text-start"
-      }`}
-    >
-      <p className="text-[10px] font-medium text-muted md:hidden">{teamName}</p>
-      {goals != null ? (
-        <span
-          className="text-xl font-bold tabular-nums tracking-tight"
+    <div className="flex w-full flex-col items-center gap-2 md:max-w-xs md:justify-self-center">
+      <div className="flex w-full items-center justify-center gap-1.5 md:hidden">
+        <span className="text-[10px] font-medium text-muted">{homeTeamName}</span>
+        <span className="text-[10px] text-muted/50">·</span>
+        <span className="text-[10px] font-medium text-muted">{awayTeamName}</span>
+      </div>
+
+      {hasScore ? (
+        <div
+          className="flex items-baseline gap-2 tabular-nums tracking-tight"
           dir="ltr"
         >
-          {goals}
-        </span>
+          <span className="text-xl font-bold">{predHome}</span>
+          <span className="text-base font-light text-muted">-</span>
+          <span className="text-xl font-bold">{predAway}</span>
+        </div>
       ) : (
         <span className="text-lg text-muted">—</span>
       )}
-      <ScorerChips scorers={scorers} align={align} />
-      {isFinished && scorePoints != null && align === "start" && (
+
+      {showResults && scorePoints != null && (
         <span
           className={`text-[10px] font-bold ${
             scorePoints > 0 ? "text-primary" : "text-danger"
@@ -137,6 +147,27 @@ function TeamPredictionColumn({
           {scorePoints > 0 ? `✓ +${scorePoints}` : "✗ 0"}
         </span>
       )}
+
+      {(homeScorers.length > 0 || awayScorers.length > 0) && (
+        <div className="grid w-full grid-cols-2 gap-2">
+          <div className="min-w-0">
+            <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
+              {homeTeamName}
+            </p>
+            <ScorerChips scorers={homeScorers} showResults={showResults} />
+          </div>
+          <div className="min-w-0 text-end">
+            <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
+              {awayTeamName}
+            </p>
+            <ScorerChips
+              scorers={awayScorers}
+              align="end"
+              showResults={showResults}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -144,9 +175,11 @@ function TeamPredictionColumn({
 function ScorerChips({
   scorers,
   align = "start",
+  showResults = false,
 }: {
   scorers: LeagueMatchPredictionRow["scorerPredictions"];
   align?: "start" | "end";
+  showResults?: boolean;
 }) {
   if (scorers.length === 0) {
     return <span className="text-xs text-muted/60">—</span>;
@@ -157,7 +190,8 @@ function ScorerChips({
       className={`flex flex-wrap gap-1 ${align === "end" ? "justify-end" : "justify-start"}`}
     >
       {scorers.map((pick) => {
-        const hit = (pick.points ?? 0) > 0;
+        const hit = showResults && (pick.points ?? 0) > 0;
+        const miss = showResults && (pick.points ?? 0) <= 0;
         return (
           <span
             key={pick.player.id}
@@ -165,19 +199,22 @@ function ScorerChips({
             className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] ring-1 ${
               hit
                 ? "bg-primary/10 text-primary/90 ring-primary/20"
-                : "bg-card-border/40 text-muted ring-card-border/60"
+                : miss
+                  ? "bg-card-border/40 text-muted ring-card-border/60"
+                  : "bg-card-border/30 text-foreground/80 ring-card-border/50"
             }`}
           >
-            {hit ? (
+            {hit && (
               <span className="text-[10px] font-bold text-primary">✓</span>
-            ) : (
+            )}
+            {miss && (
               <span className="text-[10px] text-danger">✗</span>
             )}
             {shortPlayerName(pick.player.name)}
             {pick.predictedGoals > 1 && (
               <span className="font-bold text-warning">×{pick.predictedGoals}</span>
             )}
-            {pick.points != null && (
+            {showResults && pick.points != null && (
               <span
                 className={`text-[10px] font-bold ${
                   pick.points > 0
@@ -270,7 +307,8 @@ function LeaguePredictionRow({
   awayShortName: string;
   t: Messages;
 }) {
-  const [open, setOpen] = useState(isMe);
+  const [open, setOpen] = useState(false);
+  const showResults = isFinished && !!matchResult;
 
   const homeScorers = row.scorerPredictions.filter(
     (p) => p.player.teamId === homeTeamId
@@ -280,20 +318,29 @@ function LeaguePredictionRow({
   );
 
   const breakdownInput =
-    isFinished && matchResult
+    showResults && matchResult
       ? leagueRowToBreakdownInput(row, matchResult)
       : null;
 
+  const breakdown = breakdownInput
+    ? buildMatchPointsBreakdown(breakdownInput, t, { showMisses: true })
+    : buildLeaguePendingBreakdown(
+        row,
+        {
+          isKnockout,
+          homeTeamId,
+          awayTeamId,
+          homeShortName,
+          awayShortName,
+        },
+        t
+      );
+
   const totalPoints = breakdownInput
     ? getMatchTotalUserPoints(breakdownInput)
-    : null;
+    : 0;
 
-  const breakdown =
-    breakdownInput && totalPoints != null
-      ? buildMatchPointsBreakdown(breakdownInput, t, { showMisses: true })
-      : null;
-
-  const hasBreakdown = Boolean(breakdown && breakdown.lines.length > 0);
+  const hasBreakdown = breakdown.lines.length > 0;
 
   return (
     <li
@@ -305,7 +352,7 @@ function LeaguePredictionRow({
             : "bg-background/20"
       }`}
     >
-      <div className="md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-start md:gap-3">
+      <div className="md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:items-start md:gap-4">
         <div className="mb-3 flex min-w-0 items-center gap-2 md:mb-0">
           <FeatureBadges row={row} isKnockout={isKnockout} t={t} />
           <div className="min-w-0 flex-1">
@@ -317,45 +364,19 @@ function LeaguePredictionRow({
                 </span>
               )}
             </div>
-            {totalPoints != null && (
-              <p className="mt-0.5 text-[11px] text-muted">
-                {t.matches.pointsEarned}:{" "}
-                <span
-                  className={`font-bold tabular-nums ${
-                    totalPoints > 0
-                      ? "text-primary"
-                      : totalPoints < 0
-                        ? "text-danger"
-                        : "text-muted"
-                  }`}
-                >
-                  {totalPoints > 0 ? `+${totalPoints}` : totalPoints}
-                </span>
-              </p>
-            )}
           </div>
         </div>
 
-        <div className="mb-2 md:mb-0">
-          <TeamPredictionColumn
-            teamName={homeTeamName}
-            goals={row.prediction?.predHome}
-            scorers={homeScorers}
-            scorePoints={
-              isFinished && matchResult ? row.prediction?.points : undefined
-            }
-            isFinished={isFinished && !!matchResult}
-          />
-        </div>
-
-        <div>
-          <TeamPredictionColumn
-            teamName={awayTeamName}
-            goals={row.prediction?.predAway}
-            scorers={awayScorers}
-            align="end"
-          />
-        </div>
+        <PredictionScoreboard
+          homeTeamName={homeTeamName}
+          awayTeamName={awayTeamName}
+          predHome={row.prediction?.predHome}
+          predAway={row.prediction?.predAway}
+          homeScorers={homeScorers}
+          awayScorers={awayScorers}
+          scorePoints={showResults ? row.prediction?.points : undefined}
+          showResults={showResults}
+        />
       </div>
 
       {isKnockout && (
@@ -369,24 +390,49 @@ function LeaguePredictionRow({
         />
       )}
 
-      {hasBreakdown && breakdown && (
+      {hasBreakdown && (
         <div className="mt-3 border-t border-card-border/60 pt-3">
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="flex w-full items-center justify-between gap-2 rounded-lg border border-card-border/80 bg-background/40 px-3 py-2 text-xs font-medium text-muted transition-colors hover:bg-background/60"
+            className={`flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors ${
+              totalPoints > 0
+                ? "border-primary/40 bg-primary/10 hover:bg-primary/15"
+                : totalPoints < 0
+                  ? "border-danger/40 bg-danger/10 hover:bg-danger/15"
+                  : "border-card-border/80 bg-background/40 hover:bg-background/60"
+            }`}
           >
-            <span>{t.matches.pointsBreakdownTitle}</span>
-            <span>
-              {open ? t.matches.hidePointsBreakdown : t.matches.showPointsBreakdown}{" "}
+            <div className="text-start">
+              <p className="text-[10px] text-muted">{t.matches.pointsEarned}</p>
+              <p
+                className={`text-lg font-bold tabular-nums ${
+                  totalPoints > 0
+                    ? "text-primary"
+                    : totalPoints < 0
+                      ? "text-danger"
+                      : "text-muted"
+                }`}
+              >
+                {totalPoints > 0 ? `+${totalPoints}` : totalPoints}{" "}
+                <span className="text-xs font-medium">{t.profile.pointsShort}</span>
+              </p>
+            </div>
+            <span className="text-xs text-muted">
+              {open ? t.pointsBreakdown.hideDetails : t.matches.tapForDetails}{" "}
               {open ? "▲" : "▼"}
             </span>
           </button>
           {open && (
             <div className="mt-2 rounded-lg border border-card-border/60 bg-background/30 p-3">
+              {!showResults && (
+                <p className="mb-2 text-[10px] text-warning">
+                  {t.pointsBreakdown.pendingHint}
+                </p>
+              )}
               <PointsBreakdownLines
                 lines={breakdown.lines}
-                total={breakdown.total}
+                total={totalPoints}
                 compact
               />
             </div>
@@ -425,10 +471,13 @@ export function LeaguePredictionsList({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-card-border bg-card/80 shadow-lg shadow-black/20">
-      <div className="hidden border-b border-card-border bg-background/40 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] md:gap-3 md:px-5">
+      <div className="hidden border-b border-card-border bg-background/40 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:gap-4 md:px-5">
         <span>{t.matches.scoreboardPlayer}</span>
-        <span>{homeShortName}</span>
-        <span className="text-end">{awayShortName}</span>
+        <span className="text-center">
+          {homeShortName}
+          <span className="mx-1.5 text-muted/50">-</span>
+          {awayShortName}
+        </span>
       </div>
 
       <ul className="divide-y divide-card-border/80">
