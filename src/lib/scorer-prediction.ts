@@ -174,6 +174,13 @@ export function getScorerBudgetStatus(
   const homeScorersExceeded = homeCount > predHome;
   const awayScorersExceeded = awayCount > predAway;
 
+  const homeIncomplete = predHome > 0 && homeTotal < predHome;
+  const awayIncomplete = predAway > 0 && awayTotal < predAway;
+  const homeComplete =
+    predHome === 0 ? homeTotal === 0 && homeCount === 0 : homeTotal === predHome;
+  const awayComplete =
+    predAway === 0 ? awayTotal === 0 && awayCount === 0 : awayTotal === predAway;
+
   return {
     homeTotal,
     awayTotal,
@@ -185,6 +192,12 @@ export function getScorerBudgetStatus(
     awayGoalsExceeded,
     homeScorersExceeded,
     awayScorersExceeded,
+    homeIncomplete,
+    awayIncomplete,
+    homeComplete,
+    awayComplete,
+    isComplete: homeComplete && awayComplete,
+    anyIncomplete: homeIncomplete || awayIncomplete,
     anyExceeded:
       homeGoalsExceeded ||
       awayGoalsExceeded ||

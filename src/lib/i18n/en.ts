@@ -276,9 +276,14 @@ export const en = {
     scoreFirstHint: "Set the score first, then pick scorers",
     scorerPrediction: "Scorer prediction",
     scorerHint:
-      "Each team: max scorers = predicted goals (e.g. 2-1 → at most 2 home scorers) — shootout goals don't count",
+      "Each team's scorer goals must exactly match your predicted score (e.g. 2-1 → 2 home goals + 1 away goal) — shootout goals don't count",
     scorerHintNoGoals: "0-0 score — no scorers needed",
     scorersRequired: "Pick scorers matching your predicted score",
+    scorersIncomplete:
+      "Each team's total scorer goals must exactly match your prediction — not less, not more",
+    scorersComplete: "Complete",
+    scorersRemaining: (n: number) =>
+      n === 1 ? "1 goal left" : `${n} goals left`,
     scorersNeedLineup:
       "Your score has goals — wait for lineup or change the score to save",
     scorersExceeded:

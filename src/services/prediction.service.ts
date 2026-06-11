@@ -207,8 +207,21 @@ async function validateScorerPicks(
     );
   }
 
-  if (picks.length === 0 && (predHome > 0 || predAway > 0)) {
-    throw new Error("اختر اللاعبين اللي بيسجلون حسب النتيجة");
+  if (predHome > 0 && homeGoals !== predHome) {
+    throw new Error(
+      `لازم توزّع ${predHome} ${predHome === 1 ? "هدف" : "أهداف"} على هدافي ${match.homeTeam.shortName} (حالياً ${homeGoals})`
+    );
+  }
+  if (predAway > 0 && awayGoals !== predAway) {
+    throw new Error(
+      `لازم توزّع ${predAway} ${predAway === 1 ? "هدف" : "أهداف"} على هدافي ${match.awayTeam.shortName} (حالياً ${awayGoals})`
+    );
+  }
+  if (predHome === 0 && homeGoals > 0) {
+    throw new Error(`ما فيه أهداف متوقعة لـ ${match.homeTeam.shortName}`);
+  }
+  if (predAway === 0 && awayGoals > 0) {
+    throw new Error(`ما فيه أهداف متوقعة لـ ${match.awayTeam.shortName}`);
   }
 }
 

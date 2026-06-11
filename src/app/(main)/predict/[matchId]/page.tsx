@@ -268,7 +268,6 @@ export default function PredictPage() {
   );
 
   const hasAnyGoals = predHome > 0 || predAway > 0;
-  const scorerCount = Object.keys(scorerPicks).length;
 
   useEffect(() => {
     setScorerPicks((prev) => {
@@ -566,9 +565,11 @@ export default function PredictPage() {
       return;
     }
 
-    if (hasAnyGoals && scorerCount === 0) {
+    if (hasAnyGoals && !budget.isComplete) {
       setError(
-        hasPlayers ? t.predict.scorersRequired : t.predict.scorersNeedLineup
+        hasPlayers
+          ? t.predict.scorersIncomplete
+          : t.predict.scorersNeedLineup
       );
       return;
     }
@@ -1013,7 +1014,11 @@ export default function PredictPage() {
                     className={`rounded-lg border px-3 py-2 text-sm ${
                       budget.homeExceeded
                         ? "border-danger/50 bg-danger/10 text-danger"
-                        : "border-card-border bg-card text-muted"
+                        : budget.homeIncomplete
+                          ? "border-warning/50 bg-warning/10 text-warning"
+                          : budget.homeComplete && predHome > 0
+                            ? "border-primary/40 bg-primary/10 text-primary"
+                            : "border-card-border bg-card text-muted"
                     }`}
                   >
                     <span className="font-medium text-foreground">
@@ -1023,12 +1028,25 @@ export default function PredictPage() {
                     {budget.homeExceeded && (
                       <span className="mr-1 font-bold"> — {t.predict.exceeded}</span>
                     )}
+                    {!budget.homeExceeded && budget.homeIncomplete && predHome > 0 && (
+                      <span className="mr-1 font-bold">
+                        {" "}
+                        — {t.predict.scorersRemaining(predHome - budget.homeTotal)}
+                      </span>
+                    )}
+                    {!budget.homeExceeded && budget.homeComplete && predHome > 0 && (
+                      <span className="mr-1 font-bold"> — {t.predict.scorersComplete}</span>
+                    )}
                   </div>
                   <div
                     className={`rounded-lg border px-3 py-2 text-sm ${
                       budget.awayExceeded
                         ? "border-danger/50 bg-danger/10 text-danger"
-                        : "border-card-border bg-card text-muted"
+                        : budget.awayIncomplete
+                          ? "border-warning/50 bg-warning/10 text-warning"
+                          : budget.awayComplete && predAway > 0
+                            ? "border-primary/40 bg-primary/10 text-primary"
+                            : "border-card-border bg-card text-muted"
                     }`}
                   >
                     <span className="font-medium text-foreground">
@@ -1038,6 +1056,15 @@ export default function PredictPage() {
                     {budget.awayExceeded && (
                       <span className="mr-1 font-bold"> — {t.predict.exceeded}</span>
                     )}
+                    {!budget.awayExceeded && budget.awayIncomplete && predAway > 0 && (
+                      <span className="mr-1 font-bold">
+                        {" "}
+                        — {t.predict.scorersRemaining(predAway - budget.awayTotal)}
+                      </span>
+                    )}
+                    {!budget.awayExceeded && budget.awayComplete && predAway > 0 && (
+                      <span className="mr-1 font-bold"> — {t.predict.scorersComplete}</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -1045,6 +1072,12 @@ export default function PredictPage() {
               {budget.anyExceeded && (
                 <div className="mb-4 rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-sm text-danger">
                   {t.predict.scorersExceeded}
+                </div>
+              )}
+
+              {budget.anyIncomplete && !budget.anyExceeded && (
+                <div className="mb-4 rounded-lg border border-warning/50 bg-warning/10 px-4 py-3 text-sm text-warning">
+                  {t.predict.scorersIncomplete}
                 </div>
               )}
 
@@ -1100,7 +1133,11 @@ export default function PredictPage() {
           className="w-full"
           size="lg"
           loading={submitting}
-          disabled={budget.anyExceeded || needsLineupForScorers}
+          disabled={
+            budget.anyExceeded ||
+            needsLineupForScorers ||
+            (hasAnyGoals && !budget.isComplete)
+          }
         >
           {t.predict.submit}
         </Button>
