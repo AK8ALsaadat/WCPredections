@@ -29,9 +29,18 @@ export function isSyncQuietHours(): boolean {
   return hour >= start || hour < end;
 }
 
-/** كأس العالم — API-Football: league=1 | Football-Data: WC */
+/** كأس العالم — SportScore: fifa-world-cup | API-Football: league=1 | Football-Data: WC */
 function getWorldCupSyncOptions() {
   const provider = process.env.FOOTBALL_API_PROVIDER ?? "api-football";
+
+  if (provider === "sportscore") {
+    return {
+      leagueId:
+        process.env.SPORTSCORE_COMPETITION_SLUG ?? "fifa-world-cup",
+      season: process.env.FOOTBALL_SEASON ?? "2026",
+    };
+  }
+
   const leagueId =
     process.env.FOOTBALL_LEAGUE_ID ?? (provider === "football-data" ? "WC" : "1");
   const season =

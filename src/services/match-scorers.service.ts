@@ -13,13 +13,39 @@ export async function syncMatchScorersFromApi(
 
   const resolved: { playerId: string; goals: number }[] = [];
 
-  for (const { playerApiId, goals } of apiScorers) {
+  for (const { playerApiId, goals, playerName, teamApiId } of apiScorers) {
     if (goals <= 0) continue;
 
-    const player = await prisma.player.findFirst({
+    let player = await prisma.player.findFirst({
       where: { apiPlayerId: playerApiId },
       select: { id: true },
     });
+
+    if (!player && playerName && teamApiId) {
+      const team = await prisma.team.findFirst({
+        where: { apiTeamId: teamApiId },
+        select: { id: true },
+      });
+
+      if (team) {
+        const created = await prisma.player.upsert({
+          where: {
+            teamId_apiPlayerId: {
+              teamId: team.id,
+              apiPlayerId: playerApiId,
+            },
+          },
+          create: {
+            teamId: team.id,
+            name: playerName,
+            apiPlayerId: playerApiId,
+          },
+          update: { name: playerName },
+          select: { id: true },
+        });
+        player = created;
+      }
+    }
 
     if (player) {
       resolved.push({ playerId: player.id, goals });

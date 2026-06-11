@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { Navbar } from "@/components/layout/Navbar";
+import { SportScoreAttribution } from "@/components/layout/SportScoreAttribution";
 
 export default async function MainLayout({
   children,
@@ -20,6 +21,7 @@ export default async function MainLayout({
         {children}
       </main>
       <MobileBottomNav />
+      <SportScoreAttribution />
     </div>
   );
 }

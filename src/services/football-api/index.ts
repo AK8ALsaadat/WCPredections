@@ -5,6 +5,7 @@ import { syncMatchScorersFromApi } from "@/services/match-scorers.service";
 import { recalculateMatchScoring } from "@/services/prediction.service";
 import { ApiFootballProvider } from "./api-football.provider";
 import { FootballDataProvider } from "./football-data.provider";
+import { SportScoreProvider } from "./sportscore.provider";
 import type { ExternalMatch, FootballApiProvider, SyncOptions } from "./types";
 
 export function getFootballApiProvider(): FootballApiProvider {
@@ -13,6 +14,8 @@ export function getFootballApiProvider(): FootballApiProvider {
   switch (provider) {
     case "football-data":
       return new FootballDataProvider();
+    case "sportscore":
+      return new SportScoreProvider();
     case "api-football":
     default:
       return new ApiFootballProvider();

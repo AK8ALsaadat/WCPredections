@@ -41,6 +41,8 @@ export type SyncOptions = {
 export type ExternalMatchScorer = {
   playerApiId: string;
   goals: number;
+  playerName?: string;
+  teamApiId?: string;
 };
 
 export interface FootballApiProvider {
