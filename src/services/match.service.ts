@@ -130,16 +130,21 @@ export async function getUserPinnedTodayMatches(
     orderBy: { match: { matchTime: "asc" } },
   });
 
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const matches = predictions
-    .map((p) => p.match)
-    .filter((m) => m.status === "LIVE" || new Date(m.matchTime) >= cutoff);
+const matches = predictions
+  .map((p) => p.match)
+  .sort(
+    (a, b) =>
+      new Date(b.matchTime).getTime() -
+      new Date(a.matchTime).getTime()
+  )
+  .slice(0, 3);
 
-  const uniqueById = new Map(matches.map((m) => [m.id, m]));
-  return enrichMatchesWithUserPredictions(
-    Array.from(uniqueById.values()),
-    userId
-  );
+const uniqueById = new Map(matches.map((m) => [m.id, m]));
+
+return enrichMatchesWithUserPredictions(
+  Array.from(uniqueById.values()),
+  userId
+);
 }
 
 export async function getScheduleMatches(roundId?: string) {
