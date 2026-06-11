@@ -7,11 +7,19 @@ import { prisma } from "@/lib/prisma";
 
 export const MAX_BOLD_SCORER_BETS_PER_ROUND = 1;
 
-export async function getRoundUsageLimits(userId: string, matchId: string) {
-  const match = await prisma.match.findUniqueOrThrow({
-    where: { id: matchId },
-    select: { id: true, roundId: true },
-  });
+export async function getRoundUsageLimits(
+  userId: string,
+  matchId: string,
+  roundId?: string
+) {
+  const resolvedRoundId =
+    roundId ??
+    (
+      await prisma.match.findUniqueOrThrow({
+        where: { id: matchId },
+        select: { roundId: true },
+      })
+    ).roundId;
 
   const existingPrediction = await prisma.prediction.findUnique({
     where: { userId_matchId: { userId, matchId } },
@@ -19,19 +27,19 @@ export async function getRoundUsageLimits(userId: string, matchId: string) {
   });
 
   const [doublesInRound, doublesUsedElsewhere, boldStatus] = await Promise.all([
-    countDoublesUsedInRound(userId, match.roundId),
+    countDoublesUsedInRound(userId, resolvedRoundId),
     countDoublesUsedInRound(
       userId,
-      match.roundId,
+      resolvedRoundId,
       existingPrediction?.id
     ),
-    getBoldScorerBetStatus(userId, matchId),
+    getBoldScorerBetStatus(userId, matchId, resolvedRoundId),
   ]);
 
   const doubleOnThisMatch = existingPrediction?.isDouble ?? false;
 
   return {
-    roundId: match.roundId,
+    roundId: resolvedRoundId,
     doubles: {
       used: doublesInRound,
       max: MAX_DOUBLES_PER_ROUND,

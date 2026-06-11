@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getIronSession } from "iron-session";
 import { cookies } from "next/headers";
 import type { UserSession } from "@/types";
@@ -5,15 +6,15 @@ import { sessionOptions, type SessionData } from "@/lib/session-config";
 
 export type { SessionData };
 
-export async function getSession() {
+export const getSession = cache(async () => {
   const cookieStore = await cookies();
   return getIronSession<SessionData>(cookieStore, sessionOptions);
-}
+});
 
-export async function getCurrentUser(): Promise<UserSession | null> {
+export const getCurrentUser = cache(async (): Promise<UserSession | null> => {
   const session = await getSession();
   return session.user ?? null;
-}
+});
 
 export async function requireAuth(): Promise<UserSession> {
   const user = await getCurrentUser();

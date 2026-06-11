@@ -87,7 +87,7 @@ export async function enrichMatchesWithUserPredictions<
   }));
 }
 
-export async function getScheduleMatches(roundId?: string) {
+async function fetchScheduleMatches(roundId?: string) {
   return prisma.match.findMany({
     where: {
       roundId: roundId ?? undefined,
@@ -99,6 +99,15 @@ export async function getScheduleMatches(roundId?: string) {
     },
     orderBy: { matchTime: "asc" },
   });
+}
+
+export async function getScheduleMatches(roundId?: string) {
+  const cacheKey = roundId ?? "all";
+  return unstable_cache(
+    () => fetchScheduleMatches(roundId),
+    ["schedule-matches", cacheKey],
+    { revalidate: 45, tags: ["matches-schedule"] }
+  )();
 }
 
 export async function getUpcomingMatches(roundId?: string) {
@@ -217,17 +226,19 @@ export async function getMatchById(
   let roundUsageLimits = null;
 
   if (userId) {
-    userPrediction = await prisma.prediction.findUnique({
-      where: { userId_matchId: { userId, matchId } },
-    });
-    userScorerPredictions = await prisma.scorerPrediction.findMany({
-      where: { userId, matchId },
-      include: { player: true },
-    });
-    const [boldStatus, limits] = await Promise.all([
-      getBoldScorerBetStatus(userId, matchId),
-      getRoundUsageLimits(userId, matchId),
+    const [prediction, scorers, boldStatus, limits] = await Promise.all([
+      prisma.prediction.findUnique({
+        where: { userId_matchId: { userId, matchId } },
+      }),
+      prisma.scorerPrediction.findMany({
+        where: { userId, matchId },
+        include: { player: true },
+      }),
+      getBoldScorerBetStatus(userId, matchId, match.roundId),
+      getRoundUsageLimits(userId, matchId, match.roundId),
     ]);
+    userPrediction = prediction;
+    userScorerPredictions = scorers;
     roundUsageLimits = limits;
     boldScorerRoundStatus = {
       used: boldStatus.used,

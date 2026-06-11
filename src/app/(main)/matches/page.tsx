@@ -70,7 +70,7 @@ export default function MatchesPage() {
 
   const sortedDays = Object.keys(grouped).sort();
 
-  if (loading) return <LoadingPage />;
+  if (loading && matches.length === 0) return <LoadingPage />;
 
   return (
     <div className="space-y-6">

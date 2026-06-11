@@ -31,16 +31,27 @@ export async function getBoldScorerBetForMatch(userId: string, matchId: string) 
   return null;
 }
 
-export async function getBoldScorerBetStatus(userId: string, matchId: string) {
-  const match = await prisma.match.findUniqueOrThrow({
-    where: { id: matchId },
-    select: { id: true, roundId: true },
-  });
+export async function getBoldScorerBetStatus(
+  userId: string,
+  matchId: string,
+  roundId?: string
+) {
+  const resolvedRoundId =
+    roundId ??
+    (
+      await prisma.match.findUniqueOrThrow({
+        where: { id: matchId },
+        select: { roundId: true },
+      })
+    ).roundId;
 
-  const existing = await getBoldScorerBetForUserRound(userId, match.roundId);
+  const existing = await getBoldScorerBetForUserRound(
+    userId,
+    resolvedRoundId
+  );
 
   return {
-    roundId: match.roundId,
+    roundId: resolvedRoundId,
     used: !!existing,
     onThisMatch: existing?.matchId === matchId,
     onOtherMatch: !!existing && existing.matchId !== matchId,

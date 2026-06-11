@@ -6,7 +6,7 @@ import type { LeaderboardEntry } from "@/types";
 
 type PointsRow = { username: string; points: number };
 
-const LB_CACHE_SECONDS = 60;
+const LB_CACHE_SECONDS = 120;
 
 type PointsFilter = {
   roundId?: string;

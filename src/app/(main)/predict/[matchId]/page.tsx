@@ -8,12 +8,18 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { PredictPageSkeleton } from "@/components/predict/PredictPageSkeleton";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
 import { PitchLineup } from "@/components/predict/PitchLineup";
 import { clientFetch, isAbortError } from "@/lib/client-fetch";
-import { formatDate, isPredictionAllowed, getPredictionLockReason } from "@/lib/utils";
+import {
+  cn,
+  formatDate,
+  isPredictionAllowed,
+  getPredictionLockReason,
+} from "@/lib/utils";
 import { ar } from "@/lib/i18n/ar";
 import {
   buildPlayerTeamSets,
@@ -88,6 +94,55 @@ type LineupData = {
   awayShortName: string;
 };
 
+function extractLineup(data: Record<string, unknown>): LineupData | null {
+  if (!Array.isArray(data.homePlayers) || !Array.isArray(data.awayPlayers)) {
+    return null;
+  }
+  return {
+    homePlayers: data.homePlayers as MatchPlayerView[],
+    awayPlayers: data.awayPlayers as MatchPlayerView[],
+    homeFormation: (data.homeFormation as string | null | undefined) ?? null,
+    awayFormation: (data.awayFormation as string | null | undefined) ?? null,
+    homeLineupSource: data.homeLineupSource as LineupSource | undefined,
+    awayLineupSource: data.awayLineupSource as LineupSource | undefined,
+    lineupStatus: data.lineupStatus as LineupSource | undefined,
+    homeTeamName: String(data.homeTeamName ?? ""),
+    awayTeamName: String(data.awayTeamName ?? ""),
+    homeShortName: String(data.homeShortName ?? ""),
+    awayShortName: String(data.awayShortName ?? ""),
+  };
+}
+
+function applySavedPrediction(m: MatchData, setters: {
+  setPredHome: (v: number) => void;
+  setPredAway: (v: number) => void;
+  setIsDouble: (v: boolean) => void;
+  setFinishType: (v: string) => void;
+  setPenaltyWinner: (v: string) => void;
+  setScorerPicks: (v: ScorerPicks) => void;
+  setBoldPlayerId: (v: string) => void;
+  setBoldEnabled: (v: boolean) => void;
+}) {
+  if (m.userPrediction) {
+    setters.setPredHome(m.userPrediction.predHome);
+    setters.setPredAway(m.userPrediction.predAway);
+    setters.setIsDouble(m.userPrediction.isDouble);
+    setters.setFinishType(m.userPrediction.predictedFinishType ?? "");
+    setters.setPenaltyWinner(m.userPrediction.predictedPenaltyWinnerTeamId ?? "");
+  }
+  if (m.userScorerPredictions?.length) {
+    const picks: ScorerPicks = {};
+    for (const sp of m.userScorerPredictions) {
+      picks[sp.playerId] = sp.predictedGoals ?? 1;
+    }
+    setters.setScorerPicks(picks);
+  }
+  if (m.userBoldScorerBet?.playerId) {
+    setters.setBoldPlayerId(m.userBoldScorerBet.playerId);
+    setters.setBoldEnabled(true);
+  }
+}
+
 export default function PredictPage() {
   const params = useParams();
   const router = useRouter();
@@ -107,6 +162,7 @@ export default function PredictPage() {
   const [finishType, setFinishType] = useState("");
   const [penaltyWinner, setPenaltyWinner] = useState("");
   const [scorerPicks, setScorerPicks] = useState<ScorerPicks>({});
+  const [boldEnabled, setBoldEnabled] = useState(false);
   const [boldPlayerId, setBoldPlayerId] = useState<string>("");
 
   const teamSets = useMemo(() => {
@@ -131,7 +187,6 @@ export default function PredictPage() {
 
   useEffect(() => {
     const abort = new AbortController();
-    let initial = true;
     let cancelled = false;
 
     async function loadLineup(silent = false) {
@@ -154,9 +209,11 @@ export default function PredictPage() {
       }
     }
 
-    async function loadMatch() {
+    async function loadPage() {
+      setLoading(true);
+      setLineupLoading(true);
       try {
-        const res = await clientFetch(`/api/matches/${matchId}`, {
+        const res = await clientFetch(`/api/matches/${matchId}?lineup=true`, {
           signal: abort.signal,
         });
         if (!res) {
@@ -172,43 +229,34 @@ export default function PredictPage() {
           return;
         }
 
-        const m = data.data as MatchData;
-        setMatch(m);
+        const payload = data.data as MatchData & Record<string, unknown>;
+        setMatch(payload);
+        setLineup(extractLineup(payload));
         setError("");
 
-        if (initial) {
-          if (m.userPrediction) {
-            setPredHome(m.userPrediction.predHome);
-            setPredAway(m.userPrediction.predAway);
-            setIsDouble(m.userPrediction.isDouble);
-            setFinishType(m.userPrediction.predictedFinishType ?? "");
-            setPenaltyWinner(m.userPrediction.predictedPenaltyWinnerTeamId ?? "");
-          }
-          if (m.userScorerPredictions?.length) {
-            const picks: ScorerPicks = {};
-            for (const sp of m.userScorerPredictions) {
-              picks[sp.playerId] = sp.predictedGoals ?? 1;
-            }
-            setScorerPicks(picks);
-          }
-          if (m.userBoldScorerBet?.playerId) {
-            setBoldPlayerId(m.userBoldScorerBet.playerId);
-          }
-        }
+        applySavedPrediction(payload, {
+          setPredHome,
+          setPredAway,
+          setIsDouble,
+          setFinishType,
+          setPenaltyWinner,
+          setScorerPicks,
+          setBoldPlayerId,
+          setBoldEnabled,
+        });
       } catch (err) {
         if (!isAbortError(err) && !cancelled) {
           setError(ar.errors.loadFailed);
         }
       } finally {
-        if (initial && !cancelled) {
-          initial = false;
+        if (!cancelled) {
           setLoading(false);
+          setLineupLoading(false);
         }
       }
     }
 
-    void loadMatch();
-    void loadLineup();
+    void loadPage();
 
     const interval = setInterval(() => {
       void loadLineup(true);
@@ -249,6 +297,17 @@ export default function PredictPage() {
     setIsDouble(checked);
   }
 
+  function handleBoldToggle(checked: boolean) {
+    const limits = match?.roundUsageLimits?.boldScorer;
+    if (checked && limits && !limits.canUse && !limits.onThisMatch) {
+      setError(ar.predict.boldExhausted);
+      return;
+    }
+    setError("");
+    setBoldEnabled(checked);
+    if (!checked) setBoldPlayerId("");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -277,6 +336,11 @@ export default function PredictPage() {
       return;
     }
 
+    if (boldEnabled && !boldPlayerId) {
+      setError(ar.predict.boldScorerBet.choosePlayerRequired);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -291,7 +355,7 @@ export default function PredictPage() {
           predictedFinishType: finishType || null,
           predictedPenaltyWinnerTeamId: penaltyWinner || null,
           picks: picksToArray(scorerPicks),
-          boldPlayerId: boldPlayerId || null,
+          boldPlayerId: boldEnabled ? boldPlayerId || null : null,
         }),
       });
 
@@ -311,11 +375,7 @@ export default function PredictPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
+    return <PredictPageSkeleton />;
   }
 
   if (error && !match) return <ErrorMessage message={error} />;
@@ -344,6 +404,8 @@ export default function PredictPage() {
     boldLimits?.onOtherMatch ??
     match.boldScorerRoundStatus?.onOtherMatch ??
     false;
+  const boldCheckboxDisabled =
+    boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch;
   const doubleCheckboxDisabled =
     doubleLimits != null &&
     !doubleLimits.canEnable &&
@@ -358,10 +420,6 @@ export default function PredictPage() {
       teamShort: match.awayTeam.shortName,
     })),
   ];
-
-  const selectedBoldPlayer = allLineupPlayers.find((p) => p.id === boldPlayerId);
-  const selectedBoldName =
-    selectedBoldPlayer?.name ?? match.userBoldScorerBet?.player?.name ?? "";
 
   const boldPlayerGroups =
     lineup && hasPlayers
@@ -390,19 +448,7 @@ export default function PredictPage() {
       : undefined;
 
   const boldSelectOptions = [
-    {
-      value: "",
-      label: ar.predict.boldScorerBet.choosePlayer,
-      disabled: !boldPlayerId,
-    },
-    ...(boldPlayerId && selectedBoldName
-      ? [
-          {
-            value: boldPlayerId,
-            label: ar.predict.boldScorerBet.selectedWithCheck(selectedBoldName),
-          },
-        ]
-      : []),
+    { value: "", label: ar.predict.boldScorerBet.choosePlayer },
   ];
 
   return (
@@ -522,9 +568,6 @@ export default function PredictPage() {
           <CardHeader>
             <CardTitle>{ar.predict.boldScorerBet.title}</CardTitle>
           </CardHeader>
-          <p className="mb-4 text-sm text-muted">
-            {ar.predict.boldScorerBet.hint}
-          </p>
 
           {boldLimits && (
             <div
@@ -571,23 +614,86 @@ export default function PredictPage() {
               )}
             </div>
           ) : (
-            <Select
-              label={ar.predict.boldScorerBet.selectPlayer}
-              value={boldPlayerId}
-              onChange={(e) => setBoldPlayerId(e.target.value)}
-              options={boldSelectOptions}
-              groups={boldPlayerGroups}
-            />
-          )}
+            <div className="space-y-4">
+              <label
+                className={cn(
+                  "flex items-center gap-3 rounded-lg border p-4 transition-all",
+                  boldCheckboxDisabled
+                    ? "cursor-not-allowed border-card-border/60 opacity-60"
+                    : "cursor-pointer",
+                  boldEnabled
+                    ? "border-primary/50 bg-primary/10 shadow-[0_0_12px_rgba(34,197,94,0.12)]"
+                    : "border-card-border bg-card hover:border-primary/30"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={boldEnabled}
+                  disabled={boldCheckboxDisabled}
+                  onChange={(e) => handleBoldToggle(e.target.checked)}
+                  className="sr-only"
+                />
+                <span
+                  className={cn(
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-all",
+                    boldEnabled
+                      ? "border-primary bg-primary text-background"
+                      : "border-muted/40 bg-background"
+                  )}
+                  aria-hidden
+                >
+                  {boldEnabled && (
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  )}
+                </span>
+                <div>
+                  <p
+                    className={cn(
+                      "font-medium",
+                      boldEnabled ? "text-primary" : "text-foreground"
+                    )}
+                  >
+                    {ar.predict.boldScorerBet.enable}
+                  </p>
+                  <p className="text-sm text-muted">
+                    {ar.predict.boldScorerBet.hint}
+                  </p>
+                </div>
+              </label>
 
-          {boldPlayerId && !boldLockedOnOther && hasPlayers && (
-            <button
-              type="button"
-              onClick={() => setBoldPlayerId("")}
-              className="mt-3 text-sm text-muted hover:text-danger"
-            >
-              {ar.predict.boldScorerBet.clearSelection}
-            </button>
+              {boldEnabled && (
+                <div className="rounded-lg border border-primary/25 bg-background/80 p-4">
+                  <Select
+                    label={ar.predict.boldScorerBet.choosePlayer}
+                    value={boldPlayerId}
+                    onChange={(e) => setBoldPlayerId(e.target.value)}
+                    options={boldSelectOptions}
+                    groups={boldPlayerGroups}
+                  />
+                  {boldPlayerId && (
+                    <button
+                      type="button"
+                      onClick={() => setBoldPlayerId("")}
+                      className="mt-3 text-sm text-muted hover:text-danger"
+                    >
+                      {ar.predict.boldScorerBet.clearSelection}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </Card>
 
