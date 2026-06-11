@@ -69,6 +69,17 @@ export const boldScorerBetSchema = z.object({
   playerId: z.string().min(1).nullable(),
 });
 
+export const fullPredictionBundleSchema = predictionSchema.and(
+  z.object({
+    picks: z.array(scorerPickSchema).max(15).optional().default([]),
+    boldPlayerId: z.string().min(1).nullable().optional().default(null),
+  })
+);
+
+export type FullPredictionBundleInput = z.infer<
+  typeof fullPredictionBundleSchema
+>;
+
 export const roundSchema = z.object({
   name: z.string().min(1).max(100),
   startsAt: z.string().datetime(),

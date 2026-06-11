@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { apiSuccess, handleApiError } from "@/lib/api";
 import { requireAuth } from "@/lib/session";
+import { getPredictionLockReason } from "@/lib/utils";
 import { parseBody, scorerPredictionSchema } from "@/lib/validations";
 import { submitScorerPredictions } from "@/services/prediction.service";
 
@@ -30,6 +31,15 @@ export async function DELETE(request: Request) {
 
     if (!matchId) {
       throw new Error("matchId is required");
+    }
+
+    const match = await prisma.match.findUniqueOrThrow({
+      where: { id: matchId },
+      select: { matchTime: true },
+    });
+    const lockReason = getPredictionLockReason(match.matchTime);
+    if (lockReason) {
+      throw new Error(lockReason);
     }
 
     await prisma.scorerPrediction.deleteMany({

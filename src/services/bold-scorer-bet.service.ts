@@ -28,7 +28,7 @@ export async function getBoldScorerBetForMatch(userId: string, matchId: string) 
   if (!match) return null;
   const bet = await getBoldScorerBetForUserRound(userId, match.roundId);
   if (bet?.matchId === matchId) return bet;
-  return bet;
+  return null;
 }
 
 export async function getBoldScorerBetStatus(userId: string, matchId: string) {

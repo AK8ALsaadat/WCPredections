@@ -12,6 +12,8 @@ import {
   calculateScorerPredictionPoints,
   getScorerGoalsForPoints,
 } from "../src/services/scoring.service";
+import { MAX_DOUBLES_PER_ROUND } from "../src/services/prediction.service";
+import { MAX_BOLD_SCORER_BETS_PER_ROUND } from "../src/services/round-usage.service";
 import {
   buildMatchPointsBreakdown,
   getMatchTotalUserPoints,
@@ -21,6 +23,7 @@ import {
   getScorerBudgetStatus,
 } from "../src/lib/scorer-prediction";
 import { asFinishType } from "../src/lib/finish-type";
+import { parseOptionalScore } from "../src/lib/utils";
 import { statsFromLeaderboard } from "../src/services/leaderboard.service";
 import type { LeaderboardEntry } from "../src/types";
 
@@ -146,6 +149,18 @@ ok(
     calculateScorerPredictionPoints(1, 0) === 0
 );
 
+console.log("\n=== حدود الجولة ===");
+ok("مضاعفة: حد أقصى 2 لكل جولة", MAX_DOUBLES_PER_ROUND === 2);
+ok("البطاقة الجريئة: مرة واحدة لكل جولة", MAX_BOLD_SCORER_BETS_PER_ROUND === 1);
+ok(
+  "مضاعفة نتيجة دقيقة = 6 نقاط",
+  calculateScorePredictionPoints(1, 1, 1, 1, true) === 6
+);
+ok(
+  "مضاعفة فائز صح = 2 نقاط",
+  calculateScorePredictionPoints(2, 0, 3, 1, true) === 2
+);
+
 console.log("\n=== البطاقة الجريئة ===");
 ok("BOLD_SCORER_POINTS = 4", BOLD_SCORER_POINTS === 4);
 ok(
@@ -207,6 +222,35 @@ const entries: LeaderboardEntry[] = [
 const stats = statsFromLeaderboard(entries, "b");
 ok("ترتيب المستخدم", stats.myRank === 2);
 ok("متوسط النقاط = 7.5", stats.averagePoints === 7.5);
+
+function sequentialRanks(
+  rows: { userId: string; username: string; points: number }[]
+) {
+  return rows
+    .slice()
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      return a.username.localeCompare(b.username);
+    })
+    .map((row, index) => index + 1);
+}
+
+const tiedRanks = sequentialRanks([
+  { userId: "1", username: "aziz", points: 50 },
+  { userId: "2", username: "aziz333", points: 50 },
+  { userId: "3", username: "b", points: 0 },
+  { userId: "4", username: "c", points: 0 },
+  { userId: "5", username: "d", points: 0 },
+]);
+ok(
+  "ترتيب متسلسل عند التعادل 1-5",
+  tiedRanks.join(",") === "1,2,3,4,5"
+);
+
+console.log("\n=== تحليل النتيجة (إدارة) ===");
+ok("0-0 صالحة", parseOptionalScore("0") === 0);
+ok("فارغ = null", parseOptionalScore("") === null);
+ok("غير رقم = null", parseOptionalScore("abc") === null);
 
 console.log("\n=== أنواع الإنهاء ===");
 ok("asFinishType صحيح", asFinishType("PENALTIES") === "PENALTIES");

@@ -7,7 +7,7 @@ import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
-import { formatDate } from "@/lib/utils";
+import { formatDate, parseOptionalScore } from "@/lib/utils";
 
 type Round = { id: string; name: string; _count: { matches: number } };
 type Team = { id: string; name: string; shortName: string; _count: { players: number } };
@@ -142,8 +142,8 @@ export default function AdminPage() {
     if (!edit) return;
 
     const result = await apiCall(`/api/admin/matches/${matchId}`, "PATCH", {
-      homeScore: edit.homeScore ? parseInt(edit.homeScore) : null,
-      awayScore: edit.awayScore ? parseInt(edit.awayScore) : null,
+      homeScore: parseOptionalScore(edit.homeScore),
+      awayScore: parseOptionalScore(edit.awayScore),
       status: edit.status || undefined,
       actualFinishType: edit.finishType || null,
       penaltyWinnerTeamId: edit.penaltyWinner || null,

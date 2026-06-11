@@ -190,6 +190,16 @@ export const ar = {
     scorePrediction: "توقع النتيجة",
     doublePoints: "مضاعفة النقاط",
     doubleHint: "حد أقصى مباراتين مضاعفة في كل جولة",
+    doubleCounter: (used: number, max: number) => `مضاعفة الجولة: ${used}/${max}`,
+    doubleRemaining: (n: number) =>
+      n === 1 ? "متبقي مضاعفة واحدة" : `متبقي ${n} مضاعفات`,
+    doubleExhausted: "استخدمت مضاعفتين هالجولة — مرة واحدة بس لكل مباراة",
+    doubleOnThisMatch: "مفعّلة على هالمباراة",
+    boldCounter: (used: number, max: number) =>
+      `البطاقة الجريئة: ${used}/${max}`,
+    boldAvailable: "متاحة — اختر لاعب واحد",
+    boldUsedHere: (name: string) => `مستخدمة هالمباراة: ${name}`,
+    boldExhausted: "استخدمت بطاقتك الجريئة في مباراة ثانية هالجولة",
     knockout: "توقعات الأدوار الإقصائية",
     finishTypeLabel: "طريقة انتهاء المباراة",
     penaltyWinner: "الفائز بركلات الترجيح",
@@ -198,6 +208,8 @@ export const ar = {
     scorerHint: "اختر اللاعبين اللي بيسجلون في الملعب — ركلات الترجيح بعد 120 دقيقة ما تُحسب",
     scorerHintNoGoals: "نتيجة 0-0 — ما تحتاج تختار هدافين",
     scorersRequired: "لازم تختار اللاعبين اللي بيسجلون حسب النتيجة",
+    scorersNeedLineup:
+      "نتيجتك فيها أهداف — انتظر التشكيلة أو عدّل النتيجة لحفظ التوقع",
     scorersExceeded: "مجموع أهداف اللاعبين زاد عن النتيجة المتوقعة لأحد المنتخبين",
     goalsUnit: "هدف",
     exceeded: "تجاوزت الحد",

@@ -11,7 +11,7 @@ import {
   isMatchFinishedForScoring,
 } from "@/services/scoring.service";
 
-const MAX_DOUBLES_PER_ROUND = 2;
+export const MAX_DOUBLES_PER_ROUND = 2;
 
 export async function countDoublesUsedInRound(
   userId: string,
@@ -76,8 +76,18 @@ export async function submitPrediction(
     throw new Error(lockReason);
   }
 
+  const existing = await prisma.prediction.findUnique({
+    where: { userId_matchId: { userId, matchId: data.matchId } },
+    select: { id: true },
+  });
+
   const isDouble = data.isDouble ?? false;
-  await validateDoubleUsage(userId, data.matchId, isDouble);
+  await validateDoubleUsage(
+    userId,
+    data.matchId,
+    isDouble,
+    existing?.id
+  );
 
   if (match.isKnockout && !data.predictedFinishType) {
     throw new Error("توقع طريقة الإنهاء مطلوب للمباريات الإقصائية");
@@ -125,46 +135,30 @@ export async function submitPrediction(
   });
 }
 
-export async function submitScorerPredictions(
-  userId: string,
-  matchId: string,
+async function validateScorerPicks(
+  match: {
+    homeTeamId: string;
+    awayTeamId: string;
+    homeTeam: { shortName: string };
+    awayTeam: { shortName: string };
+  },
+  predHome: number,
+  predAway: number,
   picks: { playerId: string; goals: number }[]
 ) {
-  const match = await prisma.match.findUniqueOrThrow({
-    where: { id: matchId },
-  });
-
-  const lockReason = getPredictionLockReason(match.matchTime);
-  if (lockReason) {
-    throw new Error(lockReason);
-  }
-
   const playerIds = picks.map((p) => p.playerId);
-  const players = await prisma.player.findMany({
-    where: {
-      id: { in: playerIds },
-      teamId: { in: [match.homeTeamId, match.awayTeamId] },
-    },
-  });
+  const players =
+    playerIds.length === 0
+      ? []
+      : await prisma.player.findMany({
+          where: {
+            id: { in: playerIds },
+            teamId: { in: [match.homeTeamId, match.awayTeamId] },
+          },
+        });
 
   if (players.length !== playerIds.length) {
     throw new Error("اختيار لاعب غير صالح");
-  }
-
-  const prediction = await prisma.prediction.findUnique({
-    where: { userId_matchId: { userId, matchId } },
-    include: {
-      match: {
-        include: {
-          homeTeam: { select: { shortName: true } },
-          awayTeam: { select: { shortName: true } },
-        },
-      },
-    },
-  });
-
-  if (!prediction) {
-    throw new Error("سجّل النتيجة أولاً ثم اختر الهدافين");
   }
 
   let homeGoals = 0;
@@ -179,23 +173,54 @@ export async function submitScorerPredictions(
     }
   }
 
-  if (homeGoals > prediction.predHome) {
+  if (homeGoals > predHome) {
     throw new Error(
-      `أهداف ${prediction.match.homeTeam.shortName} (${homeGoals}) زادت عن النتيجة المتوقعة (${prediction.predHome})`
+      `أهداف ${match.homeTeam.shortName} (${homeGoals}) زادت عن النتيجة المتوقعة (${predHome})`
     );
   }
-  if (awayGoals > prediction.predAway) {
+  if (awayGoals > predAway) {
     throw new Error(
-      `أهداف ${prediction.match.awayTeam.shortName} (${awayGoals}) زادت عن النتيجة المتوقعة (${prediction.predAway})`
+      `أهداف ${match.awayTeam.shortName} (${awayGoals}) زادت عن النتيجة المتوقعة (${predAway})`
     );
   }
 
-  if (
-    picks.length === 0 &&
-    (prediction.predHome > 0 || prediction.predAway > 0)
-  ) {
+  if (picks.length === 0 && (predHome > 0 || predAway > 0)) {
     throw new Error("اختر اللاعبين اللي بيسجلون حسب النتيجة");
   }
+}
+
+export async function submitScorerPredictions(
+  userId: string,
+  matchId: string,
+  picks: { playerId: string; goals: number }[]
+) {
+  const match = await prisma.match.findUniqueOrThrow({
+    where: { id: matchId },
+    include: {
+      homeTeam: { select: { shortName: true } },
+      awayTeam: { select: { shortName: true } },
+    },
+  });
+
+  const lockReason = getPredictionLockReason(match.matchTime);
+  if (lockReason) {
+    throw new Error(lockReason);
+  }
+
+  const prediction = await prisma.prediction.findUnique({
+    where: { userId_matchId: { userId, matchId } },
+  });
+
+  if (!prediction) {
+    throw new Error("سجّل النتيجة أولاً ثم اختر الهدافين");
+  }
+
+  await validateScorerPicks(
+    match,
+    prediction.predHome,
+    prediction.predAway,
+    picks
+  );
 
   await prisma.scorerPrediction.deleteMany({
     where: { userId, matchId },
@@ -213,6 +238,191 @@ export async function submitScorerPredictions(
   return prisma.scorerPrediction.findMany({
     where: { userId, matchId },
     include: { player: true },
+  });
+}
+
+export async function submitMatchPredictionBundle(
+  userId: string,
+  data: {
+    matchId: string;
+    predHome: number;
+    predAway: number;
+    isDouble?: boolean;
+    predictedFinishType?: "NINETY_MINUTES" | "EXTRA_TIME" | "PENALTIES" | null;
+    predictedPenaltyWinnerTeamId?: string | null;
+    picks: { playerId: string; goals: number }[];
+    boldPlayerId: string | null;
+  }
+) {
+  const match = await prisma.match.findUniqueOrThrow({
+    where: { id: data.matchId },
+    include: {
+      homeTeam: { select: { shortName: true } },
+      awayTeam: { select: { shortName: true } },
+    },
+  });
+
+  const lockReason = getPredictionLockReason(match.matchTime);
+  if (lockReason) {
+    throw new Error(lockReason);
+  }
+
+  const existing = await prisma.prediction.findUnique({
+    where: { userId_matchId: { userId, matchId: data.matchId } },
+    select: { id: true },
+  });
+
+  const isDouble = data.isDouble ?? false;
+  await validateDoubleUsage(
+    userId,
+    data.matchId,
+    isDouble,
+    existing?.id
+  );
+
+  if (match.isKnockout && !data.predictedFinishType) {
+    throw new Error("توقع طريقة الإنهاء مطلوب للمباريات الإقصائية");
+  }
+
+  if (
+    data.predictedFinishType === "PENALTIES" &&
+    data.predictedPenaltyWinnerTeamId
+  ) {
+    const validTeams = [match.homeTeamId, match.awayTeamId];
+    if (!validTeams.includes(data.predictedPenaltyWinnerTeamId)) {
+      throw new Error("يجب اختيار أحد فريقي المباراة كفائز بركلات الترجيح");
+    }
+  }
+
+  await validateScorerPicks(
+    match,
+    data.predHome,
+    data.predAway,
+    data.picks
+  );
+
+  if (data.boldPlayerId) {
+    const boldPlayer = await prisma.player.findFirst({
+      where: {
+        id: data.boldPlayerId,
+        teamId: { in: [match.homeTeamId, match.awayTeamId] },
+      },
+    });
+    if (!boldPlayer) {
+      throw new Error("اختيار لاعب غير صالح للبطاقة الجريئة");
+    }
+
+    const existingBold = await prisma.boldScorerBet.findUnique({
+      where: { userId_roundId: { userId, roundId: match.roundId } },
+    });
+    if (existingBold && existingBold.matchId !== data.matchId) {
+      throw new Error(
+        "استخدمت بطاقتك الجريئة في مباراة ثانية هالجولة — مرة واحدة بس"
+      );
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    if (isDouble) {
+      const doublesUsed = await tx.prediction.count({
+        where: {
+          userId,
+          isDouble: true,
+          id: existing?.id ? { not: existing.id } : undefined,
+          match: { roundId: match.roundId },
+        },
+      });
+      if (doublesUsed >= MAX_DOUBLES_PER_ROUND) {
+        throw new Error(
+          `يمكنك استخدام ${MAX_DOUBLES_PER_ROUND} مضاعفات فقط في كل جولة`
+        );
+      }
+    }
+
+    const prediction = await tx.prediction.upsert({
+      where: {
+        userId_matchId: { userId, matchId: data.matchId },
+      },
+      create: {
+        userId,
+        matchId: data.matchId,
+        predHome: data.predHome,
+        predAway: data.predAway,
+        isDouble,
+        predictedFinishType: data.predictedFinishType ?? null,
+        predictedPenaltyWinnerTeamId:
+          data.predictedPenaltyWinnerTeamId ?? null,
+      },
+      update: {
+        predHome: data.predHome,
+        predAway: data.predAway,
+        isDouble,
+        predictedFinishType: data.predictedFinishType ?? null,
+        predictedPenaltyWinnerTeamId:
+          data.predictedPenaltyWinnerTeamId ?? null,
+      },
+      include: {
+        match: {
+          include: {
+            homeTeam: true,
+            awayTeam: true,
+            round: true,
+          },
+        },
+      },
+    });
+
+    await tx.scorerPrediction.deleteMany({
+      where: { userId, matchId: data.matchId },
+    });
+    if (data.picks.length > 0) {
+      await tx.scorerPrediction.createMany({
+        data: data.picks.map((pick) => ({
+          userId,
+          matchId: data.matchId,
+          playerId: pick.playerId,
+          predictedGoals: pick.goals,
+        })),
+      });
+    }
+
+    const existingBold = await tx.boldScorerBet.findUnique({
+      where: { userId_roundId: { userId, roundId: match.roundId } },
+    });
+
+    let boldBet = null;
+    if (!data.boldPlayerId) {
+      if (existingBold?.matchId === data.matchId) {
+        await tx.boldScorerBet.delete({ where: { id: existingBold.id } });
+      }
+    } else {
+      boldBet = await tx.boldScorerBet.upsert({
+        where: {
+          userId_roundId: { userId, roundId: match.roundId },
+        },
+        create: {
+          userId,
+          roundId: match.roundId,
+          matchId: data.matchId,
+          playerId: data.boldPlayerId,
+        },
+        update: {
+          matchId: data.matchId,
+          playerId: data.boldPlayerId,
+          points: 0,
+        },
+        include: {
+          player: { select: { id: true, name: true } },
+        },
+      });
+    }
+
+    const scorers = await tx.scorerPrediction.findMany({
+      where: { userId, matchId: data.matchId },
+      include: { player: true },
+    });
+
+    return { prediction, scorers, boldBet };
   });
 }
 
@@ -337,5 +547,20 @@ export async function getUserPredictionHistory(userId: string) {
     orderBy: { createdAt: "desc" },
   });
 
-  return { predictions, scorerPredictions };
+  const boldScorerBets = await prisma.boldScorerBet.findMany({
+    where: { userId },
+    include: {
+      player: true,
+      match: {
+        include: {
+          homeTeam: true,
+          awayTeam: true,
+          round: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return { predictions, scorerPredictions, boldScorerBets };
 }

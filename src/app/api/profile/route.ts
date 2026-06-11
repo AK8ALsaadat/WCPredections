@@ -29,6 +29,9 @@ export async function GET() {
       const roundId = sp.match.round.id;
       roundPoints[roundId] = (roundPoints[roundId] ?? 0) + sp.points;
     }
+    for (const bet of history.boldScorerBets) {
+      roundPoints[bet.roundId] = (roundPoints[bet.roundId] ?? 0) + bet.points;
+    }
 
     const correctPredictions = history.predictions.filter(
       (p) => p.points > 0

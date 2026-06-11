@@ -53,6 +53,25 @@ type MatchData = {
     onOtherMatch: boolean;
     otherMatchId: string | null;
   } | null;
+  roundUsageLimits?: {
+    roundId: string;
+    doubles: {
+      used: number;
+      max: number;
+      onThisMatch: boolean;
+      canEnable: boolean;
+      remaining: number;
+    };
+    boldScorer: {
+      used: boolean;
+      max: number;
+      onThisMatch: boolean;
+      onOtherMatch: boolean;
+      canUse: boolean;
+      otherMatchId: string | null;
+      playerName: string | null;
+    };
+  } | null;
 };
 
 type LineupData = {
@@ -220,10 +239,31 @@ export default function PredictPage() {
     });
   }
 
+  function handleDoubleToggle(checked: boolean) {
+    const limits = match?.roundUsageLimits?.doubles;
+    if (checked && limits && !limits.canEnable && !limits.onThisMatch) {
+      setError(ar.predict.doubleExhausted);
+      return;
+    }
+    setError("");
+    setIsDouble(checked);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    const doubleLimits = match?.roundUsageLimits?.doubles;
+    if (
+      isDouble &&
+      doubleLimits &&
+      !doubleLimits.canEnable &&
+      !doubleLimits.onThisMatch
+    ) {
+      setError(ar.predict.doubleExhausted);
+      return;
+    }
 
     if (budget.anyExceeded) {
       setError(ar.predict.scorersExceeded);
@@ -231,14 +271,16 @@ export default function PredictPage() {
     }
 
     if (hasAnyGoals && scorerCount === 0) {
-      setError(ar.predict.scorersRequired);
+      setError(
+        hasPlayers ? ar.predict.scorersRequired : ar.predict.scorersNeedLineup
+      );
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const predictionRes = await fetch("/api/predictions", {
+      const res = await fetch("/api/predictions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -248,39 +290,14 @@ export default function PredictPage() {
           isDouble,
           predictedFinishType: finishType || null,
           predictedPenaltyWinnerTeamId: penaltyWinner || null,
+          picks: picksToArray(scorerPicks),
+          boldPlayerId: boldPlayerId || null,
         }),
       });
 
-      const predictionData = await predictionRes.json();
-      if (!predictionData.success) {
-        setError(predictionData.error);
-        return;
-      }
-
-      const scorerRes = await fetch("/api/scorer-predictions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ matchId, picks: picksToArray(scorerPicks) }),
-      });
-
-      const scorerData = await scorerRes.json();
-      if (!scorerData.success) {
-        setError(scorerData.error);
-        return;
-      }
-
-      const boldRes = await fetch("/api/bold-scorer-bet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          matchId,
-          playerId: boldPlayerId || null,
-        }),
-      });
-
-      const boldData = await boldRes.json();
-      if (!boldData.success) {
-        setError(boldData.error);
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.error);
         return;
       }
 
@@ -319,9 +336,18 @@ export default function PredictPage() {
   const hasPlayers =
     (lineup?.homePlayers.length ?? 0) > 0 ||
     (lineup?.awayPlayers.length ?? 0) > 0;
+  const needsLineupForScorers = hasAnyGoals && !hasPlayers;
 
+  const doubleLimits = match.roundUsageLimits?.doubles;
+  const boldLimits = match.roundUsageLimits?.boldScorer;
   const boldLockedOnOther =
-    match.boldScorerRoundStatus?.onOtherMatch ?? false;
+    boldLimits?.onOtherMatch ??
+    match.boldScorerRoundStatus?.onOtherMatch ??
+    false;
+  const doubleCheckboxDisabled =
+    doubleLimits != null &&
+    !doubleLimits.canEnable &&
+    !doubleLimits.onThisMatch;
   const allLineupPlayers = [
     ...(lineup?.homePlayers ?? []).map((p) => ({
       ...p,
@@ -332,6 +358,32 @@ export default function PredictPage() {
       teamShort: match.awayTeam.shortName,
     })),
   ];
+
+  const boldPlayerGroups =
+    lineup && hasPlayers
+      ? [
+          {
+            label: match.homeTeam.name,
+            options: lineup.homePlayers.map((player) => ({
+              value: player.id,
+              label:
+                player.section === "bench"
+                  ? `${player.name} (${ar.predict.scorerBench})`
+                  : player.name,
+            })),
+          },
+          {
+            label: match.awayTeam.name,
+            options: lineup.awayPlayers.map((player) => ({
+              value: player.id,
+              label:
+                player.section === "bench"
+                  ? `${player.name} (${ar.predict.scorerBench})`
+                  : player.name,
+            })),
+          },
+        ]
+      : undefined;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -397,20 +449,124 @@ export default function PredictPage() {
             {ar.predict.scoreFirstHint}
           </p>
 
-          <div className="mt-4">
-            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-card-border p-4 transition-colors hover:border-warning/50">
+          <div className="mt-4 space-y-3">
+            {doubleLimits && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm">
+                <span className="font-semibold text-warning">
+                  {ar.predict.doubleCounter(
+                    doubleLimits.used,
+                    doubleLimits.max
+                  )}
+                </span>
+                {doubleLimits.onThisMatch ? (
+                  <span className="text-warning">
+                    {ar.predict.doubleOnThisMatch}
+                  </span>
+                ) : doubleLimits.remaining > 0 ? (
+                  <span className="text-muted">
+                    {ar.predict.doubleRemaining(doubleLimits.remaining)}
+                  </span>
+                ) : (
+                  <span className="text-danger">
+                    {ar.predict.doubleExhausted}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <label
+              className={`flex items-center gap-3 rounded-lg border p-4 transition-colors ${
+                doubleCheckboxDisabled
+                  ? "cursor-not-allowed border-card-border/60 opacity-60"
+                  : "cursor-pointer border-card-border hover:border-warning/50"
+              }`}
+            >
               <input
                 type="checkbox"
                 checked={isDouble}
-                onChange={(e) => setIsDouble(e.target.checked)}
-                className="h-5 w-5 rounded accent-warning"
+                disabled={doubleCheckboxDisabled}
+                onChange={(e) => handleDoubleToggle(e.target.checked)}
+                className="h-5 w-5 rounded accent-warning disabled:cursor-not-allowed"
               />
               <div>
-                <p className="font-medium text-warning">{ar.predict.doublePoints}</p>
+                <p className="font-medium text-warning">
+                  {ar.predict.doublePoints}
+                </p>
                 <p className="text-sm text-muted">{ar.predict.doubleHint}</p>
               </div>
             </label>
           </div>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{ar.predict.boldScorerBet.title}</CardTitle>
+          </CardHeader>
+          <p className="mb-4 text-sm text-muted">
+            {ar.predict.boldScorerBet.hint}
+          </p>
+
+          {boldLimits && (
+            <div
+              className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${
+                boldLimits.used
+                  ? "border-warning/40 bg-warning/10 text-warning"
+                  : "border-primary/30 bg-primary/10 text-primary"
+              }`}
+            >
+              <span className="font-semibold">
+                {ar.predict.boldCounter(
+                  boldLimits.used ? boldLimits.max : 0,
+                  boldLimits.max
+                )}
+              </span>
+              <span>
+                {boldLimits.onThisMatch && boldLimits.playerName
+                  ? ar.predict.boldUsedHere(boldLimits.playerName)
+                  : boldLimits.onOtherMatch
+                    ? ar.predict.boldExhausted
+                    : ar.predict.boldAvailable}
+              </span>
+            </div>
+          )}
+
+          {lineupLoading ? (
+            <p className="py-4 text-center text-sm text-muted">
+              {ar.predict.lineupLoading}
+            </p>
+          ) : !hasPlayers ? (
+            <p className="py-4 text-center text-sm text-muted">
+              {ar.predict.lineupUnavailable}
+            </p>
+          ) : boldLockedOnOther ? (
+            <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+              <p>{ar.predict.boldScorerBet.usedElsewhere}</p>
+              {match.boldScorerRoundStatus?.otherMatchId && (
+                <Link
+                  href={`/matches/${match.boldScorerRoundStatus.otherMatchId}`}
+                  className="mt-2 inline-block font-medium text-primary hover:underline"
+                >
+                  {ar.predict.boldScorerBet.viewOtherMatch}
+                </Link>
+              )}
+            </div>
+          ) : (
+            <Select
+              label={ar.predict.boldScorerBet.selectPlayer}
+              value={boldPlayerId}
+              onChange={(e) => setBoldPlayerId(e.target.value)}
+              options={[{ value: "", label: ar.predict.boldScorerBet.none }]}
+              groups={boldPlayerGroups}
+            />
+          )}
+
+          {boldPlayerId && !boldLockedOnOther && hasPlayers && (
+            <p className="mt-3 text-sm font-medium text-warning">
+              {ar.predict.boldScorerBet.selected(
+                allLineupPlayers.find((p) => p.id === boldPlayerId)?.name ?? ""
+              )}
+            </p>
+          )}
         </Card>
 
         {match.isKnockout && (
@@ -543,59 +699,12 @@ export default function PredictPage() {
           )}
         </Card>
 
-        {hasPlayers && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{ar.predict.boldScorerBet.title}</CardTitle>
-            </CardHeader>
-            <p className="mb-4 text-sm text-muted">
-              {ar.predict.boldScorerBet.hint}
-            </p>
-
-            {boldLockedOnOther ? (
-              <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
-                <p>{ar.predict.boldScorerBet.usedElsewhere}</p>
-                {match.boldScorerRoundStatus?.otherMatchId && (
-                  <Link
-                    href={`/matches/${match.boldScorerRoundStatus.otherMatchId}`}
-                    className="mt-2 inline-block font-medium text-primary hover:underline"
-                  >
-                    {ar.predict.boldScorerBet.viewOtherMatch}
-                  </Link>
-                )}
-              </div>
-            ) : (
-              <Select
-                label={ar.predict.boldScorerBet.selectPlayer}
-                value={boldPlayerId}
-                onChange={(e) => setBoldPlayerId(e.target.value)}
-                options={[
-                  { value: "", label: ar.predict.boldScorerBet.none },
-                  ...allLineupPlayers.map((p) => ({
-                    value: p.id,
-                    label: `${p.name} (${p.teamShort})`,
-                  })),
-                ]}
-              />
-            )}
-
-            {boldPlayerId && !boldLockedOnOther && (
-              <p className="mt-3 text-sm font-medium text-warning">
-                {ar.predict.boldScorerBet.selected(
-                  allLineupPlayers.find((p) => p.id === boldPlayerId)?.name ??
-                    ""
-                )}
-              </p>
-            )}
-          </Card>
-        )}
-
         <Button
           type="submit"
           className="w-full"
           size="lg"
           loading={submitting}
-          disabled={!hasPlayers || budget.anyExceeded}
+          disabled={budget.anyExceeded || needsLineupForScorers}
         >
           {ar.predict.submit}
         </Button>

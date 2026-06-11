@@ -1,17 +1,30 @@
 import { cn } from "@/lib/utils";
 import type { SelectHTMLAttributes } from "react";
 
+export type SelectOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+};
+
+export type SelectOptionGroup = {
+  label: string;
+  options: SelectOption[];
+};
+
 type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
   label?: string;
   error?: string;
-  options: { value: string; label: string }[];
+  options?: SelectOption[];
+  groups?: SelectOptionGroup[];
 };
 
 export function Select({
   className,
   label,
   error,
-  options,
+  options = [],
+  groups,
   id,
   ...props
 }: SelectProps) {
@@ -34,9 +47,18 @@ export function Select({
         {...props}
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
+          <option key={opt.value} value={opt.value} disabled={opt.disabled}>
             {opt.label}
           </option>
+        ))}
+        {groups?.map((group) => (
+          <optgroup key={group.label} label={group.label}>
+            {group.options.map((opt) => (
+              <option key={opt.value} value={opt.value} disabled={opt.disabled}>
+                {opt.label}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
       {error && <p className="text-sm text-danger">{error}</p>}

@@ -49,19 +49,21 @@ function RoundStatsInline({
   myPoints,
   averagePoints,
   participantCount,
+  pointsSoFarLabel,
+  pointsAverageLabel,
 }: {
   myPoints: number;
   averagePoints: number;
   participantCount: number;
+  pointsSoFarLabel: string;
+  pointsAverageLabel: string;
 }) {
   const avgDisplay = participantCount > 0 ? averagePoints : "—";
 
   return (
     <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:gap-3">
       <div className="rounded-xl border border-warning/25 bg-warning/10 px-4 py-3 text-center sm:min-w-[9rem]">
-        <p className="text-[11px] leading-tight text-muted">
-          {ar.dashboard.tournamentPointsSoFar}
-        </p>
+        <p className="text-[11px] leading-tight text-muted">{pointsSoFarLabel}</p>
         <p
           className={`mt-1 text-2xl font-bold tabular-nums ${
             myPoints > 0
@@ -75,9 +77,7 @@ function RoundStatsInline({
         </p>
       </div>
       <div className="rounded-xl border border-card-border bg-background/40 px-4 py-3 text-center sm:min-w-[9rem]">
-        <p className="text-[11px] leading-tight text-muted">
-          {ar.dashboard.tournamentPointsAverage}
-        </p>
+        <p className="text-[11px] leading-tight text-muted">{pointsAverageLabel}</p>
         <p className="mt-1 text-2xl font-bold tabular-nums">{avgDisplay}</p>
         {participantCount > 0 && (
           <p className="mt-1 text-[10px] text-muted">
@@ -105,6 +105,22 @@ export default async function DashboardPage() {
   const subRoundLbHref = data.subRound
     ? `/leaderboard/round/${data.subRound.id}`
     : "/leaderboard/overall";
+  const tournamentLbHref = data.tournamentRound
+    ? `/leaderboard/round/${data.tournamentRound.id}`
+    : "/leaderboard/overall";
+
+  const headerStats =
+    data.hasSubRound && subRoundStats ? subRoundStats : tournamentStats;
+  const headerStatsLabels =
+    data.hasSubRound && subRoundStats
+      ? {
+          pointsSoFar: ar.dashboard.roundPointsSoFar,
+          pointsAverage: ar.dashboard.roundPointsAverage,
+        }
+      : {
+          pointsSoFar: ar.dashboard.tournamentPointsSoFar,
+          pointsAverage: ar.dashboard.tournamentPointsAverage,
+        };
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -119,9 +135,11 @@ export default async function DashboardPage() {
             <p className="mt-1 text-xs text-muted/80">{tournamentName}</p>
           </div>
           <RoundStatsInline
-            myPoints={tournamentStats.myPoints}
-            averagePoints={tournamentStats.averagePoints}
-            participantCount={tournamentStats.participantCount}
+            myPoints={headerStats.myPoints}
+            averagePoints={headerStats.averagePoints}
+            participantCount={headerStats.participantCount}
+            pointsSoFarLabel={headerStatsLabels.pointsSoFar}
+            pointsAverageLabel={headerStatsLabels.pointsAverage}
           />
         </div>
       </div>
@@ -192,16 +210,16 @@ export default async function DashboardPage() {
           <div className="mb-3 flex items-center justify-between md:mb-4">
             <h2 className="text-lg font-semibold md:text-xl">{tournamentName}</h2>
             <Link
-              href="/leaderboard/overall"
+              href={tournamentLbHref}
               className="text-sm text-primary hover:underline"
             >
               {ar.dashboard.fullLeaderboard} ←
             </Link>
           </div>
           <LeaderboardTable
-            entries={data.overall.slice(0, 5)}
+            entries={data.tournamentLb.slice(0, 5)}
             highlightUserId={user.userId}
-            showRankTrend
+            pointsLabel={ar.leaderboard.roundPointsColumn}
           />
         </div>
       </section>

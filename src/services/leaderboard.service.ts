@@ -10,12 +10,19 @@ const LB_CACHE_SECONDS = 60;
 
 type PointsFilter = {
   roundId?: string;
+  roundIds?: string[];
   before?: Date;
 };
 
 function matchWhere(filter: PointsFilter) {
+  const roundClause = filter.roundIds?.length
+    ? { roundId: { in: filter.roundIds } }
+    : filter.roundId
+      ? { roundId: filter.roundId }
+      : {};
+
   return {
-    ...(filter.roundId ? { roundId: filter.roundId } : {}),
+    ...roundClause,
     ...(filter.before
       ? {
           status: "FINISHED" as const,
@@ -26,7 +33,9 @@ function matchWhere(filter: PointsFilter) {
 }
 
 async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, PointsRow>> {
-  const hasMatchFilter = Boolean(filter.roundId || filter.before);
+  const hasMatchFilter = Boolean(
+    filter.roundId || filter.roundIds?.length || filter.before
+  );
   const where = hasMatchFilter ? { match: matchWhere(filter) } : undefined;
 
   const boldWhere = hasMatchFilter ? { match: matchWhere(filter) } : undefined;
@@ -105,15 +114,24 @@ function buildLeaderboard(pointsMap: Map<string, PointsRow>): LeaderboardEntry[]
       return a.username.localeCompare(b.username);
     });
 
-  let currentRank = 1;
   for (let i = 0; i < entries.length; i++) {
-    if (i > 0 && entries[i].points < entries[i - 1].points) {
-      currentRank = i + 1;
-    }
-    entries[i].rank = currentRank;
+    entries[i].rank = i + 1;
   }
 
   return entries;
+}
+
+async function getTournamentRoundIds(): Promise<string[]> {
+  const tournamentRound = await getTournamentRound();
+  if (!tournamentRound) return [];
+
+  const tournamentName = getTournamentRoundName();
+  const subRounds = await prisma.round.findMany({
+    where: { name: { not: tournamentName } },
+    select: { id: true },
+  });
+
+  return [tournamentRound.id, ...subRounds.map((r) => r.id)];
 }
 
 function attachRankChange(
@@ -145,7 +163,13 @@ async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardE
 }
 
 async function buildRoundLeaderboard(roundId: string): Promise<LeaderboardEntry[]> {
-  const pointsMap = await getUserPointsMap({ roundId });
+  const tournamentRound = await getTournamentRound();
+  const isMainTournament = tournamentRound?.id === roundId;
+
+  const pointsMap = isMainTournament
+    ? await getUserPointsMap({ roundIds: await getTournamentRoundIds() })
+    : await getUserPointsMap({ roundId });
+
   return buildLeaderboard(pointsMap);
 }
 

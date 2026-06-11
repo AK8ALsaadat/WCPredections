@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** يحوّل حقل نصي لنتيجة؛ يقبل 0 كقيمة صالحة */
+export function parseOptionalScore(value: string | undefined): number | null {
+  if (value === undefined || value.trim() === "") return null;
+  const n = Number.parseInt(value, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
 export function formatDate(date: Date | string): string {
   return new Intl.DateTimeFormat("ar-SA", {
     weekday: "short",

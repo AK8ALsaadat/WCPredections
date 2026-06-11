@@ -4,6 +4,7 @@ import { getTournamentRoundName } from "@/lib/rounds";
 import type { MatchStatus } from "@prisma/client";
 import { getBoldScorerBetStatus } from "@/services/bold-scorer-bet.service";
 import { calculateMatchPoints } from "@/services/prediction.service";
+import { getRoundUsageLimits } from "@/services/round-usage.service";
 
 const teamSelect = {
   id: true,
@@ -213,6 +214,7 @@ export async function getMatchById(
   let userScorerPredictions = null;
   let userBoldScorerBet = null;
   let boldScorerRoundStatus = null;
+  let roundUsageLimits = null;
 
   if (userId) {
     userPrediction = await prisma.prediction.findUnique({
@@ -222,7 +224,11 @@ export async function getMatchById(
       where: { userId, matchId },
       include: { player: true },
     });
-    const boldStatus = await getBoldScorerBetStatus(userId, matchId);
+    const [boldStatus, limits] = await Promise.all([
+      getBoldScorerBetStatus(userId, matchId),
+      getRoundUsageLimits(userId, matchId),
+    ]);
+    roundUsageLimits = limits;
     boldScorerRoundStatus = {
       used: boldStatus.used,
       onThisMatch: boldStatus.onThisMatch,
@@ -244,6 +250,7 @@ export async function getMatchById(
     userScorerPredictions,
     userBoldScorerBet,
     boldScorerRoundStatus,
+    roundUsageLimits,
   };
 
   if (!options?.includeLineup) return base;
