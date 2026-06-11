@@ -171,6 +171,10 @@ export const en = {
     score: "Score",
     finishType: "How it ended",
     pointsEarned: "Points earned",
+    pointsBreakdownTitle: "Points breakdown",
+    actualResult: "Final score",
+    showPointsBreakdown: "Show details",
+    hidePointsBreakdown: "Hide details",
     scorers: "Predicted scorers",
     goalScorers: "Goal scorers",
     scorerPoints: "Scorer points",
@@ -201,12 +205,16 @@ export const en = {
   pointsBreakdown: {
     exactScore: "Exact score",
     winnerCorrect: "Correct winner",
+    scoreWrong: "Wrong score prediction",
     doubled: "doubled",
     exactDetail: (predH: number, predA: number, actH: number, actA: number) =>
       `You predicted ${predH}-${predA}, result ${actH}-${actA}`,
     winnerDetail: (predH: number, predA: number, actH: number, actA: number) =>
       `You predicted ${predH}-${predA}, result ${actH}-${actA}`,
+    predictionDetail: (predH: number, predA: number, actH: number, actA: number) =>
+      `You predicted ${predH}-${predA}, result ${actH}-${actA}`,
     finishTypeCorrect: "Correct match ending",
+    finishTypeWrong: "Wrong match ending",
     finishTypeDetail: (type: string) => {
       const labels: Record<string, string> = {
         NINETY_MINUTES: "90 minutes",
@@ -216,7 +224,9 @@ export const en = {
       return labels[type] ?? type;
     },
     penaltyCorrect: "Correct penalty shootout winner",
+    penaltyWrong: "Wrong penalty shootout winner",
     scorerHit: (name: string) => `${name} scored`,
+    scorerMiss: (name: string) => `${name} didn't score`,
     scorerGoalsDetail: (n: number) => `You predicted ${n} goals`,
     boldScorerWin: (name: string) => `Bold card: ${name} scored`,
     boldScorerMiss: (name: string) => `Bold card: ${name} didn't score`,

@@ -620,8 +620,13 @@ export async function getLeagueMatchPredictions(matchId: string) {
       matchTime: true,
       status: true,
       isKnockout: true,
+      homeScore: true,
+      awayScore: true,
+      actualFinishType: true,
+      penaltyWinnerTeamId: true,
       homeTeam: { select: { id: true, name: true, shortName: true } },
       awayTeam: { select: { id: true, name: true, shortName: true } },
+      penaltyWinnerTeam: { select: { id: true, name: true, shortName: true } },
     },
   });
 
@@ -704,9 +709,24 @@ export async function getLeagueMatchPredictions(matchId: string) {
     rows.set(bold.userId, existing);
   }
 
-  const entries = Array.from(rows.values()).sort((a, b) =>
-    a.username.localeCompare(b.username)
-  );
+  const entries = Array.from(rows.values()).sort((a, b) => {
+    if (match.status === "FINISHED") {
+      const totalA =
+        (a.prediction?.points ?? 0) +
+        (a.prediction?.finishTypePoints ?? 0) +
+        (a.prediction?.penaltyWinnerPoints ?? 0) +
+        a.scorerPredictions.reduce((s, p) => s + (p.points ?? 0), 0) +
+        (a.boldScorerBet?.points ?? 0);
+      const totalB =
+        (b.prediction?.points ?? 0) +
+        (b.prediction?.finishTypePoints ?? 0) +
+        (b.prediction?.penaltyWinnerPoints ?? 0) +
+        b.scorerPredictions.reduce((s, p) => s + (p.points ?? 0), 0) +
+        (b.boldScorerBet?.points ?? 0);
+      if (totalB !== totalA) return totalB - totalA;
+    }
+    return a.username.localeCompare(b.username);
+  });
 
   return {
     match: {
@@ -714,6 +734,11 @@ export async function getLeagueMatchPredictions(matchId: string) {
       matchTime: match.matchTime,
       status: match.status,
       isKnockout: match.isKnockout,
+      homeScore: match.homeScore,
+      awayScore: match.awayScore,
+      actualFinishType: match.actualFinishType,
+      penaltyWinnerTeamId: match.penaltyWinnerTeamId,
+      penaltyWinnerTeam: match.penaltyWinnerTeam,
       homeTeam: match.homeTeam,
       awayTeam: match.awayTeam,
     },

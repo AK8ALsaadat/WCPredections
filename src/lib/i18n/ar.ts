@@ -168,6 +168,10 @@ export const ar = {
     score: "النتيجة",
     finishType: "نوع الإنهاء",
     pointsEarned: "النقاط المكتسبة",
+    pointsBreakdownTitle: "تفصيل النقاط",
+    actualResult: "النتيجة الفعلية",
+    showPointsBreakdown: "عرض التفاصيل",
+    hidePointsBreakdown: "إخفاء التفاصيل",
     scorers: "الهدافون المتوقعون",
     goalScorers: "مسجلو الأهداف",
     scorerPoints: "نقاط الهدافين",
@@ -198,12 +202,16 @@ export const ar = {
   pointsBreakdown: {
     exactScore: "نتيجة صحيحة بالضبط",
     winnerCorrect: "توقعت الفائز صح",
+    scoreWrong: "توقع النتيجة خاطئ",
     doubled: "مضاعفة",
     exactDetail: (predH: number, predA: number, actH: number, actA: number) =>
       `توقعت ${predH}-${predA} والنتيجة ${actH}-${actA}`,
     winnerDetail: (predH: number, predA: number, actH: number, actA: number) =>
       `توقعت ${predH}-${predA} والنتيجة ${actH}-${actA}`,
+    predictionDetail: (predH: number, predA: number, actH: number, actA: number) =>
+      `توقعت ${predH}-${predA} والنتيجة ${actH}-${actA}`,
     finishTypeCorrect: "طريقة انتهاء المباراة صح",
+    finishTypeWrong: "طريقة انتهاء خاطئة",
     finishTypeDetail: (type: string) => {
       const labels: Record<string, string> = {
         NINETY_MINUTES: "90 دقيقة",
@@ -213,7 +221,9 @@ export const ar = {
       return labels[type] ?? type;
     },
     penaltyCorrect: "الفائز بركلات الترجيح صح",
+    penaltyWrong: "فائز ركلات الترجيح خاطئ",
     scorerHit: (name: string) => `${name} سجل فعلاً`,
+    scorerMiss: (name: string) => `${name} ما سجل`,
     scorerGoalsDetail: (n: number) => `توقعت ${n} أهداف`,
     boldScorerWin: (name: string) => `البطاقة الجريئة: ${name} سجل`,
     boldScorerMiss: (name: string) => `البطاقة الجريئة: ${name} ما سجل`,

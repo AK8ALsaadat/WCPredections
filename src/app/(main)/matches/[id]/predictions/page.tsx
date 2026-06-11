@@ -7,6 +7,7 @@ import { TeamLogo } from "@/components/ui/TeamLogo";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { LeaguePredictionsList } from "@/components/matches/LeaguePredictionsList";
+import { asFinishType } from "@/lib/finish-type";
 import { formatDate } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import type { LeagueMatchPredictionRow } from "@/types";
@@ -17,6 +18,11 @@ type LeaguePredictionsPayload = {
     matchTime: string;
     status: string;
     isKnockout: boolean;
+    homeScore?: number | null;
+    awayScore?: number | null;
+    actualFinishType?: string | null;
+    penaltyWinnerTeamId?: string | null;
+    penaltyWinnerTeam?: { id: string; name: string; shortName: string } | null;
     homeTeam: {
       id: string;
       name: string;
@@ -67,9 +73,24 @@ export default function LeagueMatchPredictionsPage() {
   }
 
   const { match, predictions } = data;
-  const isFinished = match.status === "FINISHED";
+  const isFinished =
+    match.status === "FINISHED" &&
+    match.homeScore != null &&
+    match.awayScore != null;
   const withDouble = predictions.filter((p) => p.prediction?.isDouble).length;
   const withBold = predictions.filter((p) => p.boldScorerBet).length;
+  const matchResult = isFinished
+    ? {
+        homeScore: match.homeScore!,
+        awayScore: match.awayScore!,
+        isKnockout: match.isKnockout,
+        actualFinishType: asFinishType(match.actualFinishType),
+        penaltyWinnerTeamId: match.penaltyWinnerTeamId,
+        homeTeamName: match.homeTeam.name,
+        awayTeamName: match.awayTeam.name,
+        penaltyWinnerName: match.penaltyWinnerTeam?.name ?? null,
+      }
+    : null;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-8">
@@ -101,7 +122,20 @@ export default function LeagueMatchPredictionsPage() {
           </div>
 
           <div className="shrink-0 px-2 text-center">
-            <span className="text-2xl font-light text-muted">{t.matches.vs}</span>
+            {isFinished ? (
+              <div className="text-3xl font-bold tabular-nums">
+                {match.homeScore}
+                <span className="mx-2 text-muted">-</span>
+                {match.awayScore}
+              </div>
+            ) : (
+              <span className="text-2xl font-light text-muted">{t.matches.vs}</span>
+            )}
+            {isFinished && (
+              <p className="mt-1 text-[10px] font-medium text-primary">
+                {t.matches.actualResult}
+              </p>
+            )}
             <p className="mt-2 text-xs text-muted">
               {formatDate(match.matchTime, locale)}
             </p>
@@ -167,6 +201,7 @@ export default function LeagueMatchPredictionsPage() {
         awayShortName={match.awayTeam.shortName}
         isKnockout={match.isKnockout}
         isFinished={isFinished}
+        matchResult={matchResult}
         currentUserId={currentUserId}
       />
     </div>

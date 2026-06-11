@@ -1,7 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import type { LeagueMatchPredictionRow } from "@/types";
 import { asFinishType } from "@/lib/finish-type";
+import {
+  buildMatchPointsBreakdown,
+  getMatchTotalUserPoints,
+  leagueRowToBreakdownInput,
+  type LeagueMatchResultContext,
+} from "@/lib/match-points-breakdown";
+import { PointsBreakdownLines } from "@/components/matches/PointsBreakdownLines";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import type { Messages } from "@/lib/i18n/ar";
 
@@ -15,6 +23,7 @@ type LeaguePredictionsListProps = {
   awayShortName: string;
   isKnockout: boolean;
   isFinished: boolean;
+  matchResult?: LeagueMatchResultContext | null;
   currentUserId?: string;
 };
 
@@ -101,21 +110,43 @@ function ScorerChips({
     <div
       className={`flex flex-wrap gap-1 ${align === "end" ? "justify-end" : "justify-start"}`}
     >
-      {scorers.map((pick) => (
-        <span
-          key={pick.player.id}
-          title={pick.player.name}
-          className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary/90 ring-1 ring-primary/20"
-        >
-          {shortPlayerName(pick.player.name)}
-          {pick.predictedGoals > 1 && (
-            <span className="font-bold text-warning">×{pick.predictedGoals}</span>
-          )}
-          {pick.points != null && pick.points > 0 && (
-            <span className="text-[10px] text-primary">+{pick.points}</span>
-          )}
-        </span>
-      ))}
+      {scorers.map((pick) => {
+        const hit = (pick.points ?? 0) > 0;
+        return (
+          <span
+            key={pick.player.id}
+            title={pick.player.name}
+            className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] ring-1 ${
+              hit
+                ? "bg-primary/10 text-primary/90 ring-primary/20"
+                : "bg-card-border/40 text-muted ring-card-border/60"
+            }`}
+          >
+            {hit ? (
+              <span className="text-[10px] font-bold text-primary">✓</span>
+            ) : (
+              <span className="text-[10px] text-danger">✗</span>
+            )}
+            {shortPlayerName(pick.player.name)}
+            {pick.predictedGoals > 1 && (
+              <span className="font-bold text-warning">×{pick.predictedGoals}</span>
+            )}
+            {pick.points != null && (
+              <span
+                className={`text-[10px] font-bold ${
+                  pick.points > 0
+                    ? "text-primary"
+                    : pick.points < 0
+                      ? "text-danger"
+                      : "text-muted"
+                }`}
+              >
+                {pick.points > 0 ? `+${pick.points}` : pick.points}
+              </span>
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -164,6 +195,179 @@ function KnockoutExtras({
   );
 }
 
+function LeaguePredictionRow({
+  row,
+  index,
+  isMe,
+  isFinished,
+  isKnockout,
+  matchResult,
+  homeTeamId,
+  awayTeamId,
+  homeTeamName,
+  awayTeamName,
+  homeShortName,
+  awayShortName,
+  t,
+}: {
+  row: LeagueMatchPredictionRow;
+  index: number;
+  isMe: boolean;
+  isFinished: boolean;
+  isKnockout: boolean;
+  matchResult?: LeagueMatchResultContext | null;
+  homeTeamId: string;
+  awayTeamId: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeShortName: string;
+  awayShortName: string;
+  t: Messages;
+}) {
+  const [open, setOpen] = useState(isMe);
+
+  const homeScorers = row.scorerPredictions.filter(
+    (p) => p.player.teamId === homeTeamId
+  );
+  const awayScorers = row.scorerPredictions.filter(
+    (p) => p.player.teamId === awayTeamId
+  );
+
+  const breakdownInput =
+    isFinished && matchResult
+      ? leagueRowToBreakdownInput(row, matchResult)
+      : null;
+
+  const totalPoints = breakdownInput
+    ? getMatchTotalUserPoints(breakdownInput)
+    : null;
+
+  const breakdown =
+    breakdownInput && totalPoints != null
+      ? buildMatchPointsBreakdown(breakdownInput, t, { showMisses: true })
+      : null;
+
+  const hasBreakdown = Boolean(breakdown && breakdown.lines.length > 0);
+
+  return (
+    <li
+      className={`px-4 py-4 transition-colors md:px-5 ${
+        isMe
+          ? "bg-primary/[0.07] ring-1 ring-inset ring-primary/25"
+          : index % 2 === 0
+            ? "bg-transparent"
+            : "bg-background/20"
+      }`}
+    >
+      <div className="md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
+        <div className="mb-3 flex min-w-0 items-center gap-2 md:mb-0">
+          <FeatureBadges row={row} isKnockout={isKnockout} t={t} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate font-semibold">@{row.username}</span>
+              {isMe && (
+                <span className="shrink-0 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary">
+                  {t.matches.you}
+                </span>
+              )}
+            </div>
+            {totalPoints != null && (
+              <p className="mt-0.5 text-[11px] text-muted">
+                {t.matches.pointsEarned}:{" "}
+                <span
+                  className={`font-bold tabular-nums ${
+                    totalPoints > 0
+                      ? "text-primary"
+                      : totalPoints < 0
+                        ? "text-danger"
+                        : "text-muted"
+                  }`}
+                >
+                  {totalPoints > 0 ? `+${totalPoints}` : totalPoints}
+                </span>
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="mb-2 md:mb-0">
+          <p className="mb-1 text-[10px] font-medium text-muted md:hidden">
+            {homeTeamName}
+          </p>
+          <ScorerChips scorers={homeScorers} />
+        </div>
+
+        <div className="mb-2 flex justify-center md:mb-0">
+          {row.prediction ? (
+            <div className="flex min-w-[4.5rem] flex-col items-center rounded-xl bg-background/50 px-3 py-2 ring-1 ring-card-border">
+              <span className="text-xl font-bold tabular-nums tracking-tight">
+                {row.prediction.predHome}
+                <span className="mx-1 text-muted">-</span>
+                {row.prediction.predAway}
+              </span>
+              {isFinished &&
+                matchResult &&
+                row.prediction.points != null &&
+                (row.prediction.points > 0 ? (
+                  <span className="mt-1 text-[10px] font-bold text-primary">
+                    ✓ +{row.prediction.points}
+                  </span>
+                ) : (
+                  <span className="mt-1 text-[10px] text-danger">✗ 0</span>
+                ))}
+            </div>
+          ) : (
+            <span className="text-lg text-muted">—</span>
+          )}
+        </div>
+
+        <div>
+          <p className="mb-1 text-end text-[10px] font-medium text-muted md:hidden">
+            {awayTeamName}
+          </p>
+          <ScorerChips scorers={awayScorers} align="end" />
+        </div>
+      </div>
+
+      {isKnockout && (
+        <KnockoutExtras
+          row={row}
+          homeTeamId={homeTeamId}
+          awayTeamId={awayTeamId}
+          homeShortName={homeShortName}
+          awayShortName={awayShortName}
+          t={t}
+        />
+      )}
+
+      {hasBreakdown && breakdown && (
+        <div className="mt-3 border-t border-card-border/60 pt-3">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 rounded-lg border border-card-border/80 bg-background/40 px-3 py-2 text-xs font-medium text-muted transition-colors hover:bg-background/60"
+          >
+            <span>{t.matches.pointsBreakdownTitle}</span>
+            <span>
+              {open ? t.matches.hidePointsBreakdown : t.matches.showPointsBreakdown}{" "}
+              {open ? "▲" : "▼"}
+            </span>
+          </button>
+          {open && (
+            <div className="mt-2 rounded-lg border border-card-border/60 bg-background/30 p-3">
+              <PointsBreakdownLines
+                lines={breakdown.lines}
+                total={breakdown.total}
+                compact
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
 export function LeaguePredictionsList({
   rows,
   homeTeamId,
@@ -174,6 +378,7 @@ export function LeaguePredictionsList({
   awayShortName,
   isKnockout,
   isFinished,
+  matchResult,
   currentUserId,
 }: LeaguePredictionsListProps) {
   const { messages: t } = useI18n();
@@ -199,105 +404,24 @@ export function LeaguePredictionsList({
       </div>
 
       <ul className="divide-y divide-card-border/80">
-        {rows.map((row, index) => {
-          const homeScorers = row.scorerPredictions.filter(
-            (p) => p.player.teamId === homeTeamId
-          );
-          const awayScorers = row.scorerPredictions.filter(
-            (p) => p.player.teamId === awayTeamId
-          );
-          const isMe = row.userId === currentUserId;
-          const totalPoints =
-            isFinished && row.prediction
-              ? (row.prediction.points ?? 0) +
-                (row.prediction.finishTypePoints ?? 0) +
-                (row.prediction.penaltyWinnerPoints ?? 0) +
-                row.scorerPredictions.reduce((sum, p) => sum + (p.points ?? 0), 0) +
-                (row.boldScorerBet?.points ?? 0)
-              : null;
-
-          return (
-            <li
-              key={row.userId}
-              className={`px-4 py-4 transition-colors md:px-5 ${
-                isMe
-                  ? "bg-primary/[0.07] ring-1 ring-inset ring-primary/25"
-                  : index % 2 === 0
-                    ? "bg-transparent"
-                    : "bg-background/20"
-              }`}
-            >
-              <div className="md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
-                <div className="mb-3 flex min-w-0 items-center gap-2 md:mb-0">
-                  <FeatureBadges row={row} isKnockout={isKnockout} t={t} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate font-semibold">@{row.username}</span>
-                      {isMe && (
-                        <span className="shrink-0 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary">
-                          {t.matches.you}
-                        </span>
-                      )}
-                    </div>
-                    {totalPoints != null && (
-                      <p className="mt-0.5 text-[11px] text-muted">
-                        {t.matches.pointsEarned}:{" "}
-                        <span
-                          className={
-                            totalPoints > 0
-                              ? "font-bold text-primary"
-                              : "text-muted"
-                          }
-                        >
-                          {totalPoints > 0 ? `+${totalPoints}` : totalPoints}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mb-2 md:mb-0">
-                  <p className="mb-1 text-[10px] font-medium text-muted md:hidden">
-                    {homeTeamName}
-                  </p>
-                  <ScorerChips scorers={homeScorers} />
-                </div>
-
-                <div className="mb-2 flex justify-center md:mb-0">
-                  {row.prediction ? (
-                    <div className="flex min-w-[4.5rem] flex-col items-center rounded-xl bg-background/50 px-3 py-2 ring-1 ring-card-border">
-                      <span className="text-xl font-bold tabular-nums tracking-tight">
-                        {row.prediction.predHome}
-                        <span className="mx-1 text-muted">-</span>
-                        {row.prediction.predAway}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-lg text-muted">—</span>
-                  )}
-                </div>
-
-                <div>
-                  <p className="mb-1 text-end text-[10px] font-medium text-muted md:hidden">
-                    {awayTeamName}
-                  </p>
-                  <ScorerChips scorers={awayScorers} align="end" />
-                </div>
-              </div>
-
-              {isKnockout && (
-                <KnockoutExtras
-                  row={row}
-                  homeTeamId={homeTeamId}
-                  awayTeamId={awayTeamId}
-                  homeShortName={homeShortName}
-                  awayShortName={awayShortName}
-                  t={t}
-                />
-              )}
-            </li>
-          );
-        })}
+        {rows.map((row, index) => (
+          <LeaguePredictionRow
+            key={row.userId}
+            row={row}
+            index={index}
+            isMe={row.userId === currentUserId}
+            isFinished={isFinished}
+            isKnockout={isKnockout}
+            matchResult={matchResult}
+            homeTeamId={homeTeamId}
+            awayTeamId={awayTeamId}
+            homeTeamName={homeTeamName}
+            awayTeamName={awayTeamName}
+            homeShortName={homeShortName}
+            awayShortName={awayShortName}
+            t={t}
+          />
+        ))}
       </ul>
     </div>
   );
