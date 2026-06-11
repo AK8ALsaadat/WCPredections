@@ -108,7 +108,7 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
     ) ?? [];
 
   const showUserPrediction =
-    hasPrediction && !isFinished && !isLive && match.userPrediction;
+    hasPrediction && !isFinished && match.userPrediction;
 
   useEffect(() => {
     if (!showPredictButton || !canPredict) return;
@@ -169,7 +169,19 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
           </div>
 
           <div className="flex shrink-0 flex-col items-center px-1">
-            {isFinished || isLive ? (
+            {isLive ? (
+              <div className="text-center">
+                <span className="text-2xl font-bold">
+                  {match.homeScore ?? 0} - {match.awayScore ?? 0}
+                </span>
+                {showUserPrediction && (
+                  <p className="mt-1 text-xs font-semibold text-warning">
+                    {t.matches.yourPredictionShort}: {match.userPrediction!.predHome}-
+                    {match.userPrediction!.predAway}
+                  </p>
+                )}
+              </div>
+            ) : isFinished ? (
               <span className="text-2xl font-bold">
                 {match.homeScore} - {match.awayScore}
               </span>
@@ -230,6 +242,17 @@ export function MatchCard({ match, showPredictButton }: MatchCardProps) {
 
       {showPredictButton && lockReason && !isFinished && !canPredict && (
         <p className="mt-2 text-xs text-muted">{lockReason}</p>
+      )}
+
+      {!canPredict && hasPrediction && !isFinished && (
+        <div className="mt-3 text-center">
+          <Link
+            href={`/matches/${match.id}`}
+            className="text-xs font-medium text-warning hover:underline"
+          >
+            {t.matches.viewYourPrediction} →
+          </Link>
+        </div>
       )}
 
       {!canPredict && (

@@ -1,6 +1,9 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { isWithinLineupFastRefreshWindow } from "@/lib/utils";
+import {
+  getMatchCalendarDay,
+  isWithinLineupFastRefreshWindow,
+} from "@/lib/utils";
 import { getTournamentRoundName } from "@/lib/rounds";
 import type { MatchStatus } from "@prisma/client";
 import { getBoldScorerBetStatus } from "@/services/bold-scorer-bet.service";
@@ -100,6 +103,43 @@ async function fetchScheduleMatches(roundId?: string) {
     },
     orderBy: { matchTime: "asc" },
   });
+}
+
+/** مباريات اليوم اللي المستخدم توقعها — تبقى ظاهرة حتى بعد إغلاق التوقع */
+export async function getUserPinnedTodayMatches(
+  userId: string,
+  roundId?: string
+) {
+  const predictions = await prisma.prediction.findMany({
+    where: {
+      userId,
+      match: {
+        roundId: roundId ?? undefined,
+        status: { notIn: ["CANCELLED"] },
+      },
+    },
+    include: {
+      match: {
+        include: {
+          homeTeam: { select: teamSelect },
+          awayTeam: { select: teamSelect },
+          round: { select: { id: true, name: true } },
+        },
+      },
+    },
+    orderBy: { match: { matchTime: "asc" } },
+  });
+
+  const today = getMatchCalendarDay(new Date());
+  const matches = predictions
+    .map((p) => p.match)
+    .filter((m) => getMatchCalendarDay(m.matchTime) === today);
+
+  const uniqueById = new Map(matches.map((m) => [m.id, m]));
+  return enrichMatchesWithUserPredictions(
+    Array.from(uniqueById.values()),
+    userId
+  );
 }
 
 export async function getScheduleMatches(roundId?: string) {

@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
-import { MatchPointsBreakdown } from "@/components/matches/MatchPointsBreakdown";
-import { asFinishType } from "@/lib/finish-type";
+import { PredictionHistoryCard } from "@/components/predictions/PredictionHistoryCard";
+import { buildMatchHistoryEntries } from "@/lib/profile-history";
 import { formatDateShort } from "@/lib/utils";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -66,55 +66,6 @@ type ProfileData = {
 };
 
 const PROFILE_CACHE_KEY = "profile";
-
-function buildMatchHistoryEntries(history: ProfileData["history"]) {
-  const byMatch = new Map<
-    string,
-    {
-      match: ProfileMatch;
-      prediction: ProfileData["history"]["predictions"][number] | null;
-      scorers: ProfileData["history"]["scorerPredictions"];
-      bold: ProfileData["history"]["boldScorerBets"][number] | null;
-    }
-  >();
-
-  for (const prediction of history.predictions) {
-    byMatch.set(prediction.match.id, {
-      match: prediction.match,
-      prediction,
-      scorers: [],
-      bold: null,
-    });
-  }
-
-  for (const scorer of history.scorerPredictions) {
-    const existing = byMatch.get(scorer.match.id) ?? {
-      match: scorer.match,
-      prediction: null,
-      scorers: [],
-      bold: null,
-    };
-    existing.scorers.push(scorer);
-    byMatch.set(scorer.match.id, existing);
-  }
-
-  for (const bold of history.boldScorerBets) {
-    const existing = byMatch.get(bold.match.id) ?? {
-      match: bold.match,
-      prediction: null,
-      scorers: [],
-      bold: null,
-    };
-    existing.bold = bold;
-    byMatch.set(bold.match.id, existing);
-  }
-
-  return Array.from(byMatch.values()).sort(
-    (a, b) =>
-      new Date(b.match.matchTime).getTime() -
-      new Date(a.match.matchTime).getTime()
-  );
-}
 
 export default function ProfilePage() {
   const { messages: t, locale } = useI18n();
@@ -292,105 +243,23 @@ export default function ProfilePage() {
       </div>
 
       <section>
-        <h2 className="mb-4 text-xl font-semibold">{t.profile.history}</h2>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h2 className="text-xl font-semibold">{t.profile.history}</h2>
+          {matchEntries.length > 0 && (
+            <Link href="/predictions" className="text-sm text-primary hover:underline">
+              {t.profile.viewAllPredictions} →
+            </Link>
+          )}
+        </div>
         {matchEntries.length === 0 ? (
           <Card>
             <p className="text-center text-muted">{t.profile.noHistory}</p>
           </Card>
         ) : (
           <div className="space-y-4">
-            {matchEntries.map((entry) => {
-              const m = entry.match;
-              const isFinished =
-                m.status === "FINISHED" &&
-                m.homeScore != null &&
-                m.awayScore != null;
-              const penaltyWinnerName =
-                m.penaltyWinnerTeamId === m.homeTeam.id
-                  ? m.homeTeam.name
-                  : m.penaltyWinnerTeamId === m.awayTeam.id
-                    ? m.awayTeam.name
-                    : null;
-
-              const breakdownInput =
-                isFinished
-                  ? {
-                      homeScore: m.homeScore!,
-                      awayScore: m.awayScore!,
-                      isKnockout: m.isKnockout,
-                      actualFinishType: asFinishType(m.actualFinishType),
-                      penaltyWinnerTeamId: m.penaltyWinnerTeamId,
-                      homeTeamName: m.homeTeam.name,
-                      awayTeamName: m.awayTeam.name,
-                      penaltyWinnerName,
-                      userPrediction: entry.prediction
-                        ? {
-                            predHome: entry.prediction.predHome,
-                            predAway: entry.prediction.predAway,
-                            isDouble: entry.prediction.isDouble,
-                            points: entry.prediction.points,
-                            finishTypePoints: entry.prediction.finishTypePoints,
-                            penaltyWinnerPoints:
-                              entry.prediction.penaltyWinnerPoints,
-                            predictedFinishType: asFinishType(
-                              entry.prediction.predictedFinishType
-                            ),
-                            predictedPenaltyWinnerTeamId:
-                              entry.prediction.predictedPenaltyWinnerTeamId,
-                          }
-                        : null,
-                      userScorerPredictions: entry.scorers.map((sp) => ({
-                        predictedGoals: sp.predictedGoals,
-                        points: sp.points,
-                        player: { name: sp.player.name },
-                      })),
-                      userBoldScorerBet: entry.bold
-                        ? {
-                            points: entry.bold.points,
-                            player: { name: entry.bold.player.name },
-                          }
-                        : null,
-                    }
-                  : null;
-
-              return (
-                <Card key={m.id} className="p-4">
-                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-xs text-muted">{m.round.name}</p>
-                      <Link
-                        href={`/matches/${m.id}`}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {m.homeTeam.shortName} vs {m.awayTeam.shortName}
-                      </Link>
-                      {entry.prediction && (
-                        <p className="mt-1 text-sm text-muted">
-                          {t.profile.predicted}: {entry.prediction.predHome}-
-                          {entry.prediction.predAway}
-                          {entry.prediction.isDouble && (
-                            <span className="ml-1 text-warning">2×</span>
-                          )}
-                        </p>
-                      )}
-                      {isFinished && (
-                        <p className="text-sm text-muted">
-                          {t.profile.actual}: {m.homeScore}-{m.awayScore}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {breakdownInput && (
-                    <MatchPointsBreakdown {...breakdownInput} compact />
-                  )}
-
-                  {!isFinished && entry.prediction && (
-                    <p className="text-sm text-muted">{t.status[m.status as keyof typeof t.status]}</p>
-                  )}
-                </Card>
-              );
-            })}
+            {matchEntries.slice(0, 5).map((entry) => (
+              <PredictionHistoryCard key={entry.match.id} entry={entry} />
+            ))}
           </div>
         )}
       </section>

@@ -8,6 +8,7 @@ import {
   getUpcomingMatches,
   getAllMatches,
   getScheduleMatches,
+  getUserPinnedTodayMatches,
   enrichMatchesWithUserPredictions,
 } from "@/services/match.service";
 
@@ -34,7 +35,11 @@ export async function GET(request: Request) {
     if (schedule && paginated) {
       const { items, meta } = paginateSchedule(raw, page, pageSize);
       const matches = await enrichMatchesWithUserPredictions(items, user?.userId);
-      return apiSuccess({ matches, ...meta });
+      const pinnedMatches =
+        user?.userId && page === 1
+          ? await getUserPinnedTodayMatches(user.userId, roundId)
+          : [];
+      return apiSuccess({ matches, pinnedMatches, ...meta });
     }
 
     const matches = await enrichMatchesWithUserPredictions(raw, user?.userId);

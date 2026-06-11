@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { MatchCard } from "@/components/matches/MatchCard";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
@@ -36,6 +37,7 @@ type MatchesPageMeta = {
 
 type MatchesPageCache = {
   matches: Match[];
+  pinnedMatches: Match[];
   meta: MatchesPageMeta;
 };
 
@@ -53,6 +55,7 @@ export default function MatchesPage() {
   const [selectedRound, setSelectedRound] = useState("");
   const [page, setPage] = useState(1);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [pinnedMatches, setPinnedMatches] = useState<Match[]>([]);
   const [meta, setMeta] = useState<MatchesPageMeta>({
     page: 1,
     totalPages: 1,
@@ -71,6 +74,7 @@ export default function MatchesPage() {
 
   const applyCache = useCallback((cached: MatchesPageCache, activePage: number) => {
     setMatches(cached.matches);
+    setPinnedMatches(cached.pinnedMatches ?? []);
     setMeta(cached.meta);
     setPage(activePage);
     setLoading(false);
@@ -120,6 +124,7 @@ export default function MatchesPage() {
           const resolvedPage = data.data.page as number;
           const payload: MatchesPageCache = {
             matches: data.data.matches,
+            pinnedMatches: data.data.pinnedMatches ?? [],
             meta: {
               page: resolvedPage,
               totalPages: data.data.totalPages,
@@ -130,6 +135,7 @@ export default function MatchesPage() {
           };
           writeClientCache(matchesCacheKey(targetRound, resolvedPage), payload);
           setMatches(payload.matches);
+          setPinnedMatches(payload.pinnedMatches);
           setMeta(payload.meta);
           setPage(resolvedPage);
           setLastUpdate(new Date());
@@ -201,7 +207,7 @@ export default function MatchesPage() {
   }, [loadMatches, page, selectedRound]);
 
   useEffect(() => {
-    matches
+    [...pinnedMatches, ...matches]
       .filter((m) => isPredictionAllowed(m.matchTime))
       .forEach((m) => {
         seedPredictMatchFromList({
@@ -227,9 +233,12 @@ export default function MatchesPage() {
         });
         prefetchPredictData(m.id);
       });
-  }, [matches]);
+  }, [matches, pinnedMatches]);
 
-  const grouped = matches.reduce<Record<string, Match[]>>((acc, match) => {
+  const pinnedIds = new Set(pinnedMatches.map((m) => m.id));
+  const regularMatches = matches.filter((m) => !pinnedIds.has(m.id));
+
+  const grouped = regularMatches.reduce<Record<string, Match[]>>((acc, match) => {
     const key = getMatchCalendarDay(match.matchTime);
     if (!acc[key]) acc[key] = [];
     acc[key].push(match);
@@ -237,6 +246,7 @@ export default function MatchesPage() {
   }, {});
 
   const sortedDays = Object.keys(grouped).sort();
+  const showPinnedSection = page === 1 && pinnedMatches.length > 0;
   const pageLabel =
     meta.pageKind === "open" ? t.matches.pageOpen : t.matches.pageOther;
 
@@ -290,7 +300,7 @@ export default function MatchesPage() {
 
       {error && <ErrorMessage message={error} />}
 
-      {matches.length === 0 ? (
+      {matches.length === 0 && pinnedMatches.length === 0 ? (
         <div className="rounded-xl border border-card-border bg-card p-12 text-center text-muted">
           <p>{t.matches.noMatches}</p>
           <p className="mt-2 text-xs">{t.matches.syncHint}</p>
@@ -307,6 +317,32 @@ export default function MatchesPage() {
           </div>
 
           <div className="space-y-8">
+            {showPinnedSection && (
+              <section className="rounded-2xl border border-primary/25 bg-primary/5 p-4 md:p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-primary/20 pb-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-primary">
+                      {t.matches.yourMatchesToday}
+                    </h3>
+                    <p className="mt-1 text-xs text-muted">
+                      {t.matches.yourMatchesTodayHint}
+                    </p>
+                  </div>
+                  <Link
+                    href="/predictions"
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    {t.predictions.title} →
+                  </Link>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {pinnedMatches.map((match) => (
+                    <MatchCard key={match.id} match={match} showPredictButton />
+                  ))}
+                </div>
+              </section>
+            )}
+
             {sortedDays.map((dayKey) => (
               <section key={dayKey}>
                 <h3 className="mb-4 border-b border-card-border pb-2 text-base font-semibold text-foreground">
