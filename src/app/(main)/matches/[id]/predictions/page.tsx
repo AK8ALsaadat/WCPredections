@@ -48,24 +48,38 @@ export default function LeagueMatchPredictionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    Promise.all([
+  async function loadPredictions() {
+    const [predData, meData] = await Promise.all([
       fetch(`/api/matches/${matchId}/predictions`).then((r) => r.json()),
       fetch("/api/auth/me").then((r) => r.json()),
-    ])
-      .then(([predData, meData]) => {
-        if (predData.success) {
-          setData(predData.data);
-        } else {
-          setError(predData.error ?? t.errors.loadFailed);
-        }
-        if (meData.success) {
-          setCurrentUserId(meData.data.user?.userId);
-        }
-      })
+    ]);
+
+    if (predData.success) {
+      setData(predData.data);
+      setError("");
+    } else {
+      setError(predData.error ?? t.errors.loadFailed);
+    }
+    if (meData.success) {
+      setCurrentUserId(meData.data.user?.userId);
+    }
+  }
+
+  useEffect(() => {
+    loadPredictions()
       .catch(() => setError(t.errors.loadFailed))
       .finally(() => setLoading(false));
   }, [matchId, t.errors.loadFailed]);
+
+  useEffect(() => {
+    if (data?.match.status !== "LIVE") return;
+
+    const timer = setInterval(() => {
+      loadPredictions().catch(() => {});
+    }, 30_000);
+
+    return () => clearInterval(timer);
+  }, [data?.match.status, matchId]);
 
   if (loading) return <LoadingPage />;
   if (error || !data) {
@@ -73,10 +87,13 @@ export default function LeagueMatchPredictionsPage() {
   }
 
   const { match, predictions } = data;
+  const isLive = match.status === "LIVE";
   const isFinished =
     match.status === "FINISHED" &&
     match.homeScore != null &&
     match.awayScore != null;
+  const hasLiveScore =
+    isLive && match.homeScore != null && match.awayScore != null;
   const withDouble = predictions.filter((p) => p.prediction?.isDouble).length;
   const withBold = predictions.filter((p) => p.boldScorerBet).length;
   const hasScoringContext =
@@ -132,7 +149,7 @@ export default function LeagueMatchPredictionsPage() {
           </div>
 
           <div className="shrink-0 px-1 text-center md:px-2">
-            {isFinished ? (
+            {hasLiveScore || isFinished ? (
               <div className="text-2xl font-bold tabular-nums md:text-3xl">
                 {match.homeScore}
                 <span className="mx-1 text-muted md:mx-2">-</span>
@@ -142,6 +159,11 @@ export default function LeagueMatchPredictionsPage() {
               <span className="text-xl font-light text-muted md:text-2xl">
                 {t.matches.vs}
               </span>
+            )}
+            {hasLiveScore && (
+              <p className="mt-1 text-[10px] font-semibold text-warning">
+                {t.status.LIVE}
+              </p>
             )}
             {isFinished && (
               <p className="mt-1 text-[10px] font-medium text-primary">

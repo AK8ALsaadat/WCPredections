@@ -341,10 +341,65 @@ export class SportScoreProvider implements FootballApiProvider {
     );
   }
 
+  async buildSlugFromTeams(
+    homeName: string,
+    awayName: string
+  ): Promise<string> {
+    const { teamSlugByName } = await this.getStandingsMaps();
+    const homeSlug = teamSlugByName.get(homeName) ?? slugify(homeName);
+    const awaySlug = teamSlugByName.get(awayName) ?? slugify(awayName);
+    return `${homeSlug}-vs-${awaySlug}`;
+  }
+
+  private cachedStandings: {
+    teamSlugByName: Map<string, string>;
+    groupByTeamName: Map<string, string>;
+  } | null = null;
+
+  private async getStandingsMaps() {
+    if (this.cachedStandings) return this.cachedStandings;
+
+    const tables = await this.fetchStandingsTables();
+    const maps = this.buildTeamMaps(tables);
+    this.cachedStandings = maps;
+    return maps;
+  }
+
+  async fetchMatchBySlug(slug: string): Promise<ExternalMatch | null> {
+    const { teamSlugByName, groupByTeamName } = await this.getStandingsMaps();
+
+    const detail = await this.fetch<{
+      match: SportScoreMatchSummary & { url?: string };
+    }>("/api/widget/match/", {
+      sport: "football",
+      slug,
+    });
+
+    const raw = detail.match;
+    if (!raw || raw.competition !== "FIFA World Cup") return null;
+
+    return this.mapMatchSummary(
+      {
+        home: raw.home,
+        away: raw.away,
+        home_logo: raw.home_logo,
+        away_logo: raw.away_logo,
+        home_score: raw.home_score,
+        away_score: raw.away_score,
+        status: raw.status,
+        status_text: raw.status_text,
+        time: raw.time,
+        competition: raw.competition,
+        url: raw.url ?? `/football/match/${slug}/`,
+      },
+      teamSlugByName,
+      groupByTeamName
+    );
+  }
+
   async fetchMatches(options: SyncOptions): Promise<ExternalMatch[]> {
     if (options.quickSync) {
-      const quick = await this.fetchMatchesQuick();
-      if (quick.length > 0) return quick;
+      return this.fetchMatchesQuick();
     }
 
     return this.fetchMatchesFull();

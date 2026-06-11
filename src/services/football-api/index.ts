@@ -1,3 +1,4 @@
+import { addHours, subHours } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { applyRemappedMatchState } from "@/lib/wc-dates";
 import { advanceKnockoutTeams } from "@/services/knockout-advancement.service";
@@ -239,6 +240,56 @@ async function syncMatch(
   };
 }
 
+async function fetchSportScoreUpdatesForRound(
+  provider: SportScoreProvider,
+  roundId: string
+): Promise<ExternalMatch[]> {
+  const now = new Date();
+  const dbMatches = await prisma.match.findMany({
+    where: {
+      roundId,
+      matchTime: {
+        gte: subHours(now, 6),
+        lte: addHours(now, 3),
+      },
+    },
+    include: {
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+    },
+  });
+
+  const externals: ExternalMatch[] = [];
+  const seen = new Set<string>();
+
+  for (const row of dbMatches) {
+    const slugCandidates = [
+      row.apiMatchId,
+      await provider.buildSlugFromTeams(
+        row.homeTeam.name,
+        row.awayTeam.name
+      ),
+    ].filter((slug): slug is string => Boolean(slug));
+
+    for (const slug of slugCandidates) {
+      if (seen.has(slug)) continue;
+
+      try {
+        const external = await provider.fetchMatchBySlug(slug);
+        if (external) {
+          seen.add(external.apiId);
+          externals.push(external);
+          break;
+        }
+      } catch {
+        // جرّب الـ slug التالي
+      }
+    }
+  }
+
+  return externals;
+}
+
 export async function syncMatchesFromApi(
   roundId: string,
   options: SyncOptions = {}
@@ -248,11 +299,29 @@ export async function syncMatchesFromApi(
   const round = await prisma.round.findUnique({ where: { id: roundId } });
   if (!round) throw new Error("Round not found");
 
-  const teams = await syncTeams(provider, options);
+  const isSportScoreQuick =
+    provider.name === "sportscore" && options.quickSync === true;
+
+  const teams = isSportScoreQuick
+    ? []
+    : await syncTeams(provider, options);
   const skipPlayers =
     process.env.SYNC_PLAYERS === "false" || provider.name === "sportscore";
   const playersCount = skipPlayers ? 0 : await syncPlayers(provider, options);
-  const externalMatches = await provider.fetchMatches(options);
+
+  let externalMatches = await provider.fetchMatches(options);
+
+  if (provider.name === "sportscore") {
+    const dbUpdates = await fetchSportScoreUpdatesForRound(
+      provider as SportScoreProvider,
+      roundId
+    );
+    const merged = new Map(externalMatches.map((m) => [m.apiId, m]));
+    for (const match of dbUpdates) {
+      merged.set(match.apiId, match);
+    }
+    externalMatches = Array.from(merged.values());
+  }
 
   let created = 0;
   let updated = 0;

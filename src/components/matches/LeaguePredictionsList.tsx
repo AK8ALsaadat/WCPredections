@@ -473,11 +473,17 @@ function ScoreboardTeamsHeader({
   homeTeam,
   awayTeam,
   compact = false,
+  actualHomeScore,
+  actualAwayScore,
 }: {
   homeTeam: LeagueTeamInfo;
   awayTeam: LeagueTeamInfo;
   compact?: boolean;
+  actualHomeScore?: number;
+  actualAwayScore?: number;
 }) {
+  const showActual =
+    actualHomeScore != null && actualAwayScore != null;
   return (
     <div
       className={`flex items-center justify-center gap-2 ${compact ? "text-[10px]" : "text-[11px]"}`}
@@ -487,7 +493,13 @@ function ScoreboardTeamsHeader({
         <TeamLogo {...homeTeam} size="sm" />
         <span className="truncate font-medium uppercase">{homeTeam.shortName}</span>
       </div>
-      <span className="shrink-0 text-muted/50">-</span>
+      <span
+        className={`shrink-0 tabular-nums font-bold ${
+          showActual ? "text-primary" : "text-muted/50"
+        }`}
+      >
+        {showActual ? `${actualHomeScore}-${actualAwayScore}` : "-"}
+      </span>
       <div className="flex min-w-0 max-w-[42%] items-center gap-1">
         <TeamLogo {...awayTeam} size="sm" />
         <span className="truncate font-medium uppercase">{awayTeam.shortName}</span>
@@ -529,7 +541,21 @@ export function LeaguePredictionsList({
         <span className="mb-2 block text-center text-[10px] font-medium uppercase tracking-wide text-muted md:mb-0 md:text-end md:text-[11px]">
           {t.matches.scoreboardPlayer}
         </span>
-        <ScoreboardTeamsHeader homeTeam={homeTeam} awayTeam={awayTeam} compact />
+        <ScoreboardTeamsHeader
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
+          compact
+          actualHomeScore={
+            matchStatus === "LIVE" || isFinished
+              ? matchResult?.homeScore
+              : undefined
+          }
+          actualAwayScore={
+            matchStatus === "LIVE" || isFinished
+              ? matchResult?.awayScore
+              : undefined
+          }
+        />
       </div>
 
       <ul className="divide-y divide-card-border/80">
