@@ -5,57 +5,145 @@ import { MatchCard } from "@/components/matches/MatchCard";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Select } from "@/components/ui/Select";
+import { Pagination } from "@/components/ui/Pagination";
 import { formatDayHeader, getPredictionTimezone } from "@/lib/utils";
+import {
+  isClientCacheFresh,
+  readClientCache,
+  writeClientCache,
+} from "@/lib/client-page-cache";
 import { ar } from "@/lib/i18n/ar";
 
 type Round = { id: string; name: string };
 type Match = Parameters<typeof MatchCard>[0]["match"];
 
-const REFRESH_MS = 300_000; // 5 دقائق — من قاعدة البيانات فقط بدون API
+type MatchesPageMeta = {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  pageKind: "open" | "other";
+  openCount: number;
+};
+
+type MatchesPageCache = {
+  matches: Match[];
+  meta: MatchesPageMeta;
+};
+
+const REFRESH_MS = 300_000;
+
+function matchesCacheKey(roundId: string, page: number) {
+  return `matches:${roundId || "all"}:${page}`;
+}
 
 export default function MatchesPage() {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [rounds, setRounds] = useState<Round[]>([]);
+  const [rounds, setRounds] = useState<Round[]>(() =>
+    readClientCache<Round[]>("rounds") ?? []
+  );
   const [selectedRound, setSelectedRound] = useState("");
+  const [page, setPage] = useState(1);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [meta, setMeta] = useState<MatchesPageMeta>({
+    page: 1,
+    totalPages: 1,
+    totalItems: 0,
+    pageKind: "open",
+    openCount: 0,
+  });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   const predictionTimezone = getPredictionTimezone();
+  const cacheKey = matchesCacheKey(selectedRound, page);
 
-  const loadMatches = useCallback(async (showLoader = false) => {
-    if (showLoader) setLoading(true);
-    const params = new URLSearchParams({ schedule: "true" });
-    if (selectedRound) params.set("roundId", selectedRound);
+  const applyCache = useCallback((cached: MatchesPageCache) => {
+    setMatches(cached.matches);
+    setMeta(cached.meta);
+    setLoading(false);
+  }, []);
 
-    try {
-      const res = await fetch(`/api/matches?${params}`);
-      const data = await res.json();
-      if (data.success) {
-        setMatches(data.data);
-        setLastUpdate(new Date());
-        setError("");
-      } else {
-        setError(data.error);
+  const loadMatches = useCallback(
+    async (opts?: { showLoader?: boolean; force?: boolean }) => {
+      const cached = readClientCache<MatchesPageCache>(cacheKey);
+      if (cached) applyCache(cached);
+
+      if (cached && !opts?.force && isClientCacheFresh(cacheKey)) {
+        return;
       }
-    } catch {
-      setError(ar.errors.loadFailed);
-    } finally {
-      if (showLoader) setLoading(false);
-    }
-  }, [selectedRound]);
+
+      if (opts?.showLoader && !cached) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      const params = new URLSearchParams({
+        schedule: "true",
+        paginated: "true",
+        page: String(page),
+      });
+      if (selectedRound) params.set("roundId", selectedRound);
+
+      try {
+        const res = await fetch(`/api/matches?${params}`);
+        const data = await res.json();
+        if (data.success) {
+          const payload: MatchesPageCache = {
+            matches: data.data.matches,
+            meta: {
+              page: data.data.page,
+              totalPages: data.data.totalPages,
+              totalItems: data.data.totalItems,
+              pageKind: data.data.pageKind,
+              openCount: data.data.openCount,
+            },
+          };
+          writeClientCache(cacheKey, payload);
+          setMatches(payload.matches);
+          setMeta(payload.meta);
+          setLastUpdate(new Date());
+          setError("");
+        } else {
+          setError(data.error);
+        }
+      } catch {
+        if (!cached) setError(ar.errors.loadFailed);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [applyCache, cacheKey, page, selectedRound]
+  );
 
   useEffect(() => {
+    const cachedRounds = readClientCache<Round[]>("rounds");
+    if (cachedRounds) setRounds(cachedRounds);
+
     fetch("/api/rounds")
       .then((r) => r.json())
       .then((data) => {
-        if (data.success) setRounds(data.data);
+        if (data.success) {
+          writeClientCache("rounds", data.data);
+          setRounds(data.data);
+        }
       });
   }, []);
 
   useEffect(() => {
-    loadMatches(true);
-    const interval = setInterval(() => loadMatches(false), REFRESH_MS);
+    const cached = readClientCache<MatchesPageCache>(cacheKey);
+    if (cached) {
+      applyCache(cached);
+    } else {
+      setLoading(true);
+    }
+    void loadMatches({ showLoader: !cached });
+  }, [applyCache, cacheKey, loadMatches]);
+
+  useEffect(() => {
+    const interval = setInterval(() => loadMatches({ force: true }), REFRESH_MS);
     return () => clearInterval(interval);
   }, [loadMatches]);
 
@@ -69,6 +157,8 @@ export default function MatchesPage() {
   }, {});
 
   const sortedDays = Object.keys(grouped).sort();
+  const pageLabel =
+    meta.pageKind === "open" ? ar.matches.pageOpen : ar.matches.pageOther;
 
   if (loading && matches.length === 0) return <LoadingPage />;
 
@@ -81,6 +171,9 @@ export default function MatchesPage() {
           {lastUpdate && (
             <p className="mt-1 text-xs text-muted">
               آخر تحديث: {lastUpdate.toLocaleTimeString("ar-SA")} · بيانات رسمية من football-data.org
+              {refreshing && (
+                <span className="mr-2 text-primary"> · {ar.matches.refreshing}</span>
+              )}
             </p>
           )}
         </div>
@@ -89,7 +182,10 @@ export default function MatchesPage() {
             <Select
               label={ar.matches.filterRound}
               value={selectedRound}
-              onChange={(e) => setSelectedRound(e.target.value)}
+              onChange={(e) => {
+                setSelectedRound(e.target.value);
+                setPage(1);
+              }}
               options={[
                 { value: "", label: ar.matches.allRounds },
                 ...rounds.map((r) => ({ value: r.id, label: r.name })),
@@ -118,19 +214,41 @@ export default function MatchesPage() {
           <p className="mt-2 text-xs">انتظر المزامنة أو اطلب من المشرف تشغيلها من لوحة الإدارة</p>
         </div>
       ) : (
-        <div className="space-y-8">
-          {sortedDays.map((dayKey) => (
-            <section key={dayKey}>
-              <h2 className="mb-4 border-b border-card-border pb-2 text-lg font-semibold text-primary">
-                {formatDayHeader(dayKey)}
-              </h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                {grouped[dayKey].map((match) => (
-                  <MatchCard key={match.id} match={match} showPredictButton />
-                ))}
-              </div>
-            </section>
-          ))}
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-primary">{pageLabel}</h2>
+            {meta.openCount > 0 && meta.pageKind === "open" && (
+              <span className="text-sm text-muted">
+                {meta.openCount} مباراة مفتوحة للتوقع
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-8">
+            {sortedDays.map((dayKey) => (
+              <section key={dayKey}>
+                <h3 className="mb-4 border-b border-card-border pb-2 text-base font-semibold text-foreground">
+                  {formatDayHeader(dayKey)}
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {grouped[dayKey].map((match) => (
+                    <MatchCard key={match.id} match={match} showPredictButton />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+
+          <Pagination
+            page={meta.page}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            labels={{
+              previous: ar.matches.paginationPrevious,
+              next: ar.matches.paginationNext,
+              pageOf: ar.matches.paginationPageOf,
+            }}
+          />
         </div>
       )}
     </div>

@@ -45,46 +45,84 @@ function RankStatCard({
   );
 }
 
-function RoundStatsInline({
-  myPoints,
-  averagePoints,
-  participantCount,
-  pointsSoFarLabel,
-  pointsAverageLabel,
+function StatPill({
+  label,
+  value,
+  tone = "neutral",
+  footer,
 }: {
-  myPoints: number;
-  averagePoints: number;
-  participantCount: number;
-  pointsSoFarLabel: string;
-  pointsAverageLabel: string;
+  label: string;
+  value: number | string;
+  tone?: "primary" | "warning" | "neutral";
+  footer?: string;
 }) {
-  const avgDisplay = participantCount > 0 ? averagePoints : "—";
+  const valueClass =
+    tone === "primary"
+      ? "text-primary"
+      : tone === "warning"
+        ? typeof value === "number" && value < 0
+          ? "text-danger"
+          : typeof value === "number" && value > 0
+            ? "text-warning"
+            : "text-muted"
+        : "text-foreground";
+
+  const borderClass =
+    tone === "primary"
+      ? "border-primary/25 bg-primary/10"
+      : tone === "warning"
+        ? "border-warning/25 bg-warning/10"
+        : "border-card-border bg-background/40";
 
   return (
-    <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:gap-3">
-      <div className="rounded-xl border border-warning/25 bg-warning/10 px-4 py-3 text-center sm:min-w-[9rem]">
-        <p className="text-[11px] leading-tight text-muted">{pointsSoFarLabel}</p>
-        <p
-          className={`mt-1 text-2xl font-bold tabular-nums ${
-            myPoints > 0
-              ? "text-warning"
-              : myPoints < 0
-                ? "text-danger"
-                : "text-muted"
-          }`}
-        >
-          {myPoints}
-        </p>
-      </div>
-      <div className="rounded-xl border border-card-border bg-background/40 px-4 py-3 text-center sm:min-w-[9rem]">
-        <p className="text-[11px] leading-tight text-muted">{pointsAverageLabel}</p>
-        <p className="mt-1 text-2xl font-bold tabular-nums">{avgDisplay}</p>
-        {participantCount > 0 && (
-          <p className="mt-1 text-[10px] text-muted">
-            {ar.dashboard.roundParticipants(participantCount)}
-          </p>
-        )}
-      </div>
+    <div
+      className={`min-w-[7.5rem] flex-1 rounded-xl border px-3 py-3 text-center sm:min-w-[8.5rem] sm:px-4 ${borderClass}`}
+    >
+      <p className="text-[11px] leading-tight text-muted">{label}</p>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${valueClass}`}>
+        {value}
+      </p>
+      {footer && (
+        <p className="mt-1 text-[10px] text-muted">{footer}</p>
+      )}
+    </div>
+  );
+}
+
+function DashboardHeaderStats({
+  roundPoints,
+  tournamentPoints,
+  roundAverage,
+  participantCount,
+}: {
+  roundPoints: number;
+  tournamentPoints: number;
+  roundAverage: number;
+  participantCount: number;
+}) {
+  const avgDisplay = participantCount > 0 ? roundAverage : "—";
+
+  return (
+    <div className="flex w-full flex-wrap gap-2 sm:gap-3 md:w-auto md:max-w-xl">
+      <StatPill
+        label={ar.dashboard.roundPoints}
+        value={roundPoints}
+        tone="warning"
+      />
+      <StatPill
+        label={ar.dashboard.tournamentPoints}
+        value={tournamentPoints}
+        tone="primary"
+      />
+      <StatPill
+        label={ar.dashboard.roundAverage}
+        value={avgDisplay}
+        footer={
+          participantCount > 0
+            ? ar.dashboard.roundParticipants(participantCount)
+            : undefined
+        }
+      />
     </div>
   );
 }
@@ -109,23 +147,27 @@ export default async function DashboardPage() {
     ? `/leaderboard/round/${data.tournamentRound.id}`
     : "/leaderboard/overall";
 
-  const headerStats =
-    data.hasSubRound && subRoundStats ? subRoundStats : tournamentStats;
-  const headerStatsLabels =
+  const headerRoundPoints =
     data.hasSubRound && subRoundStats
-      ? {
-          pointsSoFar: ar.dashboard.roundPointsSoFar,
-          pointsAverage: ar.dashboard.roundPointsAverage,
-        }
-      : {
-          pointsSoFar: ar.dashboard.tournamentPointsSoFar,
-          pointsAverage: ar.dashboard.tournamentPointsAverage,
-        };
+      ? subRoundStats.myPoints
+      : tournamentStats.myPoints;
+  const headerTournamentPoints =
+    data.hasSubRound && subRoundStats
+      ? tournamentStats.myPoints
+      : data.totalPoints;
+  const headerRoundAverage =
+    data.hasSubRound && subRoundStats
+      ? subRoundStats.averagePoints
+      : tournamentStats.averagePoints;
+  const headerParticipants =
+    data.hasSubRound && subRoundStats
+      ? subRoundStats.participantCount
+      : tournamentStats.participantCount;
 
   return (
     <div className="space-y-6 md:space-y-8">
       <div className="rounded-2xl border border-primary/20 bg-gradient-to-l from-primary/10 via-card to-card p-4 md:p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-5">
+        <div className="flex flex-col gap-4 md:gap-5">
           <div>
             <h1 className="text-xl font-bold md:text-3xl">
               {ar.dashboard.welcome}،{" "}
@@ -134,36 +176,18 @@ export default async function DashboardPage() {
             <p className="mt-1 text-muted">{ar.dashboard.hub}</p>
             <p className="mt-1 text-xs text-muted/80">{tournamentName}</p>
           </div>
-          <RoundStatsInline
-            myPoints={headerStats.myPoints}
-            averagePoints={headerStats.averagePoints}
-            participantCount={headerStats.participantCount}
-            pointsSoFarLabel={headerStatsLabels.pointsSoFar}
-            pointsAverageLabel={headerStatsLabels.pointsAverage}
+          <DashboardHeaderStats
+            roundPoints={headerRoundPoints}
+            tournamentPoints={headerTournamentPoints}
+            roundAverage={headerRoundAverage}
+            participantCount={headerParticipants}
           />
         </div>
       </div>
 
       <div
-        className={`grid grid-cols-2 gap-3 md:gap-4 ${data.hasSubRound ? "md:grid-cols-3" : ""}`}
+        className={`grid grid-cols-2 gap-3 md:gap-4 ${data.hasSubRound ? "md:grid-cols-2" : "md:grid-cols-2"}`}
       >
-        <Card className="col-span-2 border-primary/15 md:col-span-1">
-          <p className="text-xs text-muted md:text-sm">
-            {ar.dashboard.totalPoints}
-          </p>
-          <p
-            className={`mt-1 text-2xl font-bold tabular-nums md:text-3xl ${
-              data.totalPoints > 0
-                ? "text-primary"
-                : data.totalPoints < 0
-                  ? "text-danger"
-                  : "text-muted"
-            }`}
-          >
-            {data.totalPoints}
-          </p>
-        </Card>
-
         {data.hasSubRound && subRoundStats && (
           <RankStatCard
             href={subRoundLbHref}

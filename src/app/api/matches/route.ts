@@ -1,4 +1,8 @@
 import { apiSuccess, handleApiError } from "@/lib/api";
+import {
+  paginateSchedule,
+  SCHEDULE_PAGE_SIZE,
+} from "@/lib/schedule-pagination";
 import { getCurrentUser } from "@/lib/session";
 import {
   getUpcomingMatches,
@@ -13,6 +17,12 @@ export async function GET(request: Request) {
     const roundId = searchParams.get("roundId") ?? undefined;
     const upcoming = searchParams.get("upcoming") === "true";
     const schedule = searchParams.get("schedule") === "true";
+    const paginated = searchParams.get("paginated") === "true";
+    const page = Math.max(1, Number.parseInt(searchParams.get("page") ?? "1", 10) || 1);
+    const pageSize = Math.min(
+      24,
+      Math.max(1, Number.parseInt(searchParams.get("pageSize") ?? String(SCHEDULE_PAGE_SIZE), 10) || SCHEDULE_PAGE_SIZE)
+    );
 
     const user = await getCurrentUser();
     const raw = schedule
@@ -20,6 +30,12 @@ export async function GET(request: Request) {
       : upcoming
         ? await getUpcomingMatches(roundId)
         : await getAllMatches(roundId);
+
+    if (schedule && paginated) {
+      const { items, meta } = paginateSchedule(raw, page, pageSize);
+      const matches = await enrichMatchesWithUserPredictions(items, user?.userId);
+      return apiSuccess({ matches, ...meta });
+    }
 
     const matches = await enrichMatchesWithUserPredictions(raw, user?.userId);
 

@@ -10,6 +10,11 @@ import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { formatDateShort } from "@/lib/utils";
 import Link from "next/link";
 import { ar } from "@/lib/i18n/ar";
+import {
+  isClientCacheFresh,
+  readClientCache,
+  writeClientCache,
+} from "@/lib/client-page-cache";
 
 type ProfileData = {
   username: string;
@@ -47,10 +52,16 @@ type ProfileData = {
   };
 };
 
+const PROFILE_CACHE_KEY = "profile";
+
 export default function ProfilePage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<ProfileData | null>(() =>
+    readClientCache<ProfileData>(PROFILE_CACHE_KEY)
+  );
+  const [loading, setLoading] = useState(
+    () => !readClientCache<ProfileData>(PROFILE_CACHE_KEY)
+  );
   const [error, setError] = useState("");
   const [newUsername, setNewUsername] = useState("");
   const [usernameError, setUsernameError] = useState("");
@@ -58,17 +69,32 @@ export default function ProfilePage() {
   const [savingUsername, setSavingUsername] = useState(false);
 
   useEffect(() => {
+    const cached = readClientCache<ProfileData>(PROFILE_CACHE_KEY);
+    if (cached) {
+      setProfile(cached);
+      setNewUsername(cached.username);
+      setLoading(false);
+    }
+
+    if (cached && isClientCacheFresh(PROFILE_CACHE_KEY)) {
+      return;
+    }
+
     fetch("/api/profile")
       .then((r) => r.json())
       .then((data) => {
         if (data.success) {
+          writeClientCache(PROFILE_CACHE_KEY, data.data);
           setProfile(data.data);
           setNewUsername(data.data.username);
-        } else {
+          setError("");
+        } else if (!cached) {
           setError(data.error);
         }
       })
-      .catch(() => setError(ar.errors.loadFailed))
+      .catch(() => {
+        if (!cached) setError(ar.errors.loadFailed);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -105,7 +131,12 @@ export default function ProfilePage() {
       }
 
       const updated = data.data.user.username as string;
-      setProfile((prev) => (prev ? { ...prev, username: updated } : prev));
+      setProfile((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev, username: updated };
+        writeClientCache(PROFILE_CACHE_KEY, next);
+        return next;
+      });
       setNewUsername(updated);
       setUsernameSuccess(ar.profile.usernameUpdated);
       router.refresh();
