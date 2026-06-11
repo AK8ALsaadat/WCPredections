@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { MatchCard } from "@/components/matches/MatchCard";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
@@ -61,19 +61,30 @@ export default function MatchesPage() {
 
   const predictionTimezone = getPredictionTimezone();
   const cacheKey = matchesCacheKey(selectedRound, page);
+  const loadSeq = useRef(0);
 
-  const applyCache = useCallback((cached: MatchesPageCache) => {
+  const applyCache = useCallback((cached: MatchesPageCache, activePage: number) => {
     setMatches(cached.matches);
     setMeta(cached.meta);
+    setPage(activePage);
     setLoading(false);
   }, []);
 
   const loadMatches = useCallback(
-    async (opts?: { showLoader?: boolean; force?: boolean }) => {
-      const cached = readClientCache<MatchesPageCache>(cacheKey);
-      if (cached) applyCache(cached);
+    async (
+      targetPage: number,
+      targetRound: string,
+      opts?: { showLoader?: boolean; force?: boolean; signal?: AbortSignal }
+    ) => {
+      const requestKey = matchesCacheKey(targetRound, targetPage);
+      const seq = ++loadSeq.current;
 
-      if (cached && !opts?.force && isClientCacheFresh(cacheKey)) {
+      const cached = readClientCache<MatchesPageCache>(requestKey);
+      if (cached && seq === loadSeq.current) {
+        applyCache(cached, targetPage);
+      }
+
+      if (cached && !opts?.force && isClientCacheFresh(requestKey)) {
         return;
       }
 
@@ -86,40 +97,61 @@ export default function MatchesPage() {
       const params = new URLSearchParams({
         schedule: "true",
         paginated: "true",
-        page: String(page),
+        page: String(targetPage),
       });
-      if (selectedRound) params.set("roundId", selectedRound);
+      if (targetRound) params.set("roundId", targetRound);
 
       try {
-        const res = await fetch(`/api/matches?${params}`);
+        const res = await fetch(`/api/matches?${params}`, {
+          signal: opts?.signal,
+        });
+        if (seq !== loadSeq.current) return;
+
         const data = await res.json();
+        if (seq !== loadSeq.current) return;
+
         if (data.success) {
+          const resolvedPage = data.data.page as number;
           const payload: MatchesPageCache = {
             matches: data.data.matches,
             meta: {
-              page: data.data.page,
+              page: resolvedPage,
               totalPages: data.data.totalPages,
               totalItems: data.data.totalItems,
               pageKind: data.data.pageKind,
               openCount: data.data.openCount,
             },
           };
-          writeClientCache(cacheKey, payload);
+          writeClientCache(matchesCacheKey(targetRound, resolvedPage), payload);
           setMatches(payload.matches);
           setMeta(payload.meta);
+          setPage(resolvedPage);
           setLastUpdate(new Date());
           setError("");
         } else {
           setError(data.error);
         }
-      } catch {
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (seq !== loadSeq.current) return;
         if (!cached) setError(ar.errors.loadFailed);
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (seq === loadSeq.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [applyCache, cacheKey, page, selectedRound]
+    [applyCache]
+  );
+
+  const handlePageChange = useCallback(
+    (nextPage: number) => {
+      if (nextPage < 1 || nextPage > meta.totalPages) return;
+      setPage(nextPage);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [meta.totalPages]
   );
 
   useEffect(() => {
@@ -137,19 +169,30 @@ export default function MatchesPage() {
   }, []);
 
   useEffect(() => {
+    const abort = new AbortController();
     const cached = readClientCache<MatchesPageCache>(cacheKey);
+
     if (cached) {
-      applyCache(cached);
+      applyCache(cached, cached.meta.page);
     } else {
       setLoading(true);
     }
-    void loadMatches({ showLoader: !cached });
-  }, [applyCache, cacheKey, loadMatches]);
+
+    void loadMatches(page, selectedRound, {
+      showLoader: !cached,
+      signal: abort.signal,
+    });
+
+    return () => abort.abort();
+  }, [applyCache, cacheKey, loadMatches, page, selectedRound]);
 
   useEffect(() => {
-    const interval = setInterval(() => loadMatches({ force: true }), REFRESH_MS);
+    const interval = setInterval(
+      () => loadMatches(page, selectedRound, { force: true }),
+      REFRESH_MS
+    );
     return () => clearInterval(interval);
-  }, [loadMatches]);
+  }, [loadMatches, page, selectedRound]);
 
   useEffect(() => {
     matches
@@ -273,9 +316,9 @@ export default function MatchesPage() {
           </div>
 
           <Pagination
-            page={meta.page}
+            page={page}
             totalPages={meta.totalPages}
-            onPageChange={setPage}
+            onPageChange={handlePageChange}
             labels={{
               previous: ar.matches.paginationPrevious,
               next: ar.matches.paginationNext,

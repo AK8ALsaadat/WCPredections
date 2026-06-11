@@ -12,6 +12,20 @@ type PaginationProps = {
   };
 };
 
+function buildPageList(page: number, totalPages: number): number[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const pages = new Set<number>([1, totalPages, page]);
+  if (page > 1) pages.add(page - 1);
+  if (page < totalPages) pages.add(page + 1);
+  if (page > 2) pages.add(page - 2);
+  if (page < totalPages - 1) pages.add(page + 2);
+
+  return Array.from(pages).sort((a, b) => a - b);
+}
+
 export function Pagination({
   page,
   totalPages,
@@ -21,12 +35,12 @@ export function Pagination({
 }: PaginationProps) {
   if (totalPages <= 1) return null;
 
-  const pages = Array.from({ length: totalPages }, (_, i) => i + 1).filter(
-    (p) =>
-      p === 1 ||
-      p === totalPages ||
-      (p >= page - 1 && p <= page + 1)
-  );
+  const pages = buildPageList(page, totalPages);
+
+  function goTo(nextPage: number) {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === page) return;
+    onPageChange(nextPage);
+  }
 
   return (
     <nav
@@ -36,7 +50,7 @@ export function Pagination({
       <button
         type="button"
         disabled={page <= 1}
-        onClick={() => onPageChange(page - 1)}
+        onClick={() => goTo(page - 1)}
         className="rounded-lg border border-card-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
       >
         {labels.previous}
@@ -53,12 +67,13 @@ export function Pagination({
               )}
               <button
                 type="button"
-                onClick={() => onPageChange(p)}
+                aria-current={p === page ? "page" : undefined}
+                onClick={() => goTo(p)}
                 className={cn(
-                  "min-w-9 rounded-lg border px-2 py-2 text-sm tabular-nums",
+                  "min-w-9 rounded-lg border px-2 py-2 text-sm tabular-nums transition-colors",
                   p === page
                     ? "border-primary bg-primary/15 text-primary"
-                    : "border-card-border hover:border-primary/40"
+                    : "border-card-border hover:border-primary/40 hover:bg-primary/5"
                 )}
               >
                 {p}
@@ -71,7 +86,7 @@ export function Pagination({
       <button
         type="button"
         disabled={page >= totalPages}
-        onClick={() => onPageChange(page + 1)}
+        onClick={() => goTo(page + 1)}
         className="rounded-lg border border-card-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
       >
         {labels.next}
