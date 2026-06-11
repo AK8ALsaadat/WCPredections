@@ -67,6 +67,19 @@ export function isMatchStarted(matchTime: Date | string): boolean {
   return new Date(matchTime) <= new Date();
 }
 
+/** التشكيلة الرسمية غالباً تنزل قبل المباراة بساعة */
+export const LINEUP_FAST_REFRESH_BEFORE_MS = 60 * 60 * 1000;
+
+export function msUntilMatchKickoff(matchTime: Date | string): number {
+  return new Date(matchTime).getTime() - Date.now();
+}
+
+/** نافذة التحديث السريع: من ساعة قبل البداية حتى 30 دقيقة بعدها */
+export function isWithinLineupFastRefreshWindow(matchTime: Date | string): boolean {
+  const ms = msUntilMatchKickoff(matchTime);
+  return ms <= LINEUP_FAST_REFRESH_BEFORE_MS && ms > -30 * 60 * 1000;
+}
+
 function getCalendarDayInTz(instant: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,

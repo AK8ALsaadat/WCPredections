@@ -5,6 +5,7 @@ import {
   removeClientCache,
   writeClientCache,
 } from "@/lib/client-page-cache";
+import { isWithinLineupFastRefreshWindow } from "@/lib/utils";
 
 const MATCH_FRESH_MS = 300_000;
 const LINEUP_FRESH_MS = 600_000;
@@ -14,7 +15,13 @@ type LineupCacheMeta = {
   lineupStatus?: "official" | "probable" | "estimated";
 };
 
-function lineupFreshMs(lineup?: LineupCacheMeta | null) {
+function lineupFreshMs(
+  lineup?: LineupCacheMeta | null,
+  matchTime?: string | Date | null
+) {
+  if (!matchTime || !isWithinLineupFastRefreshWindow(matchTime)) {
+    return LINEUP_FRESH_MS;
+  }
   return lineup?.lineupStatus === "official"
     ? LINEUP_FRESH_MS
     : LINEUP_PROBABLE_FRESH_MS;
@@ -77,8 +84,14 @@ async function fetchPredictMatch(matchId: string) {
 
 async function fetchPredictLineup(matchId: string) {
   const cached = readClientCache<LineupCacheMeta>(predictLineupCacheKey(matchId));
+  const matchCached = readClientCache<{ matchTime?: string }>(
+    predictMatchCacheKey(matchId)
+  );
+  const inFastWindow =
+    matchCached?.matchTime &&
+    isWithinLineupFastRefreshWindow(matchCached.matchTime);
   const freshParam =
-    cached?.lineupStatus && cached.lineupStatus !== "official" ? "?fresh=1" : "";
+    inFastWindow && cached?.lineupStatus !== "official" ? "?fresh=1" : "";
   const res = await fetch(`/api/matches/${matchId}/lineup${freshParam}`, {
     credentials: "same-origin",
   });
@@ -149,9 +162,12 @@ export function prefetchPredictData(matchId: string) {
   const cachedLineup = readClientCache<LineupCacheMeta>(
     predictLineupCacheKey(matchId)
   );
+  const matchCached = readClientCache<{ matchTime?: string }>(
+    predictMatchCacheKey(matchId)
+  );
   const lineupFresh = isClientCacheFresh(
     predictLineupCacheKey(matchId),
-    lineupFreshMs(cachedLineup)
+    lineupFreshMs(cachedLineup, matchCached?.matchTime)
   );
   if (matchFresh && lineupFresh) return Promise.resolve();
 
@@ -195,7 +211,11 @@ export function isPredictMatchCacheFresh(matchId: string) {
 
 export function isPredictLineupCacheFresh(matchId: string) {
   const cached = readPredictLineupCache<LineupCacheMeta>(matchId);
-  return isClientCacheFresh(predictLineupCacheKey(matchId), lineupFreshMs(cached));
+  const matchCached = readPredictMatchCache<{ matchTime?: string }>(matchId);
+  return isClientCacheFresh(
+    predictLineupCacheKey(matchId),
+    lineupFreshMs(cached, matchCached?.matchTime)
+  );
 }
 
 export function hasPredictMatchCache(matchId: string) {

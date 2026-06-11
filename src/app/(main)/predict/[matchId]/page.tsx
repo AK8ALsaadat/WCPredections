@@ -29,6 +29,9 @@ import {
   formatDate,
   isPredictionAllowed,
   getPredictionLockReason,
+  isWithinLineupFastRefreshWindow,
+  LINEUP_FAST_REFRESH_BEFORE_MS,
+  msUntilMatchKickoff,
 } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import {
@@ -42,8 +45,30 @@ import type {
   MatchPlayerView,
 } from "@/services/match-players.service";
 
-const LINEUP_REFRESH_MS = 60_000;
-const LINEUP_REFRESH_PROBABLE_MS = 45_000;
+const LINEUP_FAST_POLL_MS = 45_000;
+
+async function fetchLineupForMatch(
+  matchId: string,
+  matchTime: string | Date | undefined,
+  options?: { fresh?: boolean }
+) {
+  const inFastWindow =
+    matchTime && isWithinLineupFastRefreshWindow(matchTime);
+  const cachedLineup = readPredictLineupCache<LineupData>(matchId);
+  const needsFresh =
+    options?.fresh ||
+    (inFastWindow &&
+      (!cachedLineup || cachedLineup.lineupStatus !== "official"));
+  const res = await clientFetch(
+    `/api/matches/${matchId}/lineup${needsFresh ? "?fresh=1" : ""}`
+  );
+  if (!res) return null;
+  const data = await res.json();
+  if (!data.success) return null;
+  const payload = data.data as LineupData;
+  writePredictLineupCache(matchId, payload);
+  return payload;
+}
 
 const PitchLineup = dynamic(
   () =>
@@ -284,6 +309,8 @@ export default function PredictPage() {
       if (cancelled) return;
       if (!silent && !readPredictLineupCache(matchId)) setLineupLoading(true);
 
+      const matchTime =
+        readPredictMatchCache<MatchData>(matchId)?.matchTime ?? match?.matchTime;
       const cachedLineup = readPredictLineupCache<LineupData>(matchId);
       if (
         !silent &&
@@ -294,24 +321,12 @@ export default function PredictPage() {
         return;
       }
 
-      const needsFresh =
-        silent || !cachedLineup || cachedLineup.lineupStatus !== "official";
-
       try {
-        const res = await clientFetch(
-          `/api/matches/${matchId}/lineup${needsFresh ? "?fresh=1" : ""}`,
-          {
-            signal: abort.signal,
-          }
-        );
-        if (!res) return;
-        const data = await res.json();
+        const payload = await fetchLineupForMatch(matchId, matchTime, {
+          fresh: silent,
+        });
         if (cancelled) return;
-        if (data.success) {
-          const payload = data.data as LineupData;
-          writePredictLineupCache(matchId, payload);
-          setLineup(payload);
-        }
+        if (payload) setLineup(payload);
       } catch (err) {
         if (isAbortError(err) || cancelled) return;
       } finally {
@@ -381,33 +396,45 @@ export default function PredictPage() {
   }, [matchId]);
 
   useEffect(() => {
-    const refreshMs =
-      lineup?.lineupStatus === "official"
-        ? LINEUP_REFRESH_MS
-        : LINEUP_REFRESH_PROBABLE_MS;
-    const interval = setInterval(() => {
-      void (async () => {
-        const cachedLineup = readPredictLineupCache<LineupData>(matchId);
-        const needsFresh =
-          !cachedLineup || cachedLineup.lineupStatus !== "official";
-        try {
-          const res = await clientFetch(
-            `/api/matches/${matchId}/lineup${needsFresh ? "?fresh=1" : ""}`
-          );
-          if (!res) return;
-          const data = await res.json();
-          if (data.success) {
-            const payload = data.data as LineupData;
-            writePredictLineupCache(matchId, payload);
-            setLineup(payload);
+    const matchTime = match?.matchTime;
+    if (!matchTime || lineup?.lineupStatus === "official") return;
+
+    let interval: ReturnType<typeof setInterval> | undefined;
+    let windowTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const startPolling = () => {
+      if (interval) return;
+      interval = setInterval(() => {
+        void fetchLineupForMatch(matchId, matchTime, { fresh: true }).then(
+          (payload) => {
+            if (payload) setLineup(payload);
           }
-        } catch {
-          /* ignore poll errors */
-        }
-      })();
-    }, refreshMs);
-    return () => clearInterval(interval);
-  }, [matchId, lineup?.lineupStatus]);
+        );
+      }, LINEUP_FAST_POLL_MS);
+    };
+
+    if (isWithinLineupFastRefreshWindow(matchTime)) {
+      startPolling();
+    } else {
+      const msUntilWindow =
+        msUntilMatchKickoff(matchTime) - LINEUP_FAST_REFRESH_BEFORE_MS;
+      if (msUntilWindow > 0) {
+        windowTimer = setTimeout(() => {
+          void fetchLineupForMatch(matchId, matchTime, { fresh: true }).then(
+            (payload) => {
+              if (payload) setLineup(payload);
+            }
+          );
+          startPolling();
+        }, msUntilWindow);
+      }
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+      if (windowTimer) clearTimeout(windowTimer);
+    };
+  }, [matchId, match?.matchTime, lineup?.lineupStatus]);
 
   function toggleScorer(playerId: string) {
     setScorerPicks((prev) => {

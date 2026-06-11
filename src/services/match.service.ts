@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { isWithinLineupFastRefreshWindow } from "@/lib/utils";
 import { getTournamentRoundName } from "@/lib/rounds";
 import type { MatchStatus } from "@prisma/client";
 import { getBoldScorerBetStatus } from "@/services/bold-scorer-bet.service";
@@ -250,8 +251,7 @@ export async function getMatchLineup(
     select: { matchTime: true },
   });
   const nearKickoff =
-    shell?.matchTime &&
-    shell.matchTime.getTime() - Date.now() <= 6 * 60 * 60 * 1000;
+    shell?.matchTime && isWithinLineupFastRefreshWindow(shell.matchTime);
 
   const data = await getCachedMatchLineup(matchId, Boolean(nearKickoff));
   if (data) {

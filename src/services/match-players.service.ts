@@ -1,5 +1,6 @@
 import { cachedFetch } from "@/lib/api-cache";
 import { buildExpectedLineup } from "@/lib/expected-lineup";
+import { isWithinLineupFastRefreshWindow } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import {
   fetchProbableLineupFromApiFootball,
@@ -71,11 +72,7 @@ function footballDataCacheKey(
 
 function lineupFetchTtlMs(matchTime?: Date | null): number {
   if (!matchTime) return 15 * 60 * 1000;
-  const msUntilKickoff = matchTime.getTime() - Date.now();
-  if (msUntilKickoff <= 0 && msUntilKickoff > -2 * 60 * 60 * 1000) {
-    return 30 * 1000;
-  }
-  if (msUntilKickoff > 0 && msUntilKickoff <= 6 * 60 * 60 * 1000) {
+  if (isWithinLineupFastRefreshWindow(matchTime)) {
     return 45 * 1000;
   }
   return 15 * 60 * 1000;
@@ -83,8 +80,7 @@ function lineupFetchTtlMs(matchTime?: Date | null): number {
 
 function shouldBypassLineupCache(matchTime?: Date | null): boolean {
   if (!matchTime) return false;
-  const msUntilKickoff = matchTime.getTime() - Date.now();
-  return msUntilKickoff > -30 * 60 * 1000 && msUntilKickoff <= 3 * 60 * 60 * 1000;
+  return isWithinLineupFastRefreshWindow(matchTime);
 }
 
 async function fetchFootballData<T>(
