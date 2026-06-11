@@ -359,6 +359,10 @@ export default function PredictPage() {
     })),
   ];
 
+  const selectedBoldPlayer = allLineupPlayers.find((p) => p.id === boldPlayerId);
+  const selectedBoldName =
+    selectedBoldPlayer?.name ?? match.userBoldScorerBet?.player?.name ?? "";
+
   const boldPlayerGroups =
     lineup && hasPlayers
       ? [
@@ -384,6 +388,22 @@ export default function PredictPage() {
           },
         ]
       : undefined;
+
+  const boldSelectOptions = [
+    {
+      value: "",
+      label: ar.predict.boldScorerBet.choosePlayer,
+      disabled: !boldPlayerId,
+    },
+    ...(boldPlayerId && selectedBoldName
+      ? [
+          {
+            value: boldPlayerId,
+            label: ar.predict.boldScorerBet.selectedWithCheck(selectedBoldName),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -555,17 +575,19 @@ export default function PredictPage() {
               label={ar.predict.boldScorerBet.selectPlayer}
               value={boldPlayerId}
               onChange={(e) => setBoldPlayerId(e.target.value)}
-              options={[{ value: "", label: ar.predict.boldScorerBet.none }]}
+              options={boldSelectOptions}
               groups={boldPlayerGroups}
             />
           )}
 
           {boldPlayerId && !boldLockedOnOther && hasPlayers && (
-            <p className="mt-3 text-sm font-medium text-warning">
-              {ar.predict.boldScorerBet.selected(
-                allLineupPlayers.find((p) => p.id === boldPlayerId)?.name ?? ""
-              )}
-            </p>
+            <button
+              type="button"
+              onClick={() => setBoldPlayerId("")}
+              className="mt-3 text-sm text-muted hover:text-danger"
+            >
+              {ar.predict.boldScorerBet.clearSelection}
+            </button>
           )}
         </Card>
 

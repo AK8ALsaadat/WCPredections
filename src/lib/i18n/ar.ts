@@ -237,8 +237,10 @@ export const ar = {
     boldScorerBet: {
       title: "البطاقة الجريئة",
       hint: "مرة واحدة كل جولة — لاعب واحد. إذا سجل في الملعب +4، إذا ما سجل −4",
-      selectPlayer: "اختر اللاعب للبطاقة الجريئة",
-      none: "بدون بطاقة جريئة",
+      selectPlayer: "البطاقة الجريئة",
+      choosePlayer: "اختر اللاعب",
+      selectedWithCheck: (name: string) => `✓ ${name}`,
+      clearSelection: "إزالة البطاقة",
       selected: (name: string) => `بطاقتك الجريئة: ${name}`,
       usedElsewhere: "استخدمت بطاقتك الجريئة في مباراة ثانية هالجولة — مرة واحدة بس",
       viewOtherMatch: "شوف المباراة",
