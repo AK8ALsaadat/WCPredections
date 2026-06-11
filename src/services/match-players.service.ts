@@ -3,7 +3,6 @@ import { buildExpectedLineup } from "@/lib/expected-lineup";
 import { isWithinLineupFastRefreshWindow } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import {
-  fetchCurrentMatchLineupsFromApiFootball,
   fetchProbableLineupFromApiFootball,
   type ExternalLineupPlayer,
 } from "@/services/api-football-lineup.service";
@@ -204,8 +203,7 @@ async function mapProbableLineupByName(
   teamId: string,
   formation: string | null,
   lineup: ExternalLineupPlayer[],
-  bench: ExternalLineupPlayer[],
-  source: LineupSource = "probable"
+  bench: ExternalLineupPlayer[]
 ): Promise<TeamPlayersView | null> {
   const squad = await prisma.player.findMany({ where: { teamId } });
   if (squad.length === 0) return null;
@@ -254,59 +252,8 @@ async function mapProbableLineupByName(
   return {
     formation,
     players: [...mappedLineup, ...mapSection(bench, "bench")],
-    source,
+    source: "probable",
   };
-}
-
-async function applyApiFootballOfficialLineups(
-  match: {
-    matchTime?: Date | null;
-    homeTeamId: string;
-    awayTeamId: string;
-    homeTeam: { name: string };
-    awayTeam: { name: string };
-  },
-  home: TeamPlayersView,
-  away: TeamPlayersView
-): Promise<{ home: TeamPlayersView; away: TeamPlayersView }> {
-  if (home.source === "official" && away.source === "official") {
-    return { home, away };
-  }
-  if (!match.matchTime) return { home, away };
-
-  const current = await fetchCurrentMatchLineupsFromApiFootball(
-    match.homeTeam.name,
-    match.awayTeam.name,
-    match.matchTime
-  );
-  if (!current) return { home, away };
-
-  let nextHome = home;
-  let nextAway = away;
-
-  if (home.source !== "official" && current.home) {
-    const mapped = await mapProbableLineupByName(
-      match.homeTeamId,
-      current.home.formation,
-      current.home.lineup,
-      current.home.bench,
-      "official"
-    );
-    if (mapped) nextHome = mapped;
-  }
-
-  if (away.source !== "official" && current.away) {
-    const mapped = await mapProbableLineupByName(
-      match.awayTeamId,
-      current.away.formation,
-      current.away.lineup,
-      current.away.bench,
-      "official"
-    );
-    if (mapped) nextAway = mapped;
-  }
-
-  return { home: nextHome, away: nextAway };
 }
 
 async function getCachedSquad(
@@ -684,7 +631,7 @@ export async function getMatchPlayersFromApi(match: {
       skipCache: nearKickoff,
     });
 
-    let [home, away] = await Promise.all([
+    const [home, away] = await Promise.all([
       getTeamPlayersForMatch(
         match.homeTeamId,
         match.homeTeam.apiTeamId,
@@ -698,8 +645,6 @@ export async function getMatchPlayersFromApi(match: {
         apiMatch.awayTeam
       ),
     ]);
-
-    ({ home, away } = await applyApiFootballOfficialLineups(match, home, away));
 
     return {
       home,

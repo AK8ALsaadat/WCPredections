@@ -7,9 +7,6 @@ export async function GET() {
     return apiSuccess({
       database: "connected",
       footballApi: process.env.FOOTBALL_API_PROVIDER ?? "api-football",
-      officialLineups:
-        !!process.env.API_FOOTBALL_KEY &&
-        process.env.LINEUP_USE_API_FOOTBALL !== "false",
       autoSync: process.env.ENABLE_AUTO_SYNC !== "false",
     });
   } catch (error) {

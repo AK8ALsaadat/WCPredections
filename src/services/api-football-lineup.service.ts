@@ -32,8 +32,7 @@ function isEnabled() {
 
 async function apiFetch<T>(
   endpoint: string,
-  params: Record<string, string>,
-  ttlMs = 60 * 60 * 1000
+  params: Record<string, string>
 ): Promise<T[]> {
   const baseUrl =
     process.env.API_FOOTBALL_BASE_URL ?? "https://v3.football.api-sports.io";
@@ -71,129 +70,7 @@ async function apiFetch<T>(
     }
 
     return data.response ?? [];
-  }, ttlMs);
-}
-
-function fixtureDayRange(matchTime: Date) {
-  const from = new Date(matchTime);
-  from.setUTCDate(from.getUTCDate() - 1);
-  const to = new Date(matchTime);
-  to.setUTCDate(to.getUTCDate() + 1);
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-  };
-}
-
-function pickFixtureBetweenTeams(
-  rows: ApiFootballFixtureRow[],
-  homeId: number,
-  awayId: number
-) {
-  return rows.find(
-    (row) =>
-      (row.teams.home.id === homeId && row.teams.away.id === awayId) ||
-      (row.teams.home.id === awayId && row.teams.away.id === homeId)
-  );
-}
-
-type ApiFootballFixtureTeams = {
-  home: { id: number; name: string };
-  away: { id: number; name: string };
-};
-
-type ApiFootballFixtureRow = {
-  fixture: { id: number; date: string; status: { short: string } };
-  teams: ApiFootballFixtureTeams;
-};
-
-async function findCurrentFixture(
-  homeId: number,
-  awayId: number,
-  matchTime: Date
-): Promise<ApiFootballFixtureRow | null> {
-  const { from, to } = fixtureDayRange(matchTime);
-
-  const byHomeTeam = await apiFetch<ApiFootballFixtureRow & { teams: ApiFootballFixtureTeams }>(
-    "/fixtures",
-    { team: String(homeId), from, to },
-    45 * 1000
-  );
-  const direct = pickFixtureBetweenTeams(byHomeTeam, homeId, awayId);
-  if (direct) return direct;
-
-  const byAwayTeam = await apiFetch<ApiFootballFixtureRow & { teams: ApiFootballFixtureTeams }>(
-    "/fixtures",
-    { team: String(awayId), from, to },
-    45 * 1000
-  );
-  const reverse = pickFixtureBetweenTeams(byAwayTeam, homeId, awayId);
-  if (reverse) return reverse;
-
-  for (const season of ["2026", "2022"]) {
-    const wc = await apiFetch<ApiFootballFixtureRow & { teams: ApiFootballFixtureTeams }>(
-      "/fixtures",
-      { league: "1", season, from, to },
-      45 * 1000
-    );
-    const hit = pickFixtureBetweenTeams(wc, homeId, awayId);
-    if (hit) return hit;
-  }
-
-  return null;
-}
-
-function lineupFromApiFootballEntry(
-  entry: ApiFootballLineupEntry | undefined
-): ExternalProbableLineup | null {
-  const startXI = entry?.startXI ?? [];
-  if (startXI.length < 11) return null;
-
-  return {
-    formation: entry?.formation ?? null,
-    lineup: mapLineupPlayers(startXI),
-    bench: mapLineupPlayers(entry?.substitutes ?? []),
-  };
-}
-
-/** تشكيلة المباراة الحالية (رسمية) من API-Football */
-export async function fetchCurrentMatchLineupsFromApiFootball(
-  homeTeamName: string,
-  awayTeamName: string,
-  matchTime: Date
-): Promise<{
-  home: ExternalProbableLineup | null;
-  away: ExternalProbableLineup | null;
-} | null> {
-  if (!isEnabled()) return null;
-
-  try {
-    const [homeId, awayId] = await Promise.all([
-      resolveTeamId(homeTeamName),
-      resolveTeamId(awayTeamName),
-    ]);
-    if (!homeId || !awayId) return null;
-
-    const fixture = await findCurrentFixture(homeId, awayId, matchTime);
-    if (!fixture) return null;
-
-    const lineups = await apiFetch<ApiFootballLineupEntry>(
-      "/fixtures/lineups",
-      { fixture: String(fixture.fixture.id) },
-      45 * 1000
-    );
-
-    const homeEntry = lineups.find((entry) => entry.team.id === homeId);
-    const awayEntry = lineups.find((entry) => entry.team.id === awayId);
-    const home = lineupFromApiFootballEntry(homeEntry);
-    const away = lineupFromApiFootballEntry(awayEntry);
-
-    if (!home && !away) return null;
-
-    return { home, away };
-  } catch {
-    return null;
-  }
+  }, 60 * 60 * 1000);
 }
 
 function isSeniorNationalTeam(name: string) {
@@ -247,6 +124,10 @@ type ApiFootballLineupEntry = {
   formation?: string | null;
   startXI?: { player: ApiFootballPlayer }[];
   substitutes?: { player: ApiFootballPlayer }[];
+};
+
+type ApiFootballFixtureRow = {
+  fixture: { id: number; date: string; status: { short: string } };
 };
 
 async function listRecentFixtures(teamId: number): Promise<ApiFootballFixtureRow[]> {
