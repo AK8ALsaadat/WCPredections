@@ -67,6 +67,20 @@ export function isMatchStarted(matchTime: Date | string): boolean {
   return new Date(matchTime) <= new Date();
 }
 
+/** تقفل التوقعات قبل انطلاق المباراة بساعة — على غرار نظام الفانتسي */
+export const PREDICTION_LOCK_BEFORE_KICKOFF_MS = 60 * 60 * 1000;
+
+/** اللحظة التي تُقفل فيها التوقعات لهذه المباراة (ساعة قبل الانطلاق) */
+export function getPredictionLockTime(matchTime: Date | string): Date {
+  return new Date(
+    new Date(matchTime).getTime() - PREDICTION_LOCK_BEFORE_KICKOFF_MS
+  );
+}
+
+export function isPredictionLocked(matchTime: Date | string): boolean {
+  return Date.now() >= getPredictionLockTime(matchTime).getTime();
+}
+
 /** التشكيلة الرسمية غالباً تنزل قبل المباراة بساعة */
 export const LINEUP_FAST_REFRESH_BEFORE_MS = 60 * 60 * 1000;
 
@@ -117,7 +131,7 @@ function isMatchStatusLocked(status?: string | null): boolean {
   return status === "LIVE" || status === "FINISHED" || status === "CANCELLED";
 }
 
-/** التوقع مسموح لمباريات اليوم وبكره فقط — خلال 48 ساعة وقبل بداية المباراة */
+/** التوقع مسموح لمباريات اليوم وبكره فقط — خلال 48 ساعة وقبل القفل (ساعة قبل البداية) */
 export function isPredictionAllowed(
   matchTime: Date | string,
   status?: string | null
@@ -125,7 +139,7 @@ export function isPredictionAllowed(
   if (isMatchStatusLocked(status)) return false;
 
   const match = new Date(matchTime);
-  if (isMatchStarted(matchTime)) return false;
+  if (isPredictionLocked(matchTime)) return false;
 
   const hoursLeft = hoursUntilMatch(match);
   if (hoursLeft > PREDICTION_WINDOW_HOURS) return false;
@@ -144,6 +158,7 @@ export function getPredictionLockReason(
   if (status === "FINISHED") return t.finished;
   if (status === "CANCELLED") return t.cancelled;
   if (isMatchStarted(matchTime)) return t.started;
+  if (isPredictionLocked(matchTime)) return t.lockedBeforeKickoff;
 
   const match = new Date(matchTime);
   const hoursLeft = hoursUntilMatch(match);
@@ -162,18 +177,18 @@ function getZonedMidnight(calendarDay: string, timeZone: string): Date {
   return new Date(`${calendarDay}T00:00:00Z`);
 }
 
-/** آخر موعد لإرسال التوقع = انطلاق المباراة */
+/** آخر موعد لإرسال التوقع = ساعة قبل انطلاق المباراة (مثل نظام الفانتسي) */
 export function getPredictionDeadline(matchTime: Date | string): Date | null {
-  if (isMatchStarted(matchTime) || !isPredictionAllowed(matchTime)) {
+  if (isPredictionLocked(matchTime) || !isPredictionAllowed(matchTime)) {
     return null;
   }
 
-  return new Date(matchTime);
+  return getPredictionLockTime(matchTime);
 }
 
 /** أول لحظة يفتح فيها التوقع لهذه المباراة */
 export function getPredictionOpensAt(matchTime: Date | string): Date | null {
-  if (isMatchStarted(matchTime) || isPredictionAllowed(matchTime)) {
+  if (isPredictionLocked(matchTime) || isPredictionAllowed(matchTime)) {
     return null;
   }
 

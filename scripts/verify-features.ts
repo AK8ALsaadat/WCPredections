@@ -8,9 +8,12 @@ import {
   calculateBoldScorerBetPoints,
   calculateFinishTypePoints,
   calculatePenaltyWinnerPoints,
+  calculatePerfectPredictionBonus,
   calculateScorePredictionPoints,
   calculateScorerPredictionPoints,
+  EXACT_SCORE_POINTS,
   getScorerGoalsForPoints,
+  PERFECT_PREDICTION_BONUS_POINTS,
 } from "../src/services/scoring.service";
 import { MAX_DOUBLES_PER_ROUND } from "../src/services/prediction.service";
 import { MAX_BOLD_SCORER_BETS_PER_ROUND } from "../src/services/round-usage.service";
@@ -25,6 +28,7 @@ import {
   getScorerBudgetStatus,
 } from "../src/lib/scorer-prediction";
 import { resolveScorerGoalsForPlayer } from "../src/lib/player-matching";
+import { ar } from "../src/lib/i18n/ar";
 import { asFinishType } from "../src/lib/finish-type";
 import { parseOptionalScore } from "../src/lib/utils";
 import { statsFromLeaderboard } from "../src/services/leaderboard.service";
@@ -44,11 +48,39 @@ function ok(name: string, cond: boolean, detail?: string) {
 }
 
 console.log("\n=== نقاط النتيجة ===");
-ok("نتيجة دقيقة = 3", calculateScorePredictionPoints(2, 1, 2, 1, false) === 3);
+ok("EXACT_SCORE_POINTS = 5", EXACT_SCORE_POINTS === 5);
+ok("نتيجة دقيقة = 5", calculateScorePredictionPoints(2, 1, 2, 1, false) === 5);
 ok("فائز صح = 1", calculateScorePredictionPoints(2, 0, 3, 1, false) === 1);
 ok("خطأ = 0", calculateScorePredictionPoints(1, 0, 0, 2, false) === 0);
-ok("مضاعفة نتيجة دقيقة = 6", calculateScorePredictionPoints(1, 1, 1, 1, true) === 6);
+ok("مضاعفة نتيجة دقيقة = 10", calculateScorePredictionPoints(1, 1, 1, 1, true) === 10);
 ok("مضاعفة فائز = 2", calculateScorePredictionPoints(2, 0, 3, 1, true) === 2);
+
+console.log("\n=== بونص التوقع المثالي ===");
+ok("PERFECT_PREDICTION_BONUS_POINTS = 3", PERFECT_PREDICTION_BONUS_POINTS === 3);
+ok(
+  "نتيجة دقيقة + هدافين كاملين = بونص 3",
+  calculatePerfectPredictionBonus(true, [
+    { predictedGoals: 1, actualGoals: 1 },
+    { predictedGoals: 1, actualGoals: 2 },
+  ]) === 3
+);
+ok(
+  "نتيجة دقيقة بدون هدافين متوقعين (0-0) = بونص 3",
+  calculatePerfectPredictionBonus(true, []) === 3
+);
+ok(
+  "نتيجة دقيقة لكن هداف واحد خاطئ = بونص 0",
+  calculatePerfectPredictionBonus(true, [
+    { predictedGoals: 1, actualGoals: 1 },
+    { predictedGoals: 1, actualGoals: 0 },
+  ]) === 0
+);
+ok(
+  "نتيجة غير دقيقة = بونص 0 حتى لو الهدافين صح",
+  calculatePerfectPredictionBonus(false, [
+    { predictedGoals: 1, actualGoals: 1 },
+  ]) === 0
+);
 
 console.log("\n=== نقاط الإقصائي ===");
 ok(
@@ -82,7 +114,7 @@ const breakdown = buildMatchPointsBreakdown({
     predHome: 2,
     predAway: 1,
     isDouble: false,
-    points: 3,
+    points: 5,
     finishTypePoints: 1,
     penaltyWinnerPoints: 1,
     predictedFinishType: "PENALTIES",
@@ -91,12 +123,46 @@ const breakdown = buildMatchPointsBreakdown({
   userScorerPredictions: [
     { predictedGoals: 2, points: 1, player: { name: "سالم" } },
   ],
-});
-ok("مجموع التفصيل = 6", breakdown.total === 6);
+}, ar);
+ok("مجموع التفصيل = 8", breakdown.total === 8);
 ok(
   "عدد بنود التفصيل = 4",
   breakdown.lines.length === 4,
   `got ${breakdown.lines.length}`
+);
+
+console.log("\n=== بونص التوقع المثالي ضمن تفصيل المباراة ===");
+const perfectBreakdown = buildMatchPointsBreakdown({
+  homeScore: 1,
+  awayScore: 0,
+  isKnockout: false,
+  homeTeamName: "السعودية",
+  awayTeamName: "الأرجنتين",
+  userPrediction: {
+    predHome: 1,
+    predAway: 0,
+    isDouble: false,
+    points: 5,
+    finishTypePoints: 0,
+    penaltyWinnerPoints: 0,
+  },
+  userScorerPredictions: [
+    { predictedGoals: 1, points: 1, player: { name: "سالم" } },
+  ],
+}, ar);
+ok("مجموع التفصيل مع البونص = 6", perfectBreakdown.total === 6);
+ok(
+  "عدد بنود التفصيل مع البونص = 3",
+  perfectBreakdown.lines.length === 3,
+  `got ${perfectBreakdown.lines.length}`
+);
+ok(
+  "بند البونص = 3 نقاط",
+  perfectBreakdown.lines.find((l) => l.id === "perfect-bonus")?.points === 3
+);
+ok(
+  "بند النتيجة = 2 (5 - بونص 3)",
+  perfectBreakdown.lines.find((l) => l.id === "score")?.points === 2
 );
 ok(
   "getMatchTotalUserPoints",
@@ -174,8 +240,8 @@ console.log("\n=== حدود الجولة ===");
 ok("مضاعفة: حد أقصى 2 لكل جولة", MAX_DOUBLES_PER_ROUND === 2);
 ok("البطاقة الجريئة: مرة واحدة لكل جولة", MAX_BOLD_SCORER_BETS_PER_ROUND === 1);
 ok(
-  "مضاعفة نتيجة دقيقة = 6 نقاط",
-  calculateScorePredictionPoints(1, 1, 1, 1, true) === 6
+  "مضاعفة نتيجة دقيقة = 10 نقاط",
+  calculateScorePredictionPoints(1, 1, 1, 1, true) === 10
 );
 ok(
   "مضاعفة فائز صح = 2 نقاط",
@@ -200,7 +266,7 @@ const boldBreakdown = buildMatchPointsBreakdown({
   homeTeamName: "A",
   awayTeamName: "B",
   userBoldScorerBet: { points: 4, player: { name: "سالم" } },
-});
+}, ar);
 ok("تفصيل البطاقة الجريئة +4", boldBreakdown.total === 4);
 const boldMiss = buildMatchPointsBreakdown({
   homeScore: 0,
@@ -209,7 +275,7 @@ const boldMiss = buildMatchPointsBreakdown({
   homeTeamName: "A",
   awayTeamName: "B",
   userBoldScorerBet: { points: -4, player: { name: "فهد" } },
-});
+}, ar);
 ok("تفصيل البطاقة الجريئة -4", boldMiss.total === -4);
 ok(
   "بطاقة جريئة خاطئة فقط = -4 (حتى لو المجموع كان 0)",

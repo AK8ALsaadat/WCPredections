@@ -1,6 +1,7 @@
 import { getMatchResult } from "@/lib/utils";
 import type { Messages } from "@/lib/i18n/ar";
 import type { FinishType } from "@prisma/client";
+import { PERFECT_PREDICTION_BONUS_POINTS } from "@/services/scoring.service";
 
 export type PointsBreakdownLine = {
   id: string;
@@ -47,6 +48,22 @@ export type MatchPointsBreakdownInput = {
   } | null;
 };
 
+/** بونص +3 إذا كانت النتيجة دقيقة وكل توقعات الهدافين صحيحة بالكامل */
+function computePerfectBonus(input: MatchPointsBreakdownInput): number {
+  const p = input.userPrediction;
+  if (!p) return 0;
+
+  const exact =
+    p.predHome === input.homeScore && p.predAway === input.awayScore;
+  if (!exact) return 0;
+
+  const picks = input.userScorerPredictions ?? [];
+  const totalPredicted = picks.reduce((sum, sp) => sum + sp.predictedGoals, 0);
+  const totalEarned = picks.reduce((sum, sp) => sum + sp.points, 0);
+
+  return totalEarned === totalPredicted ? PERFECT_PREDICTION_BONUS_POINTS : 0;
+}
+
 function scoreBreakdownLine(
   input: MatchPointsBreakdownInput,
   messages: Messages,
@@ -74,11 +91,12 @@ function scoreBreakdownLine(
     : "";
 
   if (exact) {
+    const bonus = computePerfectBonus(input);
     return {
       id: "score",
       label: messages.pointsBreakdown.exactScore + multiplier,
       detail,
-      points: p.points,
+      points: p.points - bonus,
       correct: true,
     };
   }
@@ -158,6 +176,17 @@ export function buildMatchPointsBreakdown(
   if (!scorersOnly) {
     const scoreLine = scoreBreakdownLine(input, messages, showMisses);
     if (scoreLine) lines.push(scoreLine);
+
+    const bonus = computePerfectBonus(input);
+    if (bonus > 0) {
+      lines.push({
+        id: "perfect-bonus",
+        label: messages.pointsBreakdown.perfectBonus,
+        detail: messages.pointsBreakdown.perfectBonusDetail,
+        points: bonus,
+        correct: true,
+      });
+    }
 
     const finishLine = finishTypeLine(input, messages, showMisses);
     if (finishLine) lines.push(finishLine);

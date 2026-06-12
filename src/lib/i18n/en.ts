@@ -38,8 +38,8 @@ export const en = {
         title: "Second: exact score",
         body: "If you nail the exact score — top points.",
         example: "You predicted 2-1 and it finished 2-1",
-        points: "3 points",
-        note: "Better than winner only — 3 points straight up.",
+        points: "5 points",
+        note: "Better than winner only — 5 points straight up.",
       },
       {
         icon: "🎯",
@@ -47,7 +47,7 @@ export const en = {
         body: "After the score, pick the players who score.",
         example: "You picked Salem to score and he did",
         points: "+1 per correct goal",
-        note: "Multiple goals for the same player count. Penalty shootout goals after 120 min don't count.",
+        note: "Multiple goals for the same player count. Penalty shootout goals after 120 min don't count. And if you nail the exact score AND all your scorer picks are correct, you get a +3 bonus.",
       },
       {
         icon: "🏟️",
@@ -61,7 +61,7 @@ export const en = {
         icon: "✨",
         title: "Fifth: double points",
         body: "Double your match score points — only 2 matches per round.",
-        example: "Exact score 3 pts → with double becomes 6",
+        example: "Exact score 5 pts → with double becomes 10",
         points: "×2",
         note: "Applies to score and winner points only.",
       },
@@ -243,6 +243,8 @@ export const en = {
     boldScorerWin: (name: string) => `Bold card: ${name} scored`,
     boldScorerMiss: (name: string) => `Bold card: ${name} didn't score`,
     boldScorerDetail: "Once per round — ±4 points",
+    perfectBonus: "🎯 Perfect prediction — all scorers correct",
+    perfectBonusDetail: "Bonus on top of the exact score",
     pendingScore: "Score prediction",
     pendingScoreDetail: (predH: number, predA: number) =>
       `Predicted ${predH}-${predA}`,
@@ -281,6 +283,14 @@ export const en = {
     scorerHint:
       "Each team's scorer goals must exactly match your predicted score (e.g. 2-1 → 2 home goals + 1 away goal) — shootout goals don't count",
     scorerHintNoGoals: "0-0 score — no scorers needed",
+    scorerLimitHint: (perTeam: number, total: number) =>
+      `Max ${perTeam} players per team, and ${total} players total for the match`,
+    scorerLimitCounter: (used: number, max: number) =>
+      `Scorers selected: ${used}/${max}`,
+    scorerTeamLimitReached: (max: number) =>
+      `You've reached the max (${max}) for this team`,
+    scorerTotalLimitReached: (max: number) =>
+      `You've reached the max number of scorers (${max}) for this match`,
     scorersRequired: "Pick scorers matching your predicted score",
     scorersIncomplete:
       "Each team's total scorer goals must exactly match your prediction — not less, not more",
@@ -403,6 +413,7 @@ export const en = {
     finished: "Match finished — predictions closed",
     cancelled: "Match cancelled — predictions closed",
     started: "Match started — predictions closed",
+    lockedBeforeKickoff: "Predictions are locked — they close 1 hour before kickoff",
     tooEarly: "Predictions open 48 hours before kickoff (today or tomorrow)",
     windowOnly: "Predictions available for today and tomorrow only",
   },

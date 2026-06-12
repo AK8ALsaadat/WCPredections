@@ -2,6 +2,12 @@ import type { MatchPlayerView } from "@/services/match-players.service";
 
 export type ScorerPicks = Record<string, number>;
 
+/** أقصى عدد لاعبين يقدر اليوزر يختارهم من منتخب واحد كهدافين */
+export const MAX_SCORERS_PER_TEAM = 3;
+
+/** أقصى عدد لاعبين إجمالي (المنتخبين معاً) يقدر اليوزر يختارهم كهدافين */
+export const MAX_SCORERS_TOTAL = 5;
+
 export function buildPlayerTeamSets(lineup: {
   homePlayers: MatchPlayerView[];
   awayPlayers: MatchPlayerView[];
@@ -75,6 +81,9 @@ export function canAddScorer(
   const teamCount = isHome ? homeCount : awayCount;
   if (teamCount >= pred) return false;
 
+  if (teamCount >= MAX_SCORERS_PER_TEAM) return false;
+  if (homeCount + awayCount >= MAX_SCORERS_TOTAL) return false;
+
   const { homeTotal, awayTotal } = computeTeamGoalTotals(
     picks,
     homePlayerIds,
@@ -139,6 +148,30 @@ function trimTeamPicks(
   return next;
 }
 
+function trimToScorerLimits(
+  picks: ScorerPicks,
+  homePlayerIds: Set<string>,
+  awayPlayerIds: Set<string>
+): ScorerPicks {
+  const next = { ...picks };
+
+  for (const teamPlayerIds of [homePlayerIds, awayPlayerIds]) {
+    const ids = Object.keys(next).filter((id) => teamPlayerIds.has(id));
+    while (ids.length > MAX_SCORERS_PER_TEAM) {
+      delete next[ids.pop()!];
+    }
+  }
+
+  const allIds = Object.keys(next).filter(
+    (id) => homePlayerIds.has(id) || awayPlayerIds.has(id)
+  );
+  while (allIds.length > MAX_SCORERS_TOTAL) {
+    delete next[allIds.pop()!];
+  }
+
+  return next;
+}
+
 export function pruneScorerPicksToBudget(
   picks: ScorerPicks,
   homePlayerIds: Set<string>,
@@ -148,6 +181,7 @@ export function pruneScorerPicksToBudget(
 ): ScorerPicks {
   let next = trimTeamPicks(picks, homePlayerIds, predHome);
   next = trimTeamPicks(next, awayPlayerIds, predAway);
+  next = trimToScorerLimits(next, homePlayerIds, awayPlayerIds);
   return next;
 }
 
@@ -186,6 +220,7 @@ export function getScorerBudgetStatus(
     awayTotal,
     homeCount,
     awayCount,
+    totalCount: homeCount + awayCount,
     homeExceeded: homeGoalsExceeded || homeScorersExceeded,
     awayExceeded: awayGoalsExceeded || awayScorersExceeded,
     homeGoalsExceeded,

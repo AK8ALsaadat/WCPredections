@@ -3,14 +3,20 @@ import { revalidateTag } from "next/cache";
 import { resolveScorerGoalsForPlayer } from "@/lib/player-matching";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason, isPredictionAllowed } from "@/lib/utils";
+import {
+  MAX_SCORERS_PER_TEAM,
+  MAX_SCORERS_TOTAL,
+} from "@/lib/scorer-prediction";
 import type { LeagueMatchPredictionRow } from "@/types";
 import { calculateBoldScorerBetPointsForMatch } from "@/services/bold-scorer-bet.service";
 import {
   calculateFinishTypePoints,
   calculatePenaltyWinnerPoints,
+  calculatePerfectPredictionBonus,
   calculateScorePredictionPoints,
   calculateScorerPredictionPoints,
   getScorerGoalsForPoints,
+  isExactScorePrediction,
   isMatchEligibleForScorerPoints,
   isMatchFinishedForScoring,
 } from "@/services/scoring.service";
@@ -194,6 +200,22 @@ async function validateScorerPicks(
   if (awayScorers > predAway) {
     throw new Error(
       `عدد هدافي ${match.awayTeam.shortName} (${awayScorers}) زاد عن أهدافه المتوقعة (${predAway})`
+    );
+  }
+
+  if (homeScorers > MAX_SCORERS_PER_TEAM) {
+    throw new Error(
+      `أقصى عدد هدافين تقدر تختارهم من ${match.homeTeam.shortName} هو ${MAX_SCORERS_PER_TEAM}`
+    );
+  }
+  if (awayScorers > MAX_SCORERS_PER_TEAM) {
+    throw new Error(
+      `أقصى عدد هدافين تقدر تختارهم من ${match.awayTeam.shortName} هو ${MAX_SCORERS_PER_TEAM}`
+    );
+  }
+  if (homeScorers + awayScorers > MAX_SCORERS_TOTAL) {
+    throw new Error(
+      `أقصى عدد هدافين تقدر تختارهم لكل المباراة هو ${MAX_SCORERS_TOTAL}`
     );
   }
 
@@ -490,6 +512,14 @@ export async function submitMatchPredictionBundle(
   return { prediction, scorers, boldBet };
 }
 
+type ScorerPredictionWithPlayer = {
+  id: string;
+  userId: string;
+  playerId: string;
+  predictedGoals: number;
+  player: { name: string; teamId: string };
+};
+
 async function applyScorerAndBoldPoints(
   match: {
     id: string;
@@ -504,26 +534,10 @@ async function applyScorerAndBoldPoints(
       goals: number;
       player: { teamId: string; name: string };
     }[];
-  }
+  },
+  scorerGoalsByPlayer: Map<string, number>,
+  scorerPredictions: ScorerPredictionWithPlayer[]
 ) {
-  const scorerGoalsByPlayer = getScorerGoalsForPoints(
-    {
-      actualFinishType: match.actualFinishType,
-      homeTeamId: match.homeTeamId,
-      awayTeamId: match.awayTeamId,
-      homeScore: match.homeScore,
-      awayScore: match.awayScore,
-    },
-    match.matchScorers
-  );
-
-  const scorerPredictions = await prisma.scorerPrediction.findMany({
-    where: { matchId: match.id },
-    include: {
-      player: { select: { name: true, teamId: true } },
-    },
-  });
-
   for (const sp of scorerPredictions) {
     const actualGoals = resolveScorerGoalsForPlayer(
       sp.playerId,
@@ -565,10 +579,37 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
     throw new Error("Match is not eligible for scoring");
   }
 
+  const scorerGoalsByPlayer = canScoreScorers
+    ? getScorerGoalsForPoints(
+        {
+          actualFinishType: match.actualFinishType,
+          homeTeamId: match.homeTeamId,
+          awayTeamId: match.awayTeamId,
+          homeScore: match.homeScore!,
+          awayScore: match.awayScore!,
+        },
+        match.matchScorers
+      )
+    : null;
+
+  const scorerPredictions = canScoreScorers
+    ? await prisma.scorerPrediction.findMany({
+        where: { matchId },
+        include: { player: { select: { name: true, teamId: true } } },
+      })
+    : [];
+
   if (finished) {
     const predictions = await prisma.prediction.findMany({
       where: { matchId },
     });
+
+    const picksByUser = new Map<string, ScorerPredictionWithPlayer[]>();
+    for (const sp of scorerPredictions) {
+      const list = picksByUser.get(sp.userId) ?? [];
+      list.push(sp);
+      picksByUser.set(sp.userId, list);
+    }
 
     for (const prediction of predictions) {
       const scorePoints = calculateScorePredictionPoints(
@@ -578,6 +619,29 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
         match.awayScore!,
         prediction.isDouble
       );
+
+      let bonusPoints = 0;
+      if (scorerGoalsByPlayer) {
+        const isExact = isExactScorePrediction(
+          prediction.predHome,
+          prediction.predAway,
+          match.homeScore!,
+          match.awayScore!
+        );
+        const picks = picksByUser.get(prediction.userId) ?? [];
+        bonusPoints = calculatePerfectPredictionBonus(
+          isExact,
+          picks.map((sp) => ({
+            predictedGoals: sp.predictedGoals,
+            actualGoals: resolveScorerGoalsForPlayer(
+              sp.playerId,
+              sp.player,
+              scorerGoalsByPlayer,
+              match.matchScorers
+            ),
+          }))
+        );
+      }
 
       const finishTypePoints = match.isKnockout
         ? calculateFinishTypePoints(
@@ -596,22 +660,30 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
 
       await prisma.prediction.update({
         where: { id: prediction.id },
-        data: { points: scorePoints, finishTypePoints, penaltyWinnerPoints },
+        data: {
+          points: scorePoints + bonusPoints,
+          finishTypePoints,
+          penaltyWinnerPoints,
+        },
       });
     }
   }
 
-  if (canScoreScorers) {
-    await applyScorerAndBoldPoints({
-      id: match.id,
-      roundId: match.roundId,
-      homeTeamId: match.homeTeamId,
-      awayTeamId: match.awayTeamId,
-      homeScore: match.homeScore!,
-      awayScore: match.awayScore!,
-      actualFinishType: match.actualFinishType,
-      matchScorers: match.matchScorers,
-    });
+  if (canScoreScorers && scorerGoalsByPlayer) {
+    await applyScorerAndBoldPoints(
+      {
+        id: match.id,
+        roundId: match.roundId,
+        homeTeamId: match.homeTeamId,
+        awayTeamId: match.awayTeamId,
+        homeScore: match.homeScore!,
+        awayScore: match.awayScore!,
+        actualFinishType: match.actualFinishType,
+        matchScorers: match.matchScorers,
+      },
+      scorerGoalsByPlayer,
+      scorerPredictions
+    );
   }
 
   try {

@@ -1,6 +1,12 @@
 import type { FinishType, Match } from "@prisma/client";
 import { getMatchResult } from "@/lib/utils";
 
+/** نقاط النتيجة الصحيحة بالضبط */
+export const EXACT_SCORE_POINTS = 5;
+
+/** بونص إضافي عند توقع النتيجة بالضبط + كل الهدافين صح */
+export const PERFECT_PREDICTION_BONUS_POINTS = 3;
+
 export function calculateScorePredictionPoints(
   predHome: number,
   predAway: number,
@@ -11,7 +17,7 @@ export function calculateScorePredictionPoints(
   let basePoints = 0;
 
   if (predHome === actualHome && predAway === actualAway) {
-    basePoints = 3;
+    basePoints = EXACT_SCORE_POINTS;
   } else {
     const predicted = getMatchResult(predHome, predAway);
     const actual = getMatchResult(actualHome, actualAway);
@@ -21,6 +27,37 @@ export function calculateScorePredictionPoints(
   }
 
   return isDouble ? basePoints * 2 : basePoints;
+}
+
+export function isExactScorePrediction(
+  predHome: number,
+  predAway: number,
+  actualHome: number,
+  actualAway: number
+): boolean {
+  return predHome === actualHome && predAway === actualAway;
+}
+
+/**
+ * بونص +3 إذا توقع المستخدم النتيجة بالضبط، وكل أهداف الهدافين اللي اختارهم
+ * تحققت فعلياً (ما فيه أي هدف متوقع زايد عن الواقع).
+ */
+export function calculatePerfectPredictionBonus(
+  isExactScore: boolean,
+  scorerPicks: { predictedGoals: number; actualGoals: number | undefined }[]
+): number {
+  if (!isExactScore) return 0;
+
+  const totalPredicted = scorerPicks.reduce(
+    (sum, p) => sum + p.predictedGoals,
+    0
+  );
+  const totalEarned = scorerPicks.reduce(
+    (sum, p) => sum + calculateScorerPredictionPoints(p.predictedGoals, p.actualGoals),
+    0
+  );
+
+  return totalEarned === totalPredicted ? PERFECT_PREDICTION_BONUS_POINTS : 0;
 }
 
 export function calculateFinishTypePoints(

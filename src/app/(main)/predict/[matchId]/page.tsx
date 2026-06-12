@@ -39,6 +39,8 @@ import {
   canAddScorer,
   getScorerBudgetStatus,
   maxGoalsForPlayer,
+  MAX_SCORERS_PER_TEAM,
+  MAX_SCORERS_TOTAL,
   picksToArray,
   pruneScorerPicksToBudget,
   type ScorerPicks,
@@ -1008,6 +1010,24 @@ export default function PredictPage() {
             </div>
           ) : hasPlayers && lineup ? (
             <>
+              {hasAnyGoals && (
+                <div className="mb-4 rounded-lg border border-card-border bg-card px-3 py-2 text-sm text-muted">
+                  <span className="font-medium text-foreground">
+                    {t.predict.scorerLimitCounter(
+                      budget.totalCount,
+                      MAX_SCORERS_TOTAL
+                    )}
+                  </span>
+                  <span className="mr-1">
+                    {" "}
+                    — {t.predict.scorerLimitHint(
+                      MAX_SCORERS_PER_TEAM,
+                      MAX_SCORERS_TOTAL
+                    )}
+                  </span>
+                </div>
+              )}
+
               {hasAnyGoals && (
                 <div className="mb-4 grid gap-2 sm:grid-cols-2">
                   <div
