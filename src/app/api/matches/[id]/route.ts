@@ -2,7 +2,6 @@ import { apiSuccess, apiError, handleApiError } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 import { getCurrentUser } from "@/lib/session";
-import { ensureMatchSyncedFromApiQuick } from "@/services/football-api";
 import {
   getMatchById,
   getMatchByIdForPredict,
@@ -19,9 +18,7 @@ export async function GET(
     const includeLineup = searchParams.get("lineup") === "true";
     const user = await getCurrentUser();
 
-    if (!forPredict) {
-      await ensureMatchSyncedFromApiQuick(id);
-    }
+    // Avoid request-path sync. Serve the latest available DB data directly.
 
     const match = forPredict
       ? await getMatchByIdForPredict(id, user?.userId)
