@@ -138,65 +138,17 @@ async function batchUpsertPlayers(
   });
   const existingMap = new Map(existing.map((p) => [p.apiPlayerId!, p]));
 
-  const missing = players.filter((p) => !existingMap.has(String(p.id)));
-  if (missing.length > 0) {
-    await prisma.player.createMany({
-      data: missing.map((p) => ({
-        teamId,
-        apiPlayerId: String(p.id),
-        name: p.name,
-        position: p.position ?? null,
-        shirtNumber: p.shirtNumber ?? null,
-      })),
-      skipDuplicates: true,
-    });
-  }
-
-  const stale = players.filter((p) => {
+  return players.map((p, index) => {
     const row = existingMap.get(String(p.id));
-    return (
-      row &&
-      (row.name !== p.name ||
-        row.position !== (p.position ?? null) ||
-        row.shirtNumber !== (p.shirtNumber ?? null))
-    );
-  });
-
-  for (const p of stale) {
-    await prisma.player.update({
-      where: {
-        teamId_apiPlayerId: {
-          teamId,
-          apiPlayerId: String(p.id),
-        },
-      },
-      data: {
-        name: p.name,
-        position: p.position ?? null,
-        shirtNumber: p.shirtNumber ?? null,
-      },
-    });
-  }
-
-  const saved = await prisma.player.findMany({
-    where: { teamId, apiPlayerId: { in: apiIds } },
-  });
-  const savedMap = new Map(saved.map((p) => [p.apiPlayerId!, p]));
-
-  const result: MatchPlayerView[] = [];
-  for (const p of players) {
-    const row = savedMap.get(String(p.id));
-    if (!row) continue;
-    result.push({
-      id: row.id,
-      name: row.name,
-      position: row.position ?? p.position ?? null,
-      shirtNumber: row.shirtNumber ?? p.shirtNumber ?? null,
+    return {
+      id: row?.id ?? `temp-${teamId}-${String(p.id)}-${index}`,
+      name: row?.name ?? p.name,
+      position: row?.position ?? p.position ?? null,
+      shirtNumber: row?.shirtNumber ?? p.shirtNumber ?? null,
       section: p.section,
       grid: p.grid ?? null,
-    });
-  }
-  return result;
+    };
+  });
 }
 
 async function mapProbableLineupByName(
