@@ -26,15 +26,13 @@ export async function getRoundUsageLimits(
     select: { id: true, isDouble: true },
   });
 
-  const [doublesInRound, doublesUsedElsewhere, boldStatus] = await Promise.all([
-    countDoublesUsedInRound(userId, resolvedRoundId),
-    countDoublesUsedInRound(
-      userId,
-      resolvedRoundId,
-      existingPrediction?.id
-    ),
-    getBoldScorerBetStatus(userId, matchId, resolvedRoundId),
-  ]);
+  const doublesInRound = await countDoublesUsedInRound(userId, resolvedRoundId);
+  const doublesUsedElsewhere = await countDoublesUsedInRound(
+    userId,
+    resolvedRoundId,
+    existingPrediction?.id
+  );
+  const boldStatus = await getBoldScorerBetStatus(userId, matchId, resolvedRoundId);
 
   const doubleOnThisMatch = existingPrediction?.isDouble ?? false;
 

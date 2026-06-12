@@ -12,12 +12,10 @@ export const revalidate = 60;
 
 export default async function OverallLeaderboardPage() {
   const { messages: t } = await getServerI18n();
-  const [leaderboard, user, tournamentRound, subRounds] = await Promise.all([
-    getOverallLeaderboard(),
-    getCurrentUser(),
-    getTournamentRound(),
-    getSubRounds(),
-  ]);
+  const leaderboard = await getOverallLeaderboard();
+  const user = await getCurrentUser();
+  const tournamentRound = await getTournamentRound();
+  const subRounds = await getSubRounds();
 
   const tournamentName = tournamentRound?.name ?? getTournamentRoundName();
   const tournamentMatches = tournamentRound?._count.matches ?? 0;

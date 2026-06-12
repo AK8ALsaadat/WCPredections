@@ -40,31 +40,32 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
 
   const boldWhere = hasMatchFilter ? { match: matchWhere(filter) } : undefined;
 
-  const [allUsers, predictionGroups, scorerGroups, boldGroups] = await Promise.all([
-    prisma.user.findMany({
-      select: { id: true, username: true },
-      orderBy: { username: "asc" },
-    }),
-    prisma.prediction.groupBy({
-      by: ["userId"],
-      where,
-      _sum: {
-        points: true,
-        finishTypePoints: true,
-        penaltyWinnerPoints: true,
-      },
-    }),
-    prisma.scorerPrediction.groupBy({
-      by: ["userId"],
-      where,
-      _sum: { points: true },
-    }),
-    prisma.boldScorerBet.groupBy({
-      by: ["userId"],
-      where: boldWhere,
-      _sum: { points: true },
-    }),
-  ]);
+  const allUsers = await prisma.user.findMany({
+    select: { id: true, username: true },
+    orderBy: { username: "asc" },
+  });
+
+  const predictionGroups = await prisma.prediction.groupBy({
+    by: ["userId"],
+    where,
+    _sum: {
+      points: true,
+      finishTypePoints: true,
+      penaltyWinnerPoints: true,
+    },
+  });
+
+  const scorerGroups = await prisma.scorerPrediction.groupBy({
+    by: ["userId"],
+    where,
+    _sum: { points: true },
+  });
+
+  const boldGroups = await prisma.boldScorerBet.groupBy({
+    by: ["userId"],
+    where: boldWhere,
+    _sum: { points: true },
+  });
 
   const pointsMap = new Map<string, PointsRow>();
   for (const user of allUsers) {
@@ -235,21 +236,19 @@ export async function getRoundLeaderboardStats(
 
 /** بيانات الرئيسية — استعلامات مجمّعة ومخزّنة مؤقتاً */
 export async function getDashboardData(userId: string) {
-  const [tournamentRound, subRound, totalPoints, overall] = await Promise.all([
-    getTournamentRound(),
-    getCurrentSubRound(),
-    getUserTotalPoints(userId),
-    getOverallLeaderboard({ withTrend: true }),
-  ]);
+  const tournamentRound = await getTournamentRound();
+  const subRound = await getCurrentSubRound();
+  const totalPoints = await getUserTotalPoints(userId);
+  const overall = await getOverallLeaderboard({ withTrend: true });
 
   const hasSubRound = Boolean(subRound && subRound._count.matches > 0);
 
-  const [tournamentLb, subRoundLb] = await Promise.all([
-    tournamentRound ? getRoundLeaderboard(tournamentRound.id) : Promise.resolve([]),
-    hasSubRound && subRound
-      ? getRoundLeaderboard(subRound.id)
-      : Promise.resolve([]),
-  ]);
+  const tournamentLb = tournamentRound
+    ? await getRoundLeaderboard(tournamentRound.id)
+    : [];
+  const subRoundLb = hasSubRound && subRound
+    ? await getRoundLeaderboard(subRound.id)
+    : [];
 
   return {
     tournamentRound,
@@ -305,24 +304,24 @@ export async function getCurrentSubRound() {
 export const getCurrentGameweek = getCurrentSubRound;
 
 export async function getUserTotalPoints(userId: string): Promise<number> {
-  const [predictionAgg, scorerAgg, boldAgg] = await Promise.all([
-    prisma.prediction.aggregate({
-      where: { userId },
-      _sum: {
-        points: true,
-        finishTypePoints: true,
-        penaltyWinnerPoints: true,
-      },
-    }),
-    prisma.scorerPrediction.aggregate({
-      where: { userId },
-      _sum: { points: true },
-    }),
-    prisma.boldScorerBet.aggregate({
-      where: { userId },
-      _sum: { points: true },
-    }),
-  ]);
+  const predictionAgg = await prisma.prediction.aggregate({
+    where: { userId },
+    _sum: {
+      points: true,
+      finishTypePoints: true,
+      penaltyWinnerPoints: true,
+    },
+  });
+
+  const scorerAgg = await prisma.scorerPrediction.aggregate({
+    where: { userId },
+    _sum: { points: true },
+  });
+
+  const boldAgg = await prisma.boldScorerBet.aggregate({
+    where: { userId },
+    _sum: { points: true },
+  });
 
   return (
     (predictionAgg._sum.points ?? 0) +

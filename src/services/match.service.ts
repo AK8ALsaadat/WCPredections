@@ -36,41 +36,41 @@ export async function enrichMatchesWithUserPredictions<
   const matchIds = matches.map((m) => m.id);
   
   // استعلام محسّن: استخدم select محدود بدلاً من تحميل كل المعلومات
-  const [predictions, scorerPredictions, boldScorerBets] = await Promise.all([
-    prisma.prediction.findMany({
-      where: { userId, matchId: { in: matchIds } },
-      select: {
-        matchId: true,
-        predHome: true,
-        predAway: true,
-        isDouble: true,
-        points: true,
-        finishTypePoints: true,
-        penaltyWinnerPoints: true,
-        predictedFinishType: true,
-        predictedPenaltyWinnerTeamId: true,
-      },
-    }),
-    prisma.scorerPrediction.findMany({
-      where: { userId, matchId: { in: matchIds } },
-      select: {
-        matchId: true,
-        predictedGoals: true,
-        points: true,
-        playerId: true,
-        player: { select: { id: true, name: true, teamId: true, position: true } },
-      },
-    }),
-    prisma.boldScorerBet.findMany({
-      where: { userId, matchId: { in: matchIds } },
-      select: {
-        matchId: true,
-        points: true,
-        playerId: true,
-        player: { select: { id: true, name: true } },
-      },
-    }),
-  ]);
+  const predictions = await prisma.prediction.findMany({
+    where: { userId, matchId: { in: matchIds } },
+    select: {
+      matchId: true,
+      predHome: true,
+      predAway: true,
+      isDouble: true,
+      points: true,
+      finishTypePoints: true,
+      penaltyWinnerPoints: true,
+      predictedFinishType: true,
+      predictedPenaltyWinnerTeamId: true,
+    },
+  });
+
+  const scorerPredictions = await prisma.scorerPrediction.findMany({
+    where: { userId, matchId: { in: matchIds } },
+    select: {
+      matchId: true,
+      predictedGoals: true,
+      points: true,
+      playerId: true,
+      player: { select: { id: true, name: true, teamId: true, position: true } },
+    },
+  });
+
+  const boldScorerBets = await prisma.boldScorerBet.findMany({
+    where: { userId, matchId: { in: matchIds } },
+    select: {
+      matchId: true,
+      points: true,
+      playerId: true,
+      player: { select: { id: true, name: true } },
+    },
+  });
 
   const predictionByMatch = new Map(predictions.map((p) => [p.matchId, p]));
   const scorersByMatch = new Map<string, typeof scorerPredictions>();
@@ -334,13 +334,11 @@ export async function getMatchLineup(
 
 /** بيانات خفيفة لصفحة التوقع — بدون أهداف المباراة أو التشكيلة */
 export async function getMatchByIdForPredict(matchId: string, userId?: string) {
-  const [match, liveMeta] = await Promise.all([
-    getCachedMatchShell(matchId),
-    prisma.match.findUnique({
-      where: { id: matchId },
-      select: { status: true },
-    }),
-  ]);
+  const match = await getCachedMatchShell(matchId);
+  const liveMeta = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { status: true },
+  });
   if (!match) return null;
 
   let userPrediction = null;
@@ -350,24 +348,24 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
   let roundUsageLimits = null;
 
   if (userId) {
-    const [prediction, scorers, boldStatus, limits] = await Promise.all([
-      prisma.prediction.findUnique({
-        where: { userId_matchId: { userId, matchId } },
-        select: {
-          predHome: true,
-          predAway: true,
-          isDouble: true,
-          predictedFinishType: true,
-          predictedPenaltyWinnerTeamId: true,
-        },
-      }),
-      prisma.scorerPrediction.findMany({
-        where: { userId, matchId },
-        select: { playerId: true, predictedGoals: true },
-      }),
-      getBoldScorerBetStatus(userId, matchId, match.roundId),
-      getRoundUsageLimits(userId, matchId, match.roundId),
-    ]);
+    const prediction = await prisma.prediction.findUnique({
+      where: { userId_matchId: { userId, matchId } },
+      select: {
+        predHome: true,
+        predAway: true,
+        isDouble: true,
+        predictedFinishType: true,
+        predictedPenaltyWinnerTeamId: true,
+      },
+    });
+
+    const scorers = await prisma.scorerPrediction.findMany({
+      where: { userId, matchId },
+      select: { playerId: true, predictedGoals: true },
+    });
+
+    const boldStatus = await getBoldScorerBetStatus(userId, matchId, match.roundId);
+    const limits = await getRoundUsageLimits(userId, matchId, match.roundId);
     userPrediction = prediction;
     userScorerPredictions = scorers;
     roundUsageLimits = limits;
@@ -424,17 +422,17 @@ export async function getMatchById(
   let roundUsageLimits = null;
 
   if (userId) {
-    const [prediction, scorers, boldStatus, limits] = await Promise.all([
-      prisma.prediction.findUnique({
-        where: { userId_matchId: { userId, matchId } },
-      }),
-      prisma.scorerPrediction.findMany({
-        where: { userId, matchId },
-        include: { player: true },
-      }),
-      getBoldScorerBetStatus(userId, matchId, match.roundId),
-      getRoundUsageLimits(userId, matchId, match.roundId),
-    ]);
+    const prediction = await prisma.prediction.findUnique({
+      where: { userId_matchId: { userId, matchId } },
+    });
+
+    const scorers = await prisma.scorerPrediction.findMany({
+      where: { userId, matchId },
+      include: { player: true },
+    });
+
+    const boldStatus = await getBoldScorerBetStatus(userId, matchId, match.roundId);
+    const limits = await getRoundUsageLimits(userId, matchId, match.roundId);
     userPrediction = prediction;
     userScorerPredictions = scorers;
     roundUsageLimits = limits;
