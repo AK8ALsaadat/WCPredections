@@ -6,6 +6,7 @@ import {
   writeClientCache,
 } from "@/lib/client-page-cache";
 import { isWithinLineupFastRefreshWindow } from "@/lib/utils";
+import { enqueueBackgroundPrefetch } from "@/lib/prefetch-queue";
 
 const MATCH_FRESH_MS = 300_000;
 const LINEUP_FRESH_MS = 600_000;
@@ -29,9 +30,10 @@ function lineupFreshMs(
 
 const inflight = new Map<string, Promise<void>>();
 
-// Radical performance switch: disable prefetch/seeding to avoid many parallel
-// network requests during page load. Set to `false` to re-enable.
-const DISABLE_PREFETCH = true;
+// Use prioritized background prefetching to avoid blocking the main thread
+// or launching many simultaneous network requests.
+// Set to `true` to disable prefetching entirely.
+const DISABLE_PREFETCH = false;
 
 export function predictMatchCacheKey(matchId: string) {
   return `predict:match:${matchId}`;
@@ -180,14 +182,20 @@ export function prefetchPredictData(matchId: string) {
   const existing = inflight.get(matchId);
   if (existing) return existing;
 
-  const task = Promise.all([
-    matchFresh ? Promise.resolve() : fetchPredictMatch(matchId),
-    lineupFresh ? Promise.resolve() : fetchPredictLineup(matchId),
-  ])
-    .then(() => undefined)
-    .finally(() => inflight.delete(matchId));
+  let resolveTask: () => void;
+  const task = new Promise<void>((resolve) => {
+    resolveTask = resolve;
+  });
 
   inflight.set(matchId, task);
+
+  enqueueBackgroundPrefetch(async () => {
+    if (!matchFresh) await fetchPredictMatch(matchId);
+    if (!lineupFresh) await fetchPredictLineup(matchId);
+    inflight.delete(matchId);
+    resolveTask();
+  }, 3);
+
   return task;
 }
 
