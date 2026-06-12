@@ -1,5 +1,3 @@
-import type { NextFetchRequestConfig } from "next/dist/server/web/types";
-
 /**
  * ISR (Incremental Static Regeneration) - تحديث تلقائي كل 1 ساعة
  * مثالي للبيانات التي تتغير ببطء مثل المباريات والترتيب

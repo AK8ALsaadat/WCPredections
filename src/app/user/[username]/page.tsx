@@ -1,34 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { PredictionHistoryCard } from "@/components/predictions/PredictionHistoryCard";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
-
-type HistoryEntry = {
-  match: {
-    id: string;
-  };
-};
+import type { MatchHistoryEntry } from "@/lib/profile-history";
 
 export default function PublicUserPage({
   params,
 }: {
-  params: { username: string };
+  params: Promise<{ username: string }>;
 }) {
-  const { username } = params;
+  const { username } = use(params);
   const { messages: t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [entries, setEntries] = useState<MatchHistoryEntry[]>([]);
 
   useEffect(() => {
     setLoading(true);
 
     fetch(`/api/users/${encodeURIComponent(username)}/history`)
       .then((r) => r.json())
-      .then((data: { success: boolean; data?: { history?: HistoryEntry[] }; error?: string }) => {
+      .then((data: { success: boolean; data?: { history?: MatchHistoryEntry[] }; error?: string }) => {
         if (data.success) {
           setEntries(data.data?.history ?? []);
           setError("");

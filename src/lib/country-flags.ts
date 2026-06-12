@@ -8,8 +8,6 @@ const COUNTRY_CODES: Record<string, string> = {
   "الإمارات": "ae",
   "uae": "ae",
   "united arab emirates": "ae",
-  "ويلز": "gb-wls",
-  "wales": "gb-wls",
   
   // Group B
   "إيران": "ir",

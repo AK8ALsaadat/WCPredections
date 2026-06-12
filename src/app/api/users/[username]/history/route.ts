@@ -27,7 +27,32 @@ export async function GET(
 
     const history = await getUserPredictionHistory(user.id);
 
-    const allEntries = buildMatchHistoryEntries(history);
+    // تحويل البيانات ليطابقها النوع المتوقع (matchTime: string)
+    const formattedHistory = {
+      predictions: history.predictions.map(p => ({
+        ...p,
+        match: {
+          ...p.match,
+          matchTime: p.match.matchTime.toISOString(),
+        },
+      })),
+      scorerPredictions: history.scorerPredictions.map(sp => ({
+        ...sp,
+        match: {
+          ...sp.match,
+          matchTime: sp.match.matchTime.toISOString(),
+        },
+      })),
+      boldScorerBets: history.boldScorerBets.map(b => ({
+        ...b,
+        match: {
+          ...b.match,
+          matchTime: b.match.matchTime.toISOString(),
+        },
+      })),
+    };
+
+    const allEntries = buildMatchHistoryEntries(formattedHistory);
 
     const finished = allEntries.filter(
       (entry) =>
