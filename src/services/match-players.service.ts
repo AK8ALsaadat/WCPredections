@@ -8,10 +8,23 @@ import {
 } from "@/services/api-football-lineup.service";
 
 const EXPECTED_LINEUP_CACHE_MS = 30 * 60 * 1000;
+const TEAM_PLAYERS_CACHE_MS = 10 * 60 * 1000;
+const TEAM_SQUAD_CACHE_MS = 10 * 60 * 1000;
 
 const expectedLineupCache = new Map<
   string,
   { data: TeamPlayersView; expiresAt: number }
+>();
+const teamPlayersCache = new Map<
+  string,
+  {
+    players: { id: string; name: string; position?: string | null; shirtNumber?: number | null }[];
+    expiresAt: number;
+  }
+>();
+const teamSquadCache = new Map<
+  string,
+  { squad: ApiLineupPlayer[]; expiresAt: number }
 >();
 
 type ApiLineupPlayer = {
@@ -212,7 +225,13 @@ async function getCachedSquad(
   teamId: string,
   apiTeamId: string
 ): Promise<ApiLineupPlayer[]> {
-  const cached = await prisma.player.findMany({
+  const cacheKey = `squad:${teamId}:${apiTeamId}`;
+  const cached = teamSquadCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.squad;
+  }
+
+  const cachedPlayers = await prisma.player.findMany({
     where: { teamId, apiPlayerId: { not: null } },
     select: {
       apiPlayerId: true,
@@ -222,29 +241,31 @@ async function getCachedSquad(
     },
   });
 
-  if (cached.length >= 20) {
-    return cached.map((p) => ({
+  if (cachedPlayers.length >= 20) {
+    const squad = cachedPlayers.map((p) => ({
       id: Number(p.apiPlayerId),
       name: p.name,
       position: p.position,
       shirtNumber: p.shirtNumber,
     }));
+    teamSquadCache.set(cacheKey, {
+      squad,
+      expiresAt: Date.now() + TEAM_SQUAD_CACHE_MS,
+    });
+    return squad;
   }
 
   const data = await fetchFootballData<{ squad?: ApiLineupPlayer[] }>(
     `/teams/${apiTeamId}`
   );
   const squad = data.squad ?? [];
-
-  if (squad.length > 0) {
-    await batchUpsertPlayers(
-      teamId,
-      squad.map((p) => ({ ...p, section: "bench" as const }))
-    );
-  }
-
+  teamSquadCache.set(cacheKey, {
+    squad,
+    expiresAt: Date.now() + TEAM_SQUAD_CACHE_MS,
+  });
   return squad;
 }
+
 
 function isFootballDataLineupEnabled() {
   return (
@@ -481,20 +502,49 @@ async function getTeamPlayersForMatch(
   apiTeamData?: ApiTeamPlayers
 ): Promise<TeamPlayersView> {
   if (!apiTeamId) {
+    const cacheKey = `team:${teamId}:players`;
+    const cached = teamPlayersCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return {
+        formation: "4-3-3",
+        players: cached.players.map((p, i) => ({
+          id: p.id,
+          name: p.name,
+          position: p.position,
+          shirtNumber: p.shirtNumber,
+          section: i < 11 ? ("lineup" as const) : ("bench" as const),
+        })),
+        source: "estimated",
+      };
+    }
+
     const existing = await prisma.player.findMany({
       where: { teamId },
       orderBy: { name: "asc" },
       take: 16,
     });
-    return {
-      formation: "4-3-3",
-      players: existing.map((p, i) => ({
+
+    const players = existing.map((p, i) => ({
+      id: p.id,
+      name: p.name,
+      position: p.position,
+      shirtNumber: p.shirtNumber,
+      section: i < 11 ? ("lineup" as const) : ("bench" as const),
+    }));
+
+    teamPlayersCache.set(cacheKey, {
+      players: players.map((p) => ({
         id: p.id,
         name: p.name,
         position: p.position,
         shirtNumber: p.shirtNumber,
-        section: i < 11 ? ("lineup" as const) : ("bench" as const),
       })),
+      expiresAt: Date.now() + TEAM_PLAYERS_CACHE_MS,
+    });
+
+    return {
+      formation: "4-3-3",
+      players,
       source: "estimated",
     };
   }
