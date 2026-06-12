@@ -13,7 +13,6 @@ import {
   getUserPinnedTodayMatches,
   enrichMatchesWithUserPredictions,
 } from "@/services/match.service";
-import { syncLiveMatchesFreshQuick } from "@/services/live-scoring.service";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +33,6 @@ export async function GET(request: Request) {
 
     const user = await getCurrentUser();
 
-    void syncLiveMatchesFreshQuick().catch(() => {});
-
     const raw = completed
       ? await getCompletedMatches(roundId)
       : schedule
@@ -52,11 +49,12 @@ export async function GET(request: Request) {
         return apiSuccess({ matches, pinnedMatches: [], ...meta });
       }
       
-      const matches = await enrichMatchesWithUserPredictions(items, user?.userId);
-      const pinnedMatches =
+      const [matches, pinnedMatches] = await Promise.all([
+        enrichMatchesWithUserPredictions(items, user?.userId),
         user?.userId && page === 1
-          ? await getUserPinnedTodayMatches(user.userId, roundId)
-          : [];
+          ? getUserPinnedTodayMatches(user.userId, roundId)
+          : [],
+      ]);
       return apiSuccess({ matches, pinnedMatches, ...meta });
     }
 

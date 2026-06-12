@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import type { LeaderboardEntry } from "@/types";
 import { Card } from "@/components/ui/Card";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -76,9 +77,10 @@ function MobileLeaderboardList({
   return (
     <div className="space-y-2 md:hidden">
       {entries.map((entry) => (
-        <a
+        <Link
           key={entry.userId}
           href={`/user/${encodeURIComponent(entry.username)}`}
+          prefetch={false}
           className={`flex items-center gap-3 rounded-xl border px-3 py-3 ${
             entry.userId === highlightUserId
               ? "border-primary/40 bg-primary/10"
@@ -102,7 +104,7 @@ function MobileLeaderboardList({
               {entry.points}
             </p>
           </div>
-        </a>
+        </Link>
       ))}
     </div>
   );
@@ -134,6 +136,7 @@ export function LeaderboardTable({
   const i18nCtx = useI18n();
   const t = i18nCtx.messages;
   const [liveEntries, setLiveEntries] = useState(entries);
+  const refreshInFlight = useRef(false);
 
   useEffect(() => {
     setLiveEntries(entries);
@@ -143,17 +146,40 @@ export function LeaderboardTable({
     if (!realtimeEndpoint) return;
 
     const refresh = async () => {
-      const response = await clientFetch(realtimeEndpoint, { cache: "no-store" });
-      const payload = response ? await response.json() : null;
-      if (payload?.success && Array.isArray(payload.data)) {
-        setLiveEntries(payload.data);
+      if (
+        refreshInFlight.current ||
+        document.visibilityState !== "visible"
+      ) {
+        return;
+      }
+      refreshInFlight.current = true;
+      try {
+        const response = await clientFetch(realtimeEndpoint, {
+          cache: "no-store",
+        });
+        const payload = response ? await response.json() : null;
+        if (payload?.success && Array.isArray(payload.data)) {
+          setLiveEntries(payload.data);
+        }
+      } finally {
+        refreshInFlight.current = false;
       }
     };
 
+    const events = new EventSource("/api/events");
+    const onScoringUpdate = () => {
+      void refresh();
+    };
+    events.addEventListener("match-scoring-updated", onScoringUpdate);
+
     const timer = setInterval(() => {
       void refresh();
-    }, 5_000);
-    return () => clearInterval(timer);
+    }, 30_000);
+    return () => {
+      clearInterval(timer);
+      events.removeEventListener("match-scoring-updated", onScoringUpdate);
+      events.close();
+    };
   }, [realtimeEndpoint]);
   const L = labels ?? {
     rank: t.leaderboard.rank,
@@ -224,7 +250,13 @@ export function LeaderboardTable({
                 )}
                 <td className="px-4 py-3 font-medium">{
                   /* link to public user page */
-                }<a href={`/user/${encodeURIComponent(entry.username)}`} className="font-medium text-primary hover:underline">{entry.username}</a></td>
+                }<Link
+                  href={`/user/${encodeURIComponent(entry.username)}`}
+                  prefetch={false}
+                  className="font-medium text-primary hover:underline"
+                >
+                  {entry.username}
+                </Link></td>
                 <td
                   className={`px-4 py-3 text-start text-lg font-bold tabular-nums ${pointsTone(entry.points)}`}
                 >

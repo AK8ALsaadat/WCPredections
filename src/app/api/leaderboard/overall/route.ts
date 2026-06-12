@@ -1,11 +1,9 @@
 import { apiSuccess, handleApiError } from "@/lib/api";
 import { getOverallLeaderboard } from "@/services/leaderboard.service";
-import { syncLiveMatchesFreshQuick } from "@/services/live-scoring.service";
 
 export async function GET() {
   try {
-    void syncLiveMatchesFreshQuick().catch(() => {});
-    const leaderboard = await getOverallLeaderboard({ fresh: true });
+    const leaderboard = await getOverallLeaderboard();
     return apiSuccess(leaderboard, 200, {
       headers: { "Cache-Control": "no-store" },
     });

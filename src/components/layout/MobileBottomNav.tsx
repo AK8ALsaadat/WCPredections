@@ -39,7 +39,7 @@ export function MobileBottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              prefetch
+              prefetch={false}
               className={cn(
                 "flex flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors",
                 active ? "text-primary" : "text-muted"

@@ -80,12 +80,36 @@ export default function LeagueMatchPredictionsPage() {
       (data?.match.matchTime && isMatchStarted(data.match.matchTime));
     if (!shouldPoll) return;
 
-    const timer = setInterval(() => {
-      loadPredictions().catch(() => {});
-    }, 5_000);
+    const events = new EventSource("/api/events");
+    const onScoringUpdate = (event: Event) => {
+      try {
+        const payload = JSON.parse((event as MessageEvent).data);
+        if (payload?.matchId === matchId) {
+          void loadPredictions().catch(() => {});
+        }
+      } catch {
+        // The fallback timer handles malformed or missed events.
+      }
+    };
+    events.addEventListener("match-scoring-updated", onScoringUpdate);
 
-    return () => clearInterval(timer);
-  }, [data?.match.status, data?.match.matchTime, loadPredictions]);
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadPredictions().catch(() => {});
+      }
+    }, 15_000);
+
+    return () => {
+      clearInterval(timer);
+      events.removeEventListener("match-scoring-updated", onScoringUpdate);
+      events.close();
+    };
+  }, [
+    data?.match.status,
+    data?.match.matchTime,
+    loadPredictions,
+    matchId,
+  ]);
 
   if (loading) return <LoadingPage />;
   if (error || !data) {

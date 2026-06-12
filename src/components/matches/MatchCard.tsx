@@ -15,10 +15,7 @@ import { asFinishType } from "@/lib/finish-type";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
-import {
-  prefetchPredictData,
-  seedPredictMatchFromList,
-} from "@/lib/predict-prefetch";
+import { seedPredictMatchFromList } from "@/lib/predict-prefetch";
 
 type ScorerPick = {
   predictedGoals: number;
@@ -151,7 +148,6 @@ export function MatchCard({
         predictedGoals: sp.predictedGoals,
       })),
     });
-    prefetchPredictData(match.id);
   }, [showPredictButton, canPredict, match]);
 
   return (
@@ -185,7 +181,7 @@ export function MatchCard({
         </div>
       </div>
 
-      <Link href={`/matches/${match.id}`} prefetch className="block">
+      <Link href={`/matches/${match.id}`} prefetch={false} className="block">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <TeamLogo {...match.homeTeam} />

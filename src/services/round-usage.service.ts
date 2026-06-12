@@ -1,8 +1,5 @@
 import { getBoldScorerBetStatus } from "@/services/bold-scorer-bet.service";
-import {
-  countDoublesUsedInRound,
-  MAX_DOUBLES_PER_ROUND,
-} from "@/services/prediction.service";
+import { MAX_DOUBLES_PER_ROUND } from "@/services/prediction.service";
 import { prisma } from "@/lib/prisma";
 
 export const MAX_BOLD_SCORER_BETS_PER_ROUND = 1;
@@ -21,20 +18,25 @@ export async function getRoundUsageLimits(
       })
     ).roundId;
 
-  const existingPrediction = await prisma.prediction.findUnique({
-    where: { userId_matchId: { userId, matchId } },
-    select: { id: true, isDouble: true },
-  });
+  const [roundPredictions, boldStatus] = await Promise.all([
+    prisma.prediction.findMany({
+      where: {
+        userId,
+        match: { roundId: resolvedRoundId },
+      },
+      select: { matchId: true, isDouble: true },
+    }),
+    getBoldScorerBetStatus(userId, matchId, resolvedRoundId),
+  ]);
 
-  const doublesInRound = await countDoublesUsedInRound(userId, resolvedRoundId);
-  const doublesUsedElsewhere = await countDoublesUsedInRound(
-    userId,
-    resolvedRoundId,
-    existingPrediction?.id
-  );
-  const boldStatus = await getBoldScorerBetStatus(userId, matchId, resolvedRoundId);
-
-  const doubleOnThisMatch = existingPrediction?.isDouble ?? false;
+  const doubleOnThisMatch =
+    roundPredictions.find((prediction) => prediction.matchId === matchId)
+      ?.isDouble ?? false;
+  const doublesInRound = roundPredictions.filter(
+    (prediction) => prediction.isDouble
+  ).length;
+  const doublesUsedElsewhere =
+    doublesInRound - (doubleOnThisMatch ? 1 : 0);
 
   return {
     roundId: resolvedRoundId,
@@ -53,6 +55,8 @@ export async function getRoundUsageLimits(
       canUse: !boldStatus.used || boldStatus.onThisMatch,
       otherMatchId: boldStatus.otherMatchId,
       playerName: boldStatus.bet?.playerName ?? null,
+      playerId: boldStatus.bet?.playerId ?? null,
+      points: boldStatus.bet?.points ?? 0,
     },
   };
 }

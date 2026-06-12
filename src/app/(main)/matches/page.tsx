@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
-import dynamic from "next/dynamic";
-const MatchCard = dynamic(
-  () => import("@/components/matches/MatchCard").then((m) => ({ default: m.MatchCard })),
-  { loading: () => <div /> }
-);
+import { MatchCard } from "@/components/matches/MatchCard";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Select } from "@/components/ui/Select";
@@ -16,12 +12,7 @@ import {
   getMatchCalendarDay,
   getPredictionTimezone,
   isMatchStarted,
-  isPredictionAllowed,
 } from "@/lib/utils";
-import {
-  prefetchPredictData,
-  seedPredictMatchFromList,
-} from "@/lib/predict-prefetch";
 import {
   invalidateClientCachePrefix,
   isClientCacheFresh,
@@ -73,9 +64,9 @@ type MatchesPageCache = {
   meta: MatchesPageMeta;
 };
 
-const REFRESH_MS = 30_000;
-const LIVE_REFRESH_MS = 5_000;
-const MATCHES_CACHE_FRESH_MS = 15_000;
+const REFRESH_MS = 60_000;
+const LIVE_REFRESH_MS = 15_000;
+const MATCHES_CACHE_FRESH_MS = 30_000;
 
 function matchesCacheKey(roundId: string, page: number, matchType: string) {
   return `matches:v3:${matchType}:${roundId || "all"}:${page}`;
@@ -213,20 +204,6 @@ const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
   );
 
   useEffect(() => {
-    void clientFetch("/api/health")
-      .then((r) => (r ? r.json() : null))
-      .then((data) => {
-        if (!data || !data.success) return;
-        if (data.data.footballApi === "sportscore") {
-          setDataSourceLabel(t.matches.dataSourceSportScore);
-        }
-        const live = data.data.liveMatches?.length ?? 0;
-        setLiveMatchesCount(live);
-      })
-      .catch(() => {});
-  }, [t.matches.dataSource, t.matches.dataSourceSportScore]);
-
-  useEffect(() => {
     const cachedRounds = readClientCache<Round[]>("rounds");
     if (cachedRounds) setRounds(cachedRounds);
 
@@ -278,7 +255,7 @@ const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
 
     void loadMatches(page, selectedRound, {
       showLoader: !cached,
-      force: true,
+      force: false,
       signal: abort.signal,
     });
 
@@ -292,43 +269,27 @@ const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
   useEffect(() => {
     const intervalMs = hasLiveMatches ? LIVE_REFRESH_MS : REFRESH_MS;
     const interval = setInterval(
-      () => loadMatches(page, selectedRound, { force: true }),
+      () => {
+        if (document.visibilityState === "visible") {
+          void loadMatches(page, selectedRound, { force: true });
+        }
+      },
       intervalMs
     );
     return () => clearInterval(interval);
   }, [hasLiveMatches, loadMatches, page, selectedRound]);
 
   useEffect(() => {
-    // Limit seeding to a small set to avoid many simultaneous requests
-    const candidates = [...pinnedMatches, ...matches].filter((m) => isPredictionAllowed(m.matchTime));
-    const MAX_PREFETCH = 2;
-    const toProcess = candidates.slice(0, MAX_PREFETCH);
-
-    toProcess.forEach((m) => {
-      seedPredictMatchFromList({
-        id: m.id,
-        matchTime: m.matchTime,
-        isKnockout: m.isKnockout,
-        homeTeam: m.homeTeam,
-        awayTeam: m.awayTeam,
-        userPrediction: m.userPrediction
-          ? {
-              predHome: m.userPrediction.predHome,
-              predAway: m.userPrediction.predAway,
-              isDouble: m.userPrediction.isDouble,
-              predictedFinishType: m.userPrediction.predictedFinishType,
-              predictedPenaltyWinnerTeamId:
-                m.userPrediction.predictedPenaltyWinnerTeamId,
-            }
-          : null,
-        userScorerPredictions: m.userScorerPredictions?.map((sp) => ({
-          playerId: sp.player.id,
-          predictedGoals: sp.predictedGoals,
-        })),
-      });
-      prefetchPredictData(m.id);
-    });
-  }, [matches, pinnedMatches]);
+    setLiveMatchesCount(
+      [...pinnedMatches, ...matches].filter((match) => match.status === "LIVE")
+        .length
+    );
+    setDataSourceLabel(t.matches.dataSourceSportScore);
+  }, [
+    matches,
+    pinnedMatches,
+    t.matches.dataSourceSportScore,
+  ]);
 
   const pinnedIds = new Set(pinnedMatches.map((m) => m.id));
   const regularMatches = matches.filter((m) => !pinnedIds.has(m.id));

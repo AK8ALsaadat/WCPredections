@@ -5,21 +5,19 @@ import { apiSuccess, handleApiError } from "@/lib/api";
 import { getSession, requireAuth } from "@/lib/session";
 import { parseBody, updateUsernameSchema } from "@/lib/validations";
 import { getUserTotalPoints } from "@/services/leaderboard.service";
-import { syncLiveMatchesFreshQuick } from "@/services/live-scoring.service";
 import { getUserPredictionHistory } from "@/services/prediction.service";
 
 export async function GET() {
   try {
     const sessionUser = await requireAuth();
-    void syncLiveMatchesFreshQuick().catch(() => {});
-
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { id: sessionUser.userId },
-      select: { id: true, username: true, createdAt: true },
-    });
-
-    const totalPoints = await getUserTotalPoints(user.id);
-    const history = await getUserPredictionHistory(user.id);
+    const [user, totalPoints, history] = await Promise.all([
+      prisma.user.findUniqueOrThrow({
+        where: { id: sessionUser.userId },
+        select: { id: true, username: true, createdAt: true },
+      }),
+      getUserTotalPoints(sessionUser.userId),
+      getUserPredictionHistory(sessionUser.userId),
+    ]);
 
     const roundPoints: Record<string, number> = {};
     for (const p of history.predictions) {

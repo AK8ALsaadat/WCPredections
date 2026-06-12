@@ -750,49 +750,49 @@ export async function calculateRoundPoints(roundId: string): Promise<void> {
 }
 
 export async function getUserPredictionHistory(userId: string) {
-  const predictions = await prisma.prediction.findMany({
-    where: { userId },
-    include: {
-      match: {
-        include: {
-          homeTeam: true,
-          awayTeam: true,
-          round: true,
+  const [predictions, scorerPredictions, boldScorerBets] = await Promise.all([
+    prisma.prediction.findMany({
+      where: { userId },
+      include: {
+        match: {
+          include: {
+            homeTeam: true,
+            awayTeam: true,
+            round: true,
+          },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const scorerPredictions = await prisma.scorerPrediction.findMany({
-    where: { userId },
-    include: {
-      player: true,
-      match: {
-        include: {
-          homeTeam: true,
-          awayTeam: true,
-          round: true,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.scorerPrediction.findMany({
+      where: { userId },
+      include: {
+        player: true,
+        match: {
+          include: {
+            homeTeam: true,
+            awayTeam: true,
+            round: true,
+          },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const boldScorerBets = await prisma.boldScorerBet.findMany({
-    where: { userId },
-    include: {
-      player: true,
-      match: {
-        include: {
-          homeTeam: true,
-          awayTeam: true,
-          round: true,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.boldScorerBet.findMany({
+      where: { userId },
+      include: {
+        player: true,
+        match: {
+          include: {
+            homeTeam: true,
+            awayTeam: true,
+            round: true,
+          },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
   return { predictions, scorerPredictions, boldScorerBets };
 }

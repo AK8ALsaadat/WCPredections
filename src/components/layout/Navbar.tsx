@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
@@ -35,14 +35,6 @@ export function Navbar({ user }: { user: UserSession }) {
     [t]
   );
 
-  useEffect(() => {
-    navLinks.forEach((link) => {
-      if (link.href !== pathname) {
-        void router.prefetch(link.href);
-      }
-    });
-  }, [navLinks, pathname, router]);
-
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -62,7 +54,7 @@ export function Navbar({ user }: { user: UserSession }) {
   return (
     <nav className="sticky top-0 z-50 border-b border-card-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link href="/dashboard" prefetch={false} className="flex items-center gap-2">
           <span className="text-xl">⚽</span>
           <span className="font-bold text-primary">{t.appName}</span>
         </Link>
@@ -72,7 +64,9 @@ export function Navbar({ user }: { user: UserSession }) {
             <Link
               key={link.href}
               href={link.href}
-              prefetch
+              prefetch={false}
+              onMouseEnter={() => router.prefetch(link.href)}
+              onFocus={() => router.prefetch(link.href)}
               className={cn(
                 "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isNavActive(pathname, link.href, link.match)
@@ -131,6 +125,7 @@ export function Navbar({ user }: { user: UserSession }) {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={false}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
                   "rounded-lg px-3 py-2 text-sm font-medium",

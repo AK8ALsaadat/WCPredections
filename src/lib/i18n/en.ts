@@ -414,7 +414,7 @@ export const en = {
     finished: "Match finished — predictions closed",
     cancelled: "Match cancelled — predictions closed",
     started: "Match started — predictions closed",
-    lockedBeforeKickoff: "Predictions are locked — they close 1 hour before kickoff",
+    lockedBeforeKickoff: "Predictions are locked — they close 2 hours before kickoff",
     tooEarly: "Predictions open 48 hours before kickoff (today or tomorrow)",
     windowOnly: "Predictions available for today and tomorrow only",
   },

@@ -13,17 +13,34 @@ import {
   type MatchHistoryEntry,
 } from "@/lib/profile-history";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import {
+  isClientCacheFresh,
+  readClientCache,
+  writeClientCache,
+} from "@/lib/client-page-cache";
+
+type ProfileHistoryPayload = {
+  history: Parameters<typeof buildMatchHistoryEntries>[0];
+};
+
+const PROFILE_CACHE_KEY = "profile";
 
 export default function PredictionsHistoryPage() {
   const { messages: t } = useI18n();
-  const [entries, setEntries] = useState<MatchHistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedProfile = readClientCache<ProfileHistoryPayload>(
+    PROFILE_CACHE_KEY
+  );
+  const [entries, setEntries] = useState<MatchHistoryEntry[]>(() =>
+    cachedProfile ? buildMatchHistoryEntries(cachedProfile.history) : []
+  );
+  const [loading, setLoading] = useState(!cachedProfile);
   const [error, setError] = useState("");
 
   const loadHistory = useCallback(async () => {
     const response = await clientFetch("/api/profile", { cache: "no-store" });
     const data = response ? await response.json() : null;
     if (data?.success) {
+      writeClientCache(PROFILE_CACHE_KEY, data.data);
       setEntries(buildMatchHistoryEntries(data.data.history));
       setError("");
     } else {
@@ -32,6 +49,11 @@ export default function PredictionsHistoryPage() {
   }, [t.errors.loadFailed]);
 
   useEffect(() => {
+    if (isClientCacheFresh(PROFILE_CACHE_KEY)) {
+      setLoading(false);
+      return;
+    }
+
     void loadHistory()
       .catch(() => setError(t.errors.loadFailed))
       .finally(() => setLoading(false));
@@ -46,11 +68,25 @@ export default function PredictionsHistoryPage() {
     );
     if (!hasActiveMatch) return;
 
-    const timer = setInterval(() => {
-      void loadHistory().catch(() => {});
-    }, 5_000);
+    const events = new EventSource("/api/events");
+    const onScoringUpdate = () => {
+      if (document.visibilityState === "visible") {
+        void loadHistory().catch(() => {});
+      }
+    };
+    events.addEventListener("match-scoring-updated", onScoringUpdate);
 
-    return () => clearInterval(timer);
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadHistory().catch(() => {});
+      }
+    }, 20_000);
+
+    return () => {
+      clearInterval(timer);
+      events.removeEventListener("match-scoring-updated", onScoringUpdate);
+      events.close();
+    };
   }, [entries, loadHistory]);
 
   const stats = useMemo(() => {
