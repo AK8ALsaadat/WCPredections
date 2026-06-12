@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
@@ -35,6 +35,14 @@ export function Navbar({ user }: { user: UserSession }) {
     [t]
   );
 
+  useEffect(() => {
+    navLinks.forEach((link) => {
+      if (link.href !== pathname) {
+        void router.prefetch(link.href);
+      }
+    });
+  }, [navLinks, pathname, router]);
+
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -64,6 +72,7 @@ export function Navbar({ user }: { user: UserSession }) {
             <Link
               key={link.href}
               href={link.href}
+              prefetch
               className={cn(
                 "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isNavActive(pathname, link.href, link.match)
