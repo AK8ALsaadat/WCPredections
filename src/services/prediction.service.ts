@@ -559,7 +559,7 @@ async function applyScorerAndBoldPoints(
     const points = calculateScorerPredictionPoints(
       sp.predictedGoals,
       actualGoals,
-      sp.player.position as any,
+      sp.player.position as Parameters<typeof calculateScorerPredictionPoints>[2],
       { ignorePositionMultiplier }
     );
     await prisma.scorerPrediction.update({

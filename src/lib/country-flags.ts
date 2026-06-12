@@ -95,9 +95,30 @@ export function getFlagUrl(countryName?: string | null): string | null {
   if (!countryName) return null;
   
   const normalized = countryName.toLowerCase().trim();
-  const code = COUNTRY_CODES[normalized];
+  let code = COUNTRY_CODES[normalized];
   
-  if (!code || code === "xx") return null;
+  // إذا لم نجد الدولة، جرب الأحرف الأولى (للأسماء الطويلة)
+  if (!code && normalized.length > 2) {
+    code = COUNTRY_CODES[normalized.substring(0, 2)];
+  }
+  
+  // إذا لم تجد، تحقق من أسماء بديلة شهيرة
+  if (!code) {
+    // حاول إزالة الكلمات الشائعة مثل "country" أو "team"
+    const cleaned = normalized
+      .replace(/^(the\s+|team\s+|country\s+|national\s+team\s+)/i, "")
+      .trim();
+    code = COUNTRY_CODES[cleaned];
+  }
+  
+  // إذا فشل كل شيء، لا تُرجع اسماً خاطئاً
+  if (!code || code === "xx") {
+    // تسجيل الأخطاء لمساعدة في التصحيح
+    if (typeof window === "undefined") {
+      console.warn(`[Country Warning] Unknown country name: "${countryName}"`);
+    }
+    return null;
+  }
   
   // استخدام flagcdn.com API
   return `https://flagcdn.com/w80/${code}.png`;
@@ -110,19 +131,36 @@ export function getFlagEmoji(countryName?: string | null): string {
   if (!countryName) return "";
   
   const normalized = countryName.toLowerCase().trim();
-  const code = COUNTRY_CODES[normalized];
+  let code = COUNTRY_CODES[normalized];
+  
+  // جرب الأحرف الأولى
+  if (!code && normalized.length > 2) {
+    code = COUNTRY_CODES[normalized.substring(0, 2)];
+  }
+  
+  // حاول إزالة الكلمات الشائعة
+  if (!code) {
+    const cleaned = normalized
+      .replace(/^(the\s+|team\s+|country\s+|national\s+team\s+)/i, "")
+      .trim();
+    code = COUNTRY_CODES[cleaned];
+  }
   
   if (!code || code === "xx") return "🏴";
   
   // تحويل كود الدولة إلى emoji
   if (code === "gb-wls") return "🏴󠁧󠁢󠁷󠁬󠁳󠁿"; // Wales flag
   
-  const codePoints = code
-    .toUpperCase()
-    .split("")
-    .map(c => 127397 + c.charCodeAt(0));
-  
-  return String.fromCodePoint(...codePoints);
+  try {
+    const codePoints = code
+      .toUpperCase()
+      .split("")
+      .map(c => 127397 + c.charCodeAt(0));
+    
+    return String.fromCodePoint(...codePoints);
+  } catch (e) {
+    return "🏴"; // fallback
+  }
 }
 
 /** قائمة بجميع الدول المشاركة مع أكوادها */

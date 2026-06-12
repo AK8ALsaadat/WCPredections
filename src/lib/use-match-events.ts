@@ -8,7 +8,7 @@ export type MatchEventType =
 
 export type MatchEvent = {
   type: MatchEventType;
-  data: any;
+  data: unknown;
 };
 
 /**
@@ -42,7 +42,7 @@ export function useMatchEvents(
 
       eventSourceRef.current.addEventListener('message', (event) => {
         try {
-          const data = JSON.parse(event.data);
+          const data = JSON.parse(event.data) as MatchEvent;
           onEvent(data);
         } catch (err) {
           console.error('خطأ في parsing event:', err);

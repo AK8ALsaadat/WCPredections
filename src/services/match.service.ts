@@ -34,6 +34,8 @@ export async function enrichMatchesWithUserPredictions<
   }
 
   const matchIds = matches.map((m) => m.id);
+  
+  // استعلام محسّن: استخدم select محدود بدلاً من تحميل كل المعلومات
   const [predictions, scorerPredictions, boldScorerBets] = await Promise.all([
     prisma.prediction.findMany({
       where: { userId, matchId: { in: matchIds } },
@@ -55,6 +57,7 @@ export async function enrichMatchesWithUserPredictions<
         matchId: true,
         predictedGoals: true,
         points: true,
+        playerId: true,
         player: { select: { id: true, name: true, teamId: true, position: true } },
       },
     }),
@@ -63,6 +66,7 @@ export async function enrichMatchesWithUserPredictions<
       select: {
         matchId: true,
         points: true,
+        playerId: true,
         player: { select: { id: true, name: true } },
       },
     }),

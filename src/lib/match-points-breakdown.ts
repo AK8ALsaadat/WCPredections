@@ -1,21 +1,34 @@
 import { getMatchResult } from "@/lib/utils";
 import type { Messages } from "@/lib/i18n/ar";
 import type { FinishType } from "@prisma/client";
-import { PERFECT_PREDICTION_BONUS_POINTS, getPositionPointsMultiplier } from "@/services/scoring.service";
+import { PERFECT_PREDICTION_BONUS_POINTS } from "@/services/scoring.service";
 
 /** تحويل موضع اللاعب الإنجليزي إلى عربي مع عدد النقاط */
 function getPositionLabel(position: string | null | undefined): string {
   if (!position) return "";
+
   const lower = position.toLowerCase();
-  if (lower.includes("attacker") || lower.includes("forward") || lower.includes("striker")) {
+
+  if (
+    lower.includes("attacker") ||
+    lower.includes("forward") ||
+    lower.includes("striker")
+  ) {
     return "🔴 مهاجم (1 نقطة)";
   }
+
   if (lower.includes("midfielder") || lower.includes("mid")) {
     return "🟡 وسط (2 نقطة)";
   }
-  if (lower.includes("defender") || lower.includes("defence") || lower.includes("defense")) {
+
+  if (
+    lower.includes("defender") ||
+    lower.includes("defence") ||
+    lower.includes("defense")
+  ) {
     return "🟢 مدافع (3 نقاط)";
   }
+
   return "";
 }
 
@@ -213,10 +226,10 @@ export function buildMatchPointsBreakdown(
 
   for (const sp of input.userScorerPredictions ?? []) {
     if (!showMisses && sp.points === 0) continue;
+
     const hit = sp.points > 0;
-    const positionMultiplier = getPositionPointsMultiplier(sp.player.position as any);
     const positionLabel = getPositionLabel(sp.player.position);
-    
+
     lines.push({
       id: `scorer-${sp.player.name}`,
       label: hit
@@ -224,8 +237,11 @@ export function buildMatchPointsBreakdown(
         : messages.pointsBreakdown.scorerMiss(sp.player.name),
       detail:
         sp.predictedGoals > 1
-          ? messages.pointsBreakdown.scorerGoalsDetail(sp.predictedGoals) + (positionLabel ? ` • ${positionLabel}` : "")
-          : positionLabel ? positionLabel : undefined,
+          ? messages.pointsBreakdown.scorerGoalsDetail(sp.predictedGoals) +
+            (positionLabel ? ` • ${positionLabel}` : "")
+          : positionLabel
+            ? positionLabel
+            : undefined,
       points: sp.points,
       correct: hit,
     });

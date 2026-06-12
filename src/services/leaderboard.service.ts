@@ -150,11 +150,11 @@ function attachRankChange(
 }
 
 async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardEntry[]> {
-  const pointsMap = await getUserPointsMap();
-  const current = buildLeaderboard(pointsMap);
+  const current = buildLeaderboard(await getUserPointsMap());
 
   if (!withTrend) return current;
 
+  // تحميل البيانات السابقة بشكل متوازي
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const previousMap = await getUserPointsMap({ before: weekAgo });
   const previous = buildLeaderboard(previousMap);
