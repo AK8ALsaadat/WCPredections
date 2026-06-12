@@ -270,35 +270,28 @@ async function getCachedSquad(
     },
   });
 
-  const cachedAsSquad = () =>
-    cached.map((p) => ({
+  if (cached.length >= 20) {
+    return cached.map((p) => ({
       id: Number(p.apiPlayerId),
       name: p.name,
       position: p.position,
       shirtNumber: p.shirtNumber,
     }));
-
-  if (cached.length >= 20) {
-    return cachedAsSquad();
   }
 
-  try {
-    const data = await fetchFootballData<{ squad?: ApiLineupPlayer[] }>(
-      `/teams/${apiTeamId}`
+  const data = await fetchFootballData<{ squad?: ApiLineupPlayer[] }>(
+    `/teams/${apiTeamId}`
+  );
+  const squad = data.squad ?? [];
+
+  if (squad.length > 0) {
+    await batchUpsertPlayers(
+      teamId,
+      squad.map((p) => ({ ...p, section: "bench" as const }))
     );
-    const squad = data.squad ?? [];
-
-    if (squad.length > 0) {
-      await batchUpsertPlayers(
-        teamId,
-        squad.map((p) => ({ ...p, section: "bench" as const }))
-      );
-    }
-
-    return squad;
-  } catch {
-    return cachedAsSquad();
   }
+
+  return squad;
 }
 
 function isFootballDataLineupEnabled() {
@@ -518,100 +511,15 @@ async function syncEstimatedLineup(
   return view;
 }
 
-type LocalSquadPlayer = {
-  id: string;
-  name: string;
-  position: string | null;
-  shirtNumber: number | null;
-};
-
-/** يبني تشكيلة 4-3-3 تقديرية من لاعبين محفوظين محلياً (بمعرفات Player الحقيقية) */
-function buildEstimatedViewFromPlayers(
-  players: LocalSquadPlayer[]
-): TeamPlayersView {
-  const expected = buildExpectedLineup(players);
-  const toView = (
-    p: LocalSquadPlayer,
-    section: "lineup" | "bench"
-  ): MatchPlayerView => ({
-    id: p.id,
-    name: p.name,
-    position: p.position,
-    shirtNumber: p.shirtNumber,
-    section,
-    grid: null,
-  });
-
-  return {
-    formation: expected.formation,
-    players: [
-      ...expected.lineup.map((p) => toView(p as LocalSquadPlayer, "lineup")),
-      ...expected.bench.map((p) => toView(p as LocalSquadPlayer, "bench")),
-    ],
-    source: "estimated",
-  };
-}
-
-/** يبحث عن قائمة لاعبين قديمة (Football-Data) لنفس المنتخب عند غياب لاعبي SportScore */
-async function findLegacySquad(
-  teamName: string
-): Promise<ApiLineupPlayer[] | null> {
-  const candidates = await prisma.team.findMany({
-    where: { name: teamName, apiTeamId: { not: null } },
-    include: { players: true },
-  });
-
-  const withSquad = candidates.find((t) => t.players.length >= 11);
-  if (!withSquad) return null;
-
-  return withSquad.players
-    .filter((p) => p.apiPlayerId)
-    .map((p) => ({
-      id: Number(p.apiPlayerId),
-      name: p.name,
-      position: p.position,
-      shirtNumber: p.shirtNumber,
-    }));
-}
-
 async function syncExpectedLineup(
   teamId: string,
   apiTeamId: string,
   teamName: string
 ): Promise<TeamPlayersView> {
-  if (/^\d+$/.test(apiTeamId)) {
-    const probable = await syncProbableLineup(teamId, apiTeamId, teamName);
-    if (probable) return probable;
+  const probable = await syncProbableLineup(teamId, apiTeamId, teamName);
+  if (probable) return probable;
 
-    return syncEstimatedLineup(teamId, apiTeamId);
-  }
-
-  // فريق مصدره SportScore: لا يدعم استعلام القائمة عبر Football-Data
-  const ownSquad = await prisma.player.findMany({ where: { teamId } });
-  if (ownSquad.length >= 11) {
-    return buildEstimatedViewFromPlayers(ownSquad);
-  }
-
-  // ننسخ قائمة قديمة (لو وجدت) إلى لاعبي هذا الفريق فعلياً حتى تصبح
-  // معرفاتهم صالحة عند اختيار هداف لهذه المباراة
-  const legacySquad = await findLegacySquad(teamName);
-  if (legacySquad && legacySquad.length >= 11) {
-    const expected = buildExpectedLineup(legacySquad);
-    return buildTeamView(
-      teamId,
-      apiTeamId,
-      "estimated",
-      expected.formation,
-      expected.lineup,
-      expected.bench
-    );
-  }
-
-  if (ownSquad.length > 0) {
-    return buildEstimatedViewFromPlayers(ownSquad);
-  }
-
-  return { formation: null, players: [], source: "estimated" };
+  return syncEstimatedLineup(teamId, apiTeamId);
 }
 
 async function getTeamPlayersForMatch(
