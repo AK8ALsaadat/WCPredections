@@ -3,6 +3,7 @@
 import type { LeaderboardEntry } from "@/types";
 import { Card } from "@/components/ui/Card";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import type { Messages } from "@/lib/i18n/index";
 
 function RankTrend({ change }: { change?: number }) {
   const { messages: t } = useI18n();
@@ -111,13 +112,33 @@ export function LeaderboardTable({
   highlightUserId,
   showRankTrend = false,
   pointsLabel,
+  labels,
 }: {
   entries: LeaderboardEntry[];
   highlightUserId?: string;
   showRankTrend?: boolean;
   pointsLabel?: string;
+  labels?: {
+    rank: string;
+    trend: string;
+    username: string;
+    points: string;
+    empty: string;
+    rankUp: string;
+    rankDown: string;
+  };
 }) {
-  const { messages: t } = useI18n();
+  const i18nCtx = useI18n();
+  const t = i18nCtx.messages;
+  const L = labels ?? {
+    rank: t.leaderboard.rank,
+    trend: t.leaderboard.trend,
+    username: t.leaderboard.username,
+    points: t.leaderboard.points,
+    empty: t.leaderboard.empty,
+    rankUp: t.leaderboard.rankUp,
+    rankDown: t.leaderboard.rankDown,
+  } as const;
 
   if (entries.length === 0) {
     return (
@@ -131,7 +152,7 @@ export function LeaderboardTable({
 
   return (
     <>
-      <MobileLeaderboardList
+          <MobileLeaderboardList
         entries={entries}
         highlightUserId={highlightUserId}
         showRankTrend={showRankTrend}
@@ -143,23 +164,23 @@ export function LeaderboardTable({
           <thead>
             <tr className="border-b border-card-border bg-background/60">
               <th className="px-4 py-3 text-end text-xs font-semibold uppercase tracking-wider text-muted">
-                {t.leaderboard.rank}
+                {L.rank}
               </th>
               {showRankTrend && (
                 <th className="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted">
-                  {t.leaderboard.trend}
+                  {L.trend}
                 </th>
               )}
-              <th className="px-4 py-3 text-end text-xs font-semibold uppercase tracking-wider text-muted">
-                {t.leaderboard.username}
+                <th className="px-4 py-3 text-end text-xs font-semibold uppercase tracking-wider text-muted">
+                {L.username}
               </th>
               <th className="px-4 py-3 text-start text-xs font-semibold uppercase tracking-wider text-muted">
-                {pointsLabel ?? t.leaderboard.points}
+                {pointsLabel ?? L.points}
               </th>
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => (
+              {entries.map((entry) => (
               <tr
                 key={entry.userId}
                 className={`border-b border-card-border/40 transition-colors ${

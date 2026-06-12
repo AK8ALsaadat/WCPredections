@@ -235,6 +235,15 @@ export default async function DashboardPage() {
               entries={data.subRoundLb.slice(0, 5)}
               highlightUserId={user.userId}
               pointsLabel={t.leaderboard.roundPointsColumn}
+              labels={{
+                rank: t.leaderboard.rank,
+                trend: t.leaderboard.trend,
+                username: t.leaderboard.username,
+                points: t.leaderboard.points,
+                empty: t.leaderboard.empty,
+                rankUp: t.leaderboard.rankUp,
+                rankDown: t.leaderboard.rankDown,
+              }}
             />
           </div>
         )}
@@ -253,6 +262,15 @@ export default async function DashboardPage() {
             entries={data.tournamentLb.slice(0, 5)}
             highlightUserId={user.userId}
             pointsLabel={t.leaderboard.roundPointsColumn}
+            labels={{
+              rank: t.leaderboard.rank,
+              trend: t.leaderboard.trend,
+              username: t.leaderboard.username,
+              points: t.leaderboard.points,
+              empty: t.leaderboard.empty,
+              rankUp: t.leaderboard.rankUp,
+              rankDown: t.leaderboard.rankDown,
+            }}
           />
         </div>
       </section>

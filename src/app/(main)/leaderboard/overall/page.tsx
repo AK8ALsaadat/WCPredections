@@ -38,6 +38,15 @@ export default async function OverallLeaderboardPage() {
         entries={leaderboard}
         highlightUserId={user?.userId}
         showRankTrend
+        labels={{
+          rank: t.leaderboard.rank,
+          trend: t.leaderboard.trend,
+          username: t.leaderboard.username,
+          points: t.leaderboard.points,
+          empty: t.leaderboard.empty,
+          rankUp: t.leaderboard.rankUp,
+          rankDown: t.leaderboard.rankDown,
+        }}
       />
 
       {subRounds.length > 0 && (

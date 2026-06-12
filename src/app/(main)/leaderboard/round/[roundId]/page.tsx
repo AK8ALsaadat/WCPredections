@@ -52,6 +52,15 @@ export default async function RoundLeaderboardPage({
         entries={leaderboard}
         highlightUserId={user?.userId}
         pointsLabel={t.leaderboard.roundPointsColumn}
+        labels={{
+          rank: t.leaderboard.rank,
+          trend: t.leaderboard.trend,
+          username: t.leaderboard.username,
+          points: t.leaderboard.points,
+          empty: t.leaderboard.empty,
+          rankUp: t.leaderboard.rankUp,
+          rankDown: t.leaderboard.rankDown,
+        }}
       />
 
       <div className="flex justify-center gap-4 text-sm">
