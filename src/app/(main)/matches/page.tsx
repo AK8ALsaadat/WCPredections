@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { MatchCard } from "@/components/matches/MatchCard";
+import dynamic from "next/dynamic";
+const MatchCard = dynamic(
+  () => import("@/components/matches/MatchCard").then((m) => ({ default: m.MatchCard })),
+  { loading: () => <div /> }
+);
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Select } from "@/components/ui/Select";
@@ -25,9 +29,35 @@ import {
   writeClientCache,
 } from "@/lib/client-page-cache";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import { clientFetch } from "@/lib/client-fetch";
 
 type Round = { id: string; name: string };
-type Match = Parameters<typeof MatchCard>[0]["match"];
+type Match = {
+  id: string;
+  matchTime: string | Date;
+  status: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  isKnockout: boolean;
+  stageName?: string | null;
+  homeTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
+  awayTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
+  round: { id: string; name: string };
+  actualFinishType?: string | null;
+  penaltyWinnerTeamId?: string | null;
+  userPrediction?: {
+    predHome: number;
+    predAway: number;
+    isDouble: boolean;
+    points?: number;
+    finishTypePoints?: number;
+    penaltyWinnerPoints?: number;
+    predictedFinishType?: string | null;
+    predictedPenaltyWinnerTeamId?: string | null;
+  } | null;
+  userScorerPredictions?: { predictedGoals: number; points?: number; player: { id: string; name: string; teamId: string } }[];
+  userBoldScorerBet?: { points: number; player: { name: string } } | null;
+};
 
 type MatchesPageMeta = {
   page: number;
@@ -46,8 +76,8 @@ type MatchesPageCache = {
 const REFRESH_MS = 30_000;
 const MATCHES_CACHE_FRESH_MS = 15_000;
 
-function matchesCacheKey(roundId: string, page: number) {
-  return `matches:${roundId || "all"}:${page}`;
+function matchesCacheKey(roundId: string, page: number, matchType: string) {
+  return `matches:${matchType}:${roundId || "all"}:${page}`;
 }
 
 export default function MatchesPage() {
@@ -56,6 +86,7 @@ export default function MatchesPage() {
     readClientCache<Round[]>("rounds") ?? []
   );
   const [selectedRound, setSelectedRound] = useState("");
+  const [matchType, setMatchType] = useState<"upcoming" | "past">("upcoming");
   const [page, setPage] = useState(1);
   const [matches, setMatches] = useState<Match[]>([]);
   const [pinnedMatches, setPinnedMatches] = useState<Match[]>([]);
@@ -74,7 +105,7 @@ export default function MatchesPage() {
   const [liveMatchesCount, setLiveMatchesCount] = useState(0);
 
   const predictionTimezone = getPredictionTimezone();
-  const cacheKey = matchesCacheKey(selectedRound, page);
+  const cacheKey = matchesCacheKey(selectedRound, page, matchType);
   const loadSeq = useRef(0);
 
   const applyCache = useCallback((cached: MatchesPageCache, activePage: number) => {
@@ -91,7 +122,7 @@ export default function MatchesPage() {
       targetRound: string,
       opts?: { showLoader?: boolean; force?: boolean; signal?: AbortSignal }
     ) => {
-      const requestKey = matchesCacheKey(targetRound, targetPage);
+const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
       const seq = ++loadSeq.current;
 
       const cached = readClientCache<MatchesPageCache>(requestKey);
@@ -119,13 +150,16 @@ export default function MatchesPage() {
         schedule: "true",
         paginated: "true",
         page: String(targetPage),
+        light: matchType === "upcoming" ? "1" : "0",
       });
+      if (matchType === "past") params.set("completed", "true");
       if (targetRound) params.set("roundId", targetRound);
 
       try {
-        const res = await fetch(`/api/matches?${params}`, {
+        const res = await clientFetch(`/api/matches?${params}`, {
           signal: opts?.signal,
         });
+        if (!res) throw new Error("NetworkError");
         if (seq !== loadSeq.current) return;
 
         const data = await res.json();
@@ -144,7 +178,7 @@ export default function MatchesPage() {
               openCount: data.data.openCount,
             },
           };
-          writeClientCache(matchesCacheKey(targetRound, resolvedPage), payload);
+          writeClientCache(matchesCacheKey(targetRound, resolvedPage, matchType), payload);
           setMatches(payload.matches);
           setPinnedMatches(payload.pinnedMatches);
           setMeta(payload.meta);
@@ -165,7 +199,7 @@ export default function MatchesPage() {
         }
       }
     },
-    [applyCache]
+    [applyCache, matchType]
   );
 
   const handlePageChange = useCallback(
@@ -178,10 +212,10 @@ export default function MatchesPage() {
   );
 
   useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.json())
+    void clientFetch("/api/health")
+      .then((r) => (r ? r.json() : null))
       .then((data) => {
-        if (!data.success) return;
+        if (!data || !data.success) return;
         if (data.data.footballApi === "sportscore") {
           setDataSourceLabel(t.matches.dataSourceSportScore);
         }
@@ -195,8 +229,8 @@ export default function MatchesPage() {
     const cachedRounds = readClientCache<Round[]>("rounds");
     if (cachedRounds) setRounds(cachedRounds);
 
-    fetch("/api/rounds")
-      .then((r) => r.json())
+    void clientFetch("/api/rounds")
+      .then((r) => (r ? r.json() : null))
       .then((data) => {
         if (data.success) {
           writeClientCache("rounds", data.data);
@@ -206,7 +240,10 @@ export default function MatchesPage() {
   }, []);
 
   useEffect(() => {
-    for (const key of ["matches:all:1", `matches:${selectedRound || "all"}:${page}`]) {
+    for (const key of [
+      `matches:upcoming:${selectedRound || "all"}:1`,
+      `matches:past:${selectedRound || "all"}:${page}`,
+    ]) {
       const cached = readClientCache<MatchesPageCache>(key);
       const hasStaleScheduled = [...(cached?.matches ?? []), ...(cached?.pinnedMatches ?? [])].some(
         (m) => m.status === "SCHEDULED" && isMatchStarted(m.matchTime)
@@ -217,6 +254,16 @@ export default function MatchesPage() {
       }
     }
   }, [page, selectedRound]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [matchType]);
+
+  useEffect(() => {
+    setMatches([]);
+    setPinnedMatches([]);
+    setLoading(true);
+  }, [matchType, selectedRound]);
 
   useEffect(() => {
     const abort = new AbortController();
@@ -235,7 +282,7 @@ export default function MatchesPage() {
     });
 
     return () => abort.abort();
-  }, [applyCache, cacheKey, loadMatches, page, selectedRound]);
+  }, [applyCache, cacheKey, loadMatches, page, selectedRound, matchType]);
 
   const hasLiveMatches = [...pinnedMatches, ...matches].some(
     (m) => m.status === "LIVE"
@@ -251,32 +298,35 @@ export default function MatchesPage() {
   }, [hasLiveMatches, loadMatches, page, selectedRound]);
 
   useEffect(() => {
-    [...pinnedMatches, ...matches]
-      .filter((m) => isPredictionAllowed(m.matchTime))
-      .forEach((m) => {
-        seedPredictMatchFromList({
-          id: m.id,
-          matchTime: m.matchTime,
-          isKnockout: m.isKnockout,
-          homeTeam: m.homeTeam,
-          awayTeam: m.awayTeam,
-          userPrediction: m.userPrediction
-            ? {
-                predHome: m.userPrediction.predHome,
-                predAway: m.userPrediction.predAway,
-                isDouble: m.userPrediction.isDouble,
-                predictedFinishType: m.userPrediction.predictedFinishType,
-                predictedPenaltyWinnerTeamId:
-                  m.userPrediction.predictedPenaltyWinnerTeamId,
-              }
-            : null,
-          userScorerPredictions: m.userScorerPredictions?.map((sp) => ({
-            playerId: sp.player.id,
-            predictedGoals: sp.predictedGoals,
-          })),
-        });
-        prefetchPredictData(m.id);
+    // Limit seeding to a small set to avoid many simultaneous requests
+    const candidates = [...pinnedMatches, ...matches].filter((m) => isPredictionAllowed(m.matchTime));
+    const MAX_PREFETCH = 2;
+    const toProcess = candidates.slice(0, MAX_PREFETCH);
+
+    toProcess.forEach((m) => {
+      seedPredictMatchFromList({
+        id: m.id,
+        matchTime: m.matchTime,
+        isKnockout: m.isKnockout,
+        homeTeam: m.homeTeam,
+        awayTeam: m.awayTeam,
+        userPrediction: m.userPrediction
+          ? {
+              predHome: m.userPrediction.predHome,
+              predAway: m.userPrediction.predAway,
+              isDouble: m.userPrediction.isDouble,
+              predictedFinishType: m.userPrediction.predictedFinishType,
+              predictedPenaltyWinnerTeamId:
+                m.userPrediction.predictedPenaltyWinnerTeamId,
+            }
+          : null,
+        userScorerPredictions: m.userScorerPredictions?.map((sp) => ({
+          playerId: sp.player.id,
+          predictedGoals: sp.predictedGoals,
+        })),
       });
+      prefetchPredictData(m.id);
+    });
   }, [matches, pinnedMatches]);
 
   const pinnedIds = new Set(pinnedMatches.map((m) => m.id));
@@ -298,7 +348,7 @@ export default function MatchesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold">{t.matches.title}</h1>
           <p className="mt-1 text-muted">{t.matches.subtitle}</p>
@@ -318,6 +368,34 @@ export default function MatchesPage() {
               )}
             </p>
           )}
+        </div>
+
+        <div className="flex gap-2 border-b border-card-border pb-3">
+          <button
+            onClick={() => setMatchType("upcoming")}
+            className={`px-4 py-2 font-medium rounded-t transition ${
+              matchType === "upcoming"
+                ? "bg-primary text-white"
+                : "bg-card text-muted hover:text-foreground"
+            }`}
+          >
+            المباريات القادمة
+          </button>
+          <button
+            onClick={() => setMatchType("past")}
+            className={`px-4 py-2 font-medium rounded-t transition ${
+              matchType === "past"
+                ? "bg-primary text-white"
+                : "bg-card text-muted hover:text-foreground"
+            }`}
+          >
+            المباريات السابقة
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
         </div>
         {rounds.length > 0 && (
           <div className="w-full sm:w-64">
@@ -375,6 +453,7 @@ export default function MatchesPage() {
                 match={match}
                 showPredictButton
                 finalPrediction
+                isPastMatch={matchType === "past"}
               />
             ))}
           </div>
@@ -405,7 +484,12 @@ export default function MatchesPage() {
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   {grouped[dayKey].map((match) => (
-                    <MatchCard key={match.id} match={match} showPredictButton />
+                    <MatchCard 
+                      key={match.id} 
+                      match={match} 
+                      showPredictButton 
+                      isPastMatch={matchType === "past"}
+                    />
                   ))}
                 </div>
               </section>

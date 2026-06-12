@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { apiSuccess, handleApiError } from "@/lib/api";
 import {
   paginateSchedule,
@@ -8,6 +9,7 @@ import { syncStalePredictedMatchesQuick } from "@/services/football-api";
 import {
   getUpcomingMatches,
   getAllMatches,
+  getCompletedMatches,
   getScheduleMatches,
   getUserPinnedTodayMatches,
   enrichMatchesWithUserPredictions,
@@ -18,6 +20,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    const light = searchParams.get("light") === "1";
+    const completed = searchParams.get("completed") === "true";
     const roundId = searchParams.get("roundId") ?? undefined;
     const upcoming = searchParams.get("upcoming") === "true";
     const schedule = searchParams.get("schedule") === "true";
@@ -30,24 +34,50 @@ export async function GET(request: Request) {
 
     const user = await getCurrentUser();
 
-    if (schedule) {
+    if (schedule && !light && !completed) {
       await syncStalePredictedMatchesQuick(roundId, { maxMatches: 2 });
     }
 
-    const raw = schedule
-      ? await getScheduleMatches(roundId)
-      : upcoming
-        ? await getUpcomingMatches(roundId)
-        : await getAllMatches(roundId);
+    const raw = completed
+      ? await getCompletedMatches(roundId)
+      : schedule
+        ? await getScheduleMatches(roundId)
+        : upcoming
+          ? await getUpcomingMatches(roundId)
+          : await getAllMatches(roundId);
 
-    if (schedule && paginated) {
+    if ((schedule || completed) && paginated) {
       const { items, meta } = paginateSchedule(raw, page, pageSize);
+      
+      if (light && !completed) {
+        const matches = await enrichMatchesWithUserPredictions(items, user?.userId);
+        return apiSuccess({ matches, pinnedMatches: [], ...meta });
+      }
+      
       const matches = await enrichMatchesWithUserPredictions(items, user?.userId);
       const pinnedMatches =
-        user?.userId && page === 1
+        user?.userId && page === 1 && !completed
           ? await getUserPinnedTodayMatches(user.userId, roundId)
           : [];
       return apiSuccess({ matches, pinnedMatches, ...meta });
+    }
+
+    if (light && !completed) {
+      const lite = raw.map((m: any) => ({
+        id: m.id,
+        matchTime: m.matchTime,
+        status: m.status,
+        homeScore: m.homeScore ?? null,
+        awayScore: m.awayScore ?? null,
+        isKnockout: m.isKnockout,
+        stageName: m.stageName,
+        homeTeam: m.homeTeam,
+        awayTeam: m.awayTeam,
+        round: m.round,
+        actualFinishType: m.actualFinishType ?? null,
+        penaltyWinnerTeamId: m.penaltyWinnerTeamId ?? null,
+      }));
+      return apiSuccess(lite, 200, { headers: { "Cache-Control": "private, no-cache" } });
     }
 
     const matches = await enrichMatchesWithUserPredictions(raw, user?.userId);

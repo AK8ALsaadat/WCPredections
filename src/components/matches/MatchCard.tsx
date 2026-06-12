@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { formatDate, isPredictionAllowed, getPredictionLockReason } from "@/lib/utils";
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { Card } from "@/components/ui/Card";
-import { MatchPointsBreakdown } from "@/components/matches/MatchPointsBreakdown";
+import dynamic from "next/dynamic";
+const MatchPointsBreakdown = dynamic(
+  () => import("@/components/matches/MatchPointsBreakdown").then((m) => ({ default: m.MatchPointsBreakdown })),
+  { loading: () => <div /> }
+);
 import { asFinishType } from "@/lib/finish-type";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { PredictNavLink } from "@/components/matches/PredictNavLink";
@@ -53,6 +57,7 @@ type MatchCardProps = {
     } | null;
   };
   showPredictButton?: boolean;
+  isPastMatch?: boolean;
   /** بطاقة توقعاتك النهائية — نفس شكل التوقع مع زر توقعات الدوري */
   finalPrediction?: boolean;
 };
@@ -86,6 +91,7 @@ function ScorerList({ scorers }: { scorers: ScorerPick[] }) {
 export function MatchCard({
   match,
   showPredictButton,
+  isPastMatch = false,
   finalPrediction = false,
 }: MatchCardProps) {
   const { messages: t, locale } = useI18n();
@@ -247,13 +253,13 @@ export function MatchCard({
         </div>
       </Link>
 
-      {showPredictButton && !isFinished && !isLive && (
+      {showPredictButton && !isFinished && !isLive && !isPastMatch && (
         <div className="mt-3">
           <PredictionCountdown matchTime={match.matchTime} />
         </div>
       )}
 
-      {showPredictButton && canPredict && (
+      {showPredictButton && canPredict && !isPastMatch && (
         <div className="mt-4 flex justify-end">
           <PredictNavLink
             matchId={match.id}
@@ -380,3 +386,5 @@ export function MatchCard({
     </Card>
   );
 }
+
+export default memo(MatchCard);
