@@ -60,7 +60,10 @@ async function syncPlayers(
   options: SyncOptions
 ) {
   const teams = await prisma.team.findMany({
-    where: { apiTeamId: { not: null } },
+    where: {
+      apiTeamId: { not: null },
+      NOT: { apiTeamId: { startsWith: "tbd-" } },
+    },
   });
 
   let count = 0;
@@ -68,7 +71,12 @@ async function syncPlayers(
   for (const team of teams) {
     if (!team.apiTeamId) continue;
 
-    const players = await provider.fetchPlayers(team.apiTeamId, options);
+    let players: Awaited<ReturnType<typeof provider.fetchPlayers>>;
+    try {
+      players = await provider.fetchPlayers(team.apiTeamId, options);
+    } catch {
+      continue;
+    }
 
     for (const player of players) {
       await prisma.player.upsert({
@@ -522,8 +530,7 @@ export async function syncMatchesFromApi(
   const teams = isSportScoreQuick
     ? []
     : await syncTeams(provider, options);
-  const skipPlayers =
-    process.env.SYNC_PLAYERS === "false" || provider.name === "sportscore";
+  const skipPlayers = process.env.SYNC_PLAYERS === "false";
   const playersCount = skipPlayers ? 0 : await syncPlayers(provider, options);
 
   let externalMatches = await provider.fetchMatches(options);

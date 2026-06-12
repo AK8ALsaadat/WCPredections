@@ -1,9 +1,11 @@
 type SquadPlayer = {
-  id: number;
+  id: number | string;
   name: string;
   position?: string | null;
   shirtNumber?: number | null;
 };
+
+type WithPosition = Pick<SquadPlayer, "id" | "position">;
 
 export const EXPECTED_FORMATION = "4-3-3";
 
@@ -33,8 +35,8 @@ function getPositionBucket(position?: string | null): PositionBucket {
 }
 
 /** تشكيلة متوقعة 4-3-3 من قائمة المنتخب */
-export function buildExpectedLineup(squad: SquadPlayer[]) {
-  const buckets: Record<PositionBucket, SquadPlayer[]> = {
+export function buildExpectedLineup<T extends WithPosition>(squad: T[]) {
+  const buckets: Record<PositionBucket, T[]> = {
     gk: [],
     def: [],
     mid: [],
@@ -46,7 +48,7 @@ export function buildExpectedLineup(squad: SquadPlayer[]) {
     buckets[getPositionBucket(player.position)].push(player);
   }
 
-  const lineup: SquadPlayer[] = [];
+  const lineup: T[] = [];
   const pick = (bucket: PositionBucket, count: number) => {
     const taken = buckets[bucket].splice(0, count);
     lineup.push(...taken);
