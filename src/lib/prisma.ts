@@ -16,15 +16,13 @@ function addConnectionLimitToUrl(url: string, limit: string) {
   }
 }
 
+const defaultConnectionLimit =
+  process.env.NODE_ENV === "production" ? "5" : "2";
 const connectionLimit =
-  process.env.NODE_ENV === "production"
-    ? process.env.PRISMA_CONNECTION_LIMIT ?? "1"
-    : process.env.PRISMA_CONNECTION_LIMIT;
+  process.env.PRISMA_CONNECTION_LIMIT ?? defaultConnectionLimit;
 
 const prismaUrl = process.env.DATABASE_URL
-  ? connectionLimit
-    ? addConnectionLimitToUrl(process.env.DATABASE_URL, connectionLimit)
-    : process.env.DATABASE_URL
+  ? addConnectionLimitToUrl(process.env.DATABASE_URL, connectionLimit)
   : undefined;
 
 export const prisma =
