@@ -103,19 +103,17 @@ export async function syncMatchScorersFromApi(
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.matchScorer.deleteMany({ where: { matchId } });
+  await prisma.matchScorer.deleteMany({ where: { matchId } });
 
-    if (resolved.length > 0) {
-      await tx.matchScorer.createMany({
-        data: resolved.map((row) => ({
-          matchId,
-          playerId: row.playerId,
-          goals: row.goals,
-        })),
-      });
-    }
-  });
+  if (resolved.length > 0) {
+    await prisma.matchScorer.createMany({
+      data: resolved.map((row) => ({
+        matchId,
+        playerId: row.playerId,
+        goals: row.goals,
+      })),
+    });
+  }
 
   return resolved.length;
 }
