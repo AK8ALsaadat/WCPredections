@@ -269,6 +269,7 @@ export const en = {
     doubleExhausted: "You used both doubles this round — one per match only",
     doubleOnThisMatch: "Active on this match",
     doubleLocked: "Double is active — can't turn off after saving",
+    doubleAndBoldConflict: "Can't use double and bold card on the same match",
     boldLocked: "Bold card is locked — can't remove or change player",
     boldCounter: (used: number, max: number) =>
       `Bold card: ${used}/${max}`,

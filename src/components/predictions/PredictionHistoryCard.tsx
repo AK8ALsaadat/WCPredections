@@ -46,9 +46,9 @@ function OutcomeBadge({ outcome }: { outcome: ReturnType<typeof getPredictionOut
   );
 }
 
-export function PredictionHistoryCard({ entry }: { entry: MatchHistoryEntry }) {
+export function PredictionHistoryCard({ entry, defaultOpen = false }: { entry: MatchHistoryEntry; defaultOpen?: boolean }) {
   const { messages: t, locale } = useI18n();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const m = entry.match;
   const outcome = getPredictionOutcome(entry);
   const breakdownInput = entryToBreakdownInput(entry);
@@ -102,7 +102,7 @@ export function PredictionHistoryCard({ entry }: { entry: MatchHistoryEntry }) {
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-2">
-          {breakdownInput && (
+          {breakdownInput && !defaultOpen && (
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}

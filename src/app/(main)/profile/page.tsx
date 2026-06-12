@@ -173,7 +173,7 @@ export default function ProfilePage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">@{profile.username}</h1>
+        <h1 className="text-3xl font-bold">{profile.username}</h1>
         <p className="mt-1 text-muted">
           {t.profile.memberSince} {formatDateShort(profile.createdAt, locale)}
         </p>

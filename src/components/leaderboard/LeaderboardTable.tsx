@@ -74,8 +74,9 @@ function MobileLeaderboardList({
   return (
     <div className="space-y-2 md:hidden">
       {entries.map((entry) => (
-        <div
+        <a
           key={entry.userId}
+          href={`/user/${encodeURIComponent(entry.username)}`}
           className={`flex items-center gap-3 rounded-xl border px-3 py-3 ${
             entry.userId === highlightUserId
               ? "border-primary/40 bg-primary/10"
@@ -84,7 +85,7 @@ function MobileLeaderboardList({
         >
           <RankBadge rank={entry.rank} />
           <div className="min-w-0 flex-1 text-end">
-            <p className="truncate font-medium">@{entry.username}</p>
+            <p className="truncate font-medium">{entry.username}</p>
             {showRankTrend && (
               <div className="mt-0.5">
                 <RankTrend change={entry.rankChange} />
@@ -99,7 +100,7 @@ function MobileLeaderboardList({
               {entry.points}
             </p>
           </div>
-        </div>
+        </a>
       ))}
     </div>
   );
@@ -175,7 +176,9 @@ export function LeaderboardTable({
                     <RankTrend change={entry.rankChange} />
                   </td>
                 )}
-                <td className="px-4 py-3 font-medium">@{entry.username}</td>
+                <td className="px-4 py-3 font-medium">{
+                  /* link to public user page */
+                }<a href={`/user/${encodeURIComponent(entry.username)}`} className="font-medium text-primary hover:underline">{entry.username}</a></td>
                 <td
                   className={`px-4 py-3 text-start text-lg font-bold tabular-nums ${pointsTone(entry.points)}`}
                 >

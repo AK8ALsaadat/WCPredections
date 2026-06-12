@@ -9,6 +9,7 @@ export type ExternalPlayer = {
   apiId: string;
   name: string;
   teamApiId: string;
+  position?: string | null;
 };
 
 export type ExternalMatch = {
@@ -51,6 +52,8 @@ export type ExternalMatchScorer = {
   goals: number;
   playerName?: string;
   teamApiId?: string;
+  /** دقيقة الهدف (null إذا لم تكن متوفرة) */
+  minute?: number | null;
 };
 
 export interface FootballApiProvider {

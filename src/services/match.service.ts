@@ -55,7 +55,7 @@ export async function enrichMatchesWithUserPredictions<
         matchId: true,
         predictedGoals: true,
         points: true,
-        player: { select: { id: true, name: true, teamId: true } },
+        player: { select: { id: true, name: true, teamId: true, position: true } },
       },
     }),
     prisma.boldScorerBet.findMany({

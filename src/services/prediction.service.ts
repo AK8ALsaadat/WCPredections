@@ -13,11 +13,13 @@ import {
   calculateFinishTypePoints,
   calculatePenaltyWinnerPoints,
   calculatePerfectPredictionBonus,
+  calculatePerfectPredictionBonusWithMinute,
   calculateScorePredictionPoints,
   calculateScorerPredictionPoints,
   getScorerGoalsForPoints,
   isExactScorePrediction,
   isMatchEligibleForScorerPoints,
+  PERFECT_PREDICTION_MIN_MINUTE,
   isMatchFinishedForScoring,
 } from "@/services/scoring.service";
 
@@ -429,6 +431,13 @@ export async function submitMatchPredictionBundle(
     where: { userId_roundId: { userId, roundId: match.roundId } },
   });
 
+  // ✅ منع استخدام الـ Double والـ Bold معاً على نفس المباراة
+  if (isDouble && data.boldPlayerId) {
+    throw new Error(
+      "ما تقدر تستخدم المضاعفة والبطاقة الجريئة معاً على نفس المباراة"
+    );
+  }
+
   if (storedBold?.matchId === data.matchId) {
     if (!data.boldPlayerId) {
       throw new Error("ما تقدر تلغي البطاقة الجريئة بعد تفعيلها");
@@ -517,7 +526,7 @@ type ScorerPredictionWithPlayer = {
   userId: string;
   playerId: string;
   predictedGoals: number;
-  player: { name: string; teamId: string };
+  player: { name: string; teamId: string; position?: string | null };
 };
 
 async function applyScorerAndBoldPoints(
@@ -537,6 +546,8 @@ async function applyScorerAndBoldPoints(
   },
   scorerGoalsByPlayer: Map<string, number>,
   scorerPredictions: ScorerPredictionWithPlayer[]
+  ,
+  ignorePositionMultiplier = false
 ) {
   for (const sp of scorerPredictions) {
     const actualGoals = resolveScorerGoalsForPlayer(
@@ -547,7 +558,9 @@ async function applyScorerAndBoldPoints(
     );
     const points = calculateScorerPredictionPoints(
       sp.predictedGoals,
-      actualGoals
+      actualGoals,
+      sp.player.position as any,
+      { ignorePositionMultiplier }
     );
     await prisma.scorerPrediction.update({
       where: { id: sp.id },
@@ -572,6 +585,15 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
     },
   });
 
+  // Determine whether this match is one of the two most recently finished matches.
+  const lastTwoFinished = await prisma.match.findMany({
+    where: { status: "FINISHED" },
+    orderBy: { matchTime: "desc" },
+    take: 2,
+    select: { id: true },
+  });
+  const ignorePositionMultiplier = lastTwoFinished.some((m) => m.id === match.id);
+
   const finished = isMatchFinishedForScoring(match);
   const canScoreScorers = isMatchEligibleForScorerPoints(match);
 
@@ -595,7 +617,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
   const scorerPredictions = canScoreScorers
     ? await prisma.scorerPrediction.findMany({
         where: { matchId },
-        include: { player: { select: { name: true, teamId: true } } },
+        include: { player: { select: { name: true, teamId: true, position: true } } },
       })
     : [];
 
@@ -629,7 +651,9 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
           match.awayScore!
         );
         const picks = picksByUser.get(prediction.userId) ?? [];
-        bonusPoints = calculatePerfectPredictionBonus(
+        
+        // استخدم الدالة الجديدة التي تتحقق من الدقيقة 75
+        bonusPoints = calculatePerfectPredictionBonusWithMinute(
           isExact,
           picks.map((sp) => ({
             predictedGoals: sp.predictedGoals,
@@ -639,7 +663,11 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
               scorerGoalsByPlayer,
               match.matchScorers
             ),
-          }))
+            position: sp.player.position,
+          })),
+          match.matchTime,
+          match.status,
+          { ignorePositionMultiplier }
         );
       }
 
@@ -682,7 +710,8 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
         matchScorers: match.matchScorers,
       },
       scorerGoalsByPlayer,
-      scorerPredictions
+      scorerPredictions,
+      ignorePositionMultiplier
     );
   }
 
@@ -804,7 +833,7 @@ export async function getLeagueMatchPredictions(matchId: string) {
       where: { matchId },
       include: {
         user: { select: { id: true, username: true } },
-        player: { select: { id: true, name: true, teamId: true } },
+        player: { select: { id: true, name: true, teamId: true, position: true } },
       },
     }),
     prisma.boldScorerBet.findMany({

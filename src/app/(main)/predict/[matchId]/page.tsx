@@ -662,14 +662,17 @@ export default function PredictPage() {
     boldLimits?.onOtherMatch ??
     match.boldScorerRoundStatus?.onOtherMatch ??
     false;
+  // ✅ منع الـ Double عند تفعيل الـ Bold والعكس
   const boldCheckboxDisabled =
     boldCommitted ||
-    (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch);
+    (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
+    isDouble; // منع البطاقة الجريئة إذا كان الـ Double مفعل
   const doubleCheckboxDisabled =
     doubleCommitted ||
     (doubleLimits != null &&
       !doubleLimits.canEnable &&
-      !doubleLimits.onThisMatch);
+      !doubleLimits.onThisMatch) ||
+    boldEnabled; // منع الـ Double إذا كانت البطاقة الجريئة مفعلة
   const allLineupPlayers = [
     ...(lineup?.homePlayers ?? []).map((p) => ({
       ...p,
@@ -823,6 +826,8 @@ export default function PredictPage() {
                 <p className="text-sm text-muted">
                   {doubleCommitted
                     ? t.predict.doubleLocked
+                    : boldEnabled
+                    ? t.predict.doubleAndBoldConflict
                     : t.predict.doubleHint}
                 </p>
               </div>
@@ -936,6 +941,8 @@ export default function PredictPage() {
                   <p className="text-sm text-muted">
                     {boldCommitted
                       ? t.predict.boldLocked
+                      : isDouble
+                      ? t.predict.doubleAndBoldConflict
                       : t.predict.boldScorerBet.hint}
                   </p>
                 </div>

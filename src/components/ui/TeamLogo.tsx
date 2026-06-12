@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { getFlagUrl } from "@/lib/country-flags";
 
 type TeamLogoProps = {
   name: string;
@@ -12,16 +13,22 @@ const sizes = { sm: 24, md: 36, lg: 48 };
 
 export function TeamLogo({ name, shortName, logoUrl, size = "md" }: TeamLogoProps) {
   const px = sizes[size];
+  
+  // محاولة استخدام العلم الرسمي أولاً
+  const flagUrl = getFlagUrl(name) || getFlagUrl(shortName);
+  const finalLogoUrl = logoUrl || flagUrl;
 
-  if (logoUrl) {
+  if (finalLogoUrl) {
     return (
       <Image
-        src={logoUrl}
+        src={finalLogoUrl}
         alt={name}
         width={px}
         height={px}
-        className="rounded-full object-contain"
-        unoptimized
+        loading="lazy"
+        quality={75}
+        className={cn("rounded-full object-contain", flagUrl ? "border border-card-border/30" : "")}
+        unoptimized={!flagUrl} // السماح بـ unoptimized للشعارات الخارجية الأخرى
       />
     );
   }

@@ -6,6 +6,9 @@ import { getRoundLeaderboard } from "@/services/leaderboard.service";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { getServerI18n } from "@/lib/i18n/server";
 
+// Regenerate round leaderboard every 60 seconds
+export const revalidate = 60;
+
 export default async function RoundLeaderboardPage({
   params,
 }: {

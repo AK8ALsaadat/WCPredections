@@ -91,7 +91,7 @@ export function Navbar({ user }: { user: UserSession }) {
 
         <div className="hidden items-center gap-3 md:flex">
           <LanguageToggle />
-          <span className="text-sm text-muted">@{user.username}</span>
+          <span className="text-sm text-muted">{user.username}</span>
           <Button variant="ghost" size="sm" onClick={handleLogout} loading={loggingOut}>
             {t.nav.logout}
           </Button>

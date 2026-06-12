@@ -7,6 +7,9 @@ import { Card } from "@/components/ui/Card";
 import { getServerI18n } from "@/lib/i18n/server";
 import { getTournamentRoundName } from "@/lib/rounds";
 
+// Regenerate leaderboard every 60 seconds
+export const revalidate = 60;
+
 export default async function OverallLeaderboardPage() {
   const { messages: t } = await getServerI18n();
   const [leaderboard, user, tournamentRound, subRounds] = await Promise.all([

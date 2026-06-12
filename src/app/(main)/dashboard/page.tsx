@@ -177,7 +177,7 @@ export default async function DashboardPage() {
           <div>
             <h1 className="text-xl font-bold md:text-3xl">
               {t.dashboard.welcome}{" "}
-              <span className="text-primary">@{user.username}</span>
+              <span className="text-primary">{user.username}</span>
             </h1>
             <p className="mt-1 text-muted">{t.dashboard.hub}</p>
             <p className="mt-1 text-xs text-muted/80">{tournamentName}</p>

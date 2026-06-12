@@ -82,8 +82,12 @@ async function syncPlayers(
           teamId: team.id,
           name: player.name,
           apiPlayerId: player.apiId,
+          position: player.position || null,
         },
-        update: { name: player.name },
+        update: { 
+          name: player.name,
+          position: player.position || null,
+        },
       });
       count++;
     }

@@ -39,25 +39,19 @@ export function isExactScorePrediction(
 }
 
 /**
- * بونص +3 إذا توقع المستخدم النتيجة بالضبط، وكل أهداف الهدافين اللي اختارهم
- * تحققت فعلياً (ما فيه أي هدف متوقع زايد عن الواقع).
+ * بونص +3 إذا توقع المستخدم النتيجة بالضبط، وكل لاعب سجل بالضبط عدد الأهداف
+ * المتوقعة لهم (لا يكفي أن يكون المجموع صح — كل لاعب تفصيلياً بيكون صح).
  */
 export function calculatePerfectPredictionBonus(
   isExactScore: boolean,
-  scorerPicks: { predictedGoals: number; actualGoals: number | undefined }[]
+  scorerPicks: { predictedGoals: number; actualGoals: number | undefined; position?: string | null }[],
+  options?: { ignorePositionMultiplier?: boolean }
 ): number {
   if (!isExactScore) return 0;
 
-  const totalPredicted = scorerPicks.reduce(
-    (sum, p) => sum + p.predictedGoals,
-    0
-  );
-  const totalEarned = scorerPicks.reduce(
-    (sum, p) => sum + calculateScorerPredictionPoints(p.predictedGoals, p.actualGoals),
-    0
-  );
-
-  return totalEarned === totalPredicted ? PERFECT_PREDICTION_BONUS_POINTS : 0;
+  // Check that every player scored their exact predicted goals
+  const allExact = scorerPicks.every(p => p.actualGoals === p.predictedGoals);
+  return allExact ? PERFECT_PREDICTION_BONUS_POINTS : 0;
 }
 
 export function calculateFinishTypePoints(
@@ -82,6 +76,75 @@ export function isMatchFinishedForScoring(match: Match): boolean {
     match.homeScore !== null &&
     match.awayScore !== null
   );
+}
+
+/** 
+ * الحد الأدنى من الدقائق المسموحة قبل حساب بونص التوقع الصحيح
+ * لا يتم حساب البونص حتى نصل للدقيقة 75 (أو نهاية المباراة)
+ */
+export const PERFECT_PREDICTION_MIN_MINUTE = 75;
+
+/**
+ * تصفية أهداف قبل دقيقة معينة — لاستخدام في حساب بونص التوقع الصحيح
+ * @param scorers - قائمة الهدافين مع الأهداف والدقائق
+ * @param beforeMinute - الحد الأقصى للدقيقة (يشمل هذه الدقيقة)
+ * @returns خريطة من playerId -> عدد الأهداف قبل هذه الدقيقة
+ */
+export function getScorerGoalsBeforeMinute(
+  scorers: Array<{ playerId: string; goals: number; minute?: number | null }>,
+  beforeMinute: number
+): Map<string, number> {
+  const result = new Map<string, number>();
+  
+  for (const scorer of scorers) {
+    // إذا لم تكن الدقيقة متوفرة، نفترض أن الهدف قبل الدقيقة المطلوبة
+    const minute = scorer.minute ?? 0;
+    const goalsBeforeMinute = minute <= beforeMinute ? scorer.goals : 0;
+    
+    if (goalsBeforeMinute > 0) {
+      result.set(scorer.playerId, goalsBeforeMinute);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * حساب بونص التوقع الصحيح مع التحقق من الدقيقة 75
+ * 
+ * - قبل الدقيقة 75 والمباراة حية: 0 نقاط (في الانتظار)
+ * - بعد الدقيقة 75 أو عند النهاية: +3 نقاط إذا كانت جميع التفاصيل صح
+ * 
+ * @param isExactScore - هل النتيجة صح
+ * @param scorerPicks - التنبؤات والنتائج الفعلية لكل هداف
+ * @param matchTime - وقت بدء المباراة
+ * @param matchStatus - حالة المباراة
+ * @param options - خيارات إضافية
+ */
+export function calculatePerfectPredictionBonusWithMinute(
+  isExactScore: boolean,
+  scorerPicks: { predictedGoals: number; actualGoals: number | undefined; position?: string | null }[],
+  matchTime: Date,
+  matchStatus: string,
+  options?: { ignorePositionMultiplier?: boolean }
+): number {
+  if (!isExactScore) return 0;
+
+  // Check that every player scored their exact predicted goals
+  const allExact = scorerPicks.every(p => p.actualGoals === p.predictedGoals);
+  if (!allExact) return 0;
+
+  // التحقق من الدقيقة 75
+  const minutesElapsed = (Date.now() - new Date(matchTime).getTime()) / (1000 * 60);
+  const matchFinished = matchStatus === "FINISHED";
+
+  // قبل الدقيقة 75 والمباراة حية: لا نحسب البونص
+  if (minutesElapsed < PERFECT_PREDICTION_MIN_MINUTE && !matchFinished) {
+    return 0;
+  }
+
+  // بعد الدقيقة 75 أو عند النهاية: +3 نقاط
+  return PERFECT_PREDICTION_BONUS_POINTS;
 }
 
 /** نقاط الهدافين والبطاقة الجريئة — أثناء المباراة أو بعدها */
@@ -157,12 +220,30 @@ export function getScorerGoalsForPoints(
   );
 }
 
+/** نقاط الهدافين حسب الموضع */
+export type PlayerPositionType = "Attacker" | "Midfielder" | "Defender" | null | undefined;
+
+export function getPositionPointsMultiplier(position: PlayerPositionType): number {
+  if (!position) return 1;
+  const lower = position.toLowerCase();
+  if (lower.includes("attacker") || lower.includes("forward") || lower.includes("striker")) return 1;
+  if (lower.includes("midfielder") || lower.includes("mid")) return 2;
+  if (lower.includes("defender") || lower.includes("defence") || lower.includes("defense")) return 3;
+  return 1;
+}
+
 export function calculateScorerPredictionPoints(
   predictedGoals: number,
-  actualGoals: number | undefined
+  actualGoals: number | undefined,
+  position?: PlayerPositionType,
+  options?: { ignorePositionMultiplier?: boolean }
 ): number {
   if (actualGoals == null || actualGoals <= 0) return 0;
-  return Math.min(predictedGoals, actualGoals);
+  const basePoints = Math.min(predictedGoals, actualGoals);
+  const multiplier = options?.ignorePositionMultiplier
+    ? 1
+    : getPositionPointsMultiplier(position);
+  return basePoints * multiplier;
 }
 
 /** البطاقة الجريئة — تراهن على هداف مرة واحدة كل جولة */

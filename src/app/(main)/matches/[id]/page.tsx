@@ -251,13 +251,28 @@ export default function MatchDetailPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <p className="text-sm text-muted">{t.matches.score}</p>
-              <p className="text-xl font-bold">
-                {m.userPrediction.predHome} - {m.userPrediction.predAway}
+              <div className="flex items-center gap-2">
+                <p className="text-xl font-bold">
+                  {m.userPrediction.predHome} - {m.userPrediction.predAway}
+                </p>
                 {m.userPrediction.isDouble && (
-                  <span className="ml-2 text-sm text-warning">2x</span>
+                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-warning/20 px-1.5 text-xs font-bold text-warning ring-1 ring-warning/30">
+                    2×
+                  </span>
                 )}
-              </p>
+              </div>
             </div>
+            {m.userBoldScorerBet && (
+              <div>
+                <p className="text-sm text-muted">{t.matches.featureBold}</p>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-6 items-center gap-0.5 rounded-md bg-amber-500/15 px-1.5 text-xs font-semibold text-amber-400 ring-1 ring-amber-500/25">
+                    <span aria-hidden>✦</span>
+                    <span>{m.userBoldScorerBet.player.name}</span>
+                  </span>
+                </div>
+              </div>
+            )}
             {m.userPrediction.predictedFinishType && (
               <div>
                 <p className="text-sm text-muted">{t.matches.finishType}</p>
