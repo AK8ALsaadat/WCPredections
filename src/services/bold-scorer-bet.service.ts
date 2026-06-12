@@ -151,12 +151,18 @@ export async function calculateBoldScorerBetPointsForMatch(
     player: { name: string; teamId: string };
   }[] = []
 ) {
-  const bets = await prisma.boldScorerBet.findMany({
-    where: { matchId },
-    include: {
-      player: { select: { name: true, teamId: true } },
-    },
-  });
+  const [match, bets] = await Promise.all([
+    prisma.match.findUnique({
+      where: { id: matchId },
+      select: { status: true },
+    }),
+    prisma.boldScorerBet.findMany({
+      where: { matchId },
+      include: {
+        player: { select: { name: true, teamId: true } },
+      },
+    }),
+  ]);
 
   for (const bet of bets) {
     const regulationGoals =
@@ -166,7 +172,12 @@ export async function calculateBoldScorerBetPointsForMatch(
         regulationGoalsByPlayer,
         actualScorers
       ) ?? 0;
-    const points = calculateBoldScorerBetPoints(regulationGoals);
+    const points =
+      match?.status === "FINISHED"
+        ? calculateBoldScorerBetPoints(regulationGoals)
+        : regulationGoals > 0
+          ? BOLD_SCORER_POINTS
+          : 0;
     await prisma.boldScorerBet.update({
       where: { id: bet.id },
       data: { points },

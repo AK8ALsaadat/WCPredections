@@ -5,6 +5,7 @@ import {
   syncMatchesFromApi,
 } from "@/services/football-api";
 import { resolveFootballApiProviderName } from "@/services/football-api/types";
+import { syncLiveMatchesFreshQuick } from "@/services/live-scoring.service";
 import { recalculateMatchScoring } from "@/services/prediction.service";
 import { addDays, format } from "date-fns";
 
@@ -132,11 +133,23 @@ export async function syncActiveRoundFromApi() {
       homeScore: { not: null },
       awayScore: { not: null },
     },
-    select: { id: true },
+    select: {
+      id: true,
+      homeScore: true,
+      awayScore: true,
+      matchScorers: { select: { goals: true } },
+    },
   });
 
   let pointsRecalculated = 0;
   for (const match of scorableMatches) {
+    const expectedGoals = (match.homeScore ?? 0) + (match.awayScore ?? 0);
+    const knownGoals = match.matchScorers.reduce(
+      (sum, scorer) => sum + scorer.goals,
+      0
+    );
+    if (knownGoals !== expectedGoals) continue;
+
     try {
       await recalculateMatchScoring(match.id);
       pointsRecalculated++;
@@ -145,9 +158,13 @@ export async function syncActiveRoundFromApi() {
     }
   }
 
-  revalidateTag("matches-schedule");
-  revalidatePath("/matches");
-  revalidatePath("/dashboard");
+  try {
+    revalidateTag("matches-schedule");
+    revalidatePath("/matches");
+    revalidatePath("/dashboard");
+  } catch {
+    // Direct sync scripts do not have a Next.js request cache store.
+  }
 
   return {
     ...result,
@@ -159,13 +176,28 @@ export async function syncActiveRoundFromApi() {
 }
 
 let syncInterval: ReturnType<typeof setInterval> | null = null;
+let liveSyncInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startAutoSync() {
-  // Radical/debugging measure: disable auto sync to avoid heavy background
-  // work that affects local performance and may cause DB contention.
-  const DISABLE_AUTO_SYNC = true;
-  if (DISABLE_AUTO_SYNC) return;
-  if (syncInterval || process.env.ENABLE_AUTO_SYNC === "false") return;
+  if (
+    syncInterval ||
+    liveSyncInterval ||
+    process.env.ENABLE_AUTO_SYNC === "false"
+  ) {
+    return;
+  }
+
+  const liveSeconds = Math.max(
+    3,
+    Number(process.env.LIVE_SYNC_INTERVAL_SECONDS ?? "8")
+  );
+  const liveRun = () => {
+    void syncLiveMatchesFreshQuick().catch((error) => {
+      console.error("[live scoring] failed:", error);
+    });
+  };
+  setTimeout(liveRun, 1000);
+  liveSyncInterval = setInterval(liveRun, liveSeconds * 1000);
 
   const minutes = Number(process.env.SYNC_INTERVAL_MINUTES ?? "30");
   const intervalMs = minutes * 60 * 1000;
@@ -183,7 +215,7 @@ export function startAutoSync() {
     }
   };
 
-  setTimeout(run, 5000);
+  setTimeout(run, intervalMs);
   syncInterval = setInterval(run, intervalMs);
   const quietStart = process.env.SYNC_QUIET_START ?? "10";
   const quietEnd = process.env.SYNC_QUIET_END ?? "16";

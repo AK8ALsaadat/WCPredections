@@ -898,7 +898,7 @@ export async function getLeagueMatchPredictions(matchId: string) {
   }
 
   const entries = Array.from(rows.values()).sort((a, b) => {
-    if (match.status === "FINISHED") {
+    if (match.status === "LIVE" || match.status === "FINISHED") {
       const totalA =
         (a.prediction?.points ?? 0) +
         (a.prediction?.finishTypePoints ?? 0) +

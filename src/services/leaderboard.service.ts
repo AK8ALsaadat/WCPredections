@@ -176,8 +176,12 @@ async function buildRoundLeaderboard(roundId: string): Promise<LeaderboardEntry[
 
 export async function getOverallLeaderboard(options?: {
   withTrend?: boolean;
+  fresh?: boolean;
 }): Promise<LeaderboardEntry[]> {
   const withTrend = options?.withTrend ?? true;
+  if (options?.fresh) {
+    return buildOverallLeaderboard(withTrend);
+  }
 
   return unstable_cache(
     () => buildOverallLeaderboard(withTrend),
@@ -187,8 +191,13 @@ export async function getOverallLeaderboard(options?: {
 }
 
 export async function getRoundLeaderboard(
-  roundId: string
+  roundId: string,
+  options?: { fresh?: boolean }
 ): Promise<LeaderboardEntry[]> {
+  if (options?.fresh) {
+    return buildRoundLeaderboard(roundId);
+  }
+
   return unstable_cache(
     () => buildRoundLeaderboard(roundId),
     ["round-leaderboard", roundId],

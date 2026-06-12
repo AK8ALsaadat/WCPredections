@@ -74,10 +74,11 @@ type MatchesPageCache = {
 };
 
 const REFRESH_MS = 30_000;
+const LIVE_REFRESH_MS = 5_000;
 const MATCHES_CACHE_FRESH_MS = 15_000;
 
 function matchesCacheKey(roundId: string, page: number, matchType: string) {
-  return `matches:${matchType}:${roundId || "all"}:${page}`;
+  return `matches:v3:${matchType}:${roundId || "all"}:${page}`;
 }
 
 export default function MatchesPage() {
@@ -289,7 +290,7 @@ const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
   );
 
   useEffect(() => {
-    const intervalMs = hasLiveMatches ? 15_000 : REFRESH_MS;
+    const intervalMs = hasLiveMatches ? LIVE_REFRESH_MS : REFRESH_MS;
     const interval = setInterval(
       () => loadMatches(page, selectedRound, { force: true }),
       intervalMs
@@ -389,7 +390,7 @@ const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
                 : "bg-card text-muted hover:text-foreground"
             }`}
           >
-            المباريات السابقة
+            المباريات المتوقعة
           </button>
         </div>
       </div>

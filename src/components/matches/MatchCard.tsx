@@ -333,6 +333,7 @@ export function MatchCard({
           <div className="mt-3">
             <MatchPointsBreakdown
               compact
+              defaultOpen={isLive}
               scorersOnly={isLive && !isFinished}
               homeScore={match.homeScore ?? 0}
               awayScore={match.awayScore ?? 0}

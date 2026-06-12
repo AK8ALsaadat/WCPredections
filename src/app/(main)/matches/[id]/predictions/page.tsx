@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
@@ -49,10 +49,10 @@ export default function LeagueMatchPredictionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadPredictions() {
+  const loadPredictions = useCallback(async () => {
     const [predRes, meRes] = await Promise.all([
-      clientFetch(`/api/matches/${matchId}/predictions`),
-      clientFetch("/api/auth/me"),
+      clientFetch(`/api/matches/${matchId}/predictions`, { cache: "no-store" }),
+      clientFetch("/api/auth/me", { cache: "no-store" }),
     ]);
     const predData = predRes ? await predRes.json() : null;
     const meData = meRes ? await meRes.json() : null;
@@ -66,13 +66,13 @@ export default function LeagueMatchPredictionsPage() {
     if (meData?.success) {
       setCurrentUserId(meData.data.user?.userId);
     }
-  }
+  }, [matchId, t.errors.loadFailed]);
 
   useEffect(() => {
     loadPredictions()
       .catch(() => setError(t.errors.loadFailed))
       .finally(() => setLoading(false));
-  }, [matchId, t.errors.loadFailed]);
+  }, [loadPredictions, t.errors.loadFailed]);
 
   useEffect(() => {
     const shouldPoll =
@@ -82,10 +82,10 @@ export default function LeagueMatchPredictionsPage() {
 
     const timer = setInterval(() => {
       loadPredictions().catch(() => {});
-    }, 30_000);
+    }, 5_000);
 
     return () => clearInterval(timer);
-  }, [data?.match.status, data?.match.matchTime, matchId]);
+  }, [data?.match.status, data?.match.matchTime, loadPredictions]);
 
   if (loading) return <LoadingPage />;
   if (error || !data) {

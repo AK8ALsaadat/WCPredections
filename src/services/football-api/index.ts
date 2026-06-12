@@ -323,7 +323,8 @@ export async function reconcileDuplicateMatchesInRound(roundId: string) {
 async function syncMatch(
   external: ExternalMatch,
   roundId: string,
-  options: SyncOptions = {}
+  options: SyncOptions = {},
+  sourceProvider?: FootballApiProvider
 ): Promise<{ created: boolean; updated: boolean; finished: boolean }> {
   const mapped = applyRemappedMatchState(external);
   const homeTeamId = await resolveTeamId(mapped.homeTeamApiId, {
@@ -389,10 +390,17 @@ async function syncMatch(
 
   const shouldSyncScorers =
     mapped.status === "LIVE" || mapped.status === "FINISHED";
+  let scorerDataComplete = !shouldSyncScorers;
 
   if (shouldSyncScorers) {
     try {
-      await syncMatchScorersFromApi(match.id, mapped.apiId, options);
+      await syncMatchScorersFromApi(
+        match.id,
+        mapped.apiId,
+        options,
+        sourceProvider
+      );
+      scorerDataComplete = true;
       // Publish immediate update about match scorers and basic match info
       try {
         const ms = await prisma.matchScorer.findMany({ where: { matchId: match.id }, include: { player: true } });
@@ -400,6 +408,13 @@ async function syncMatch(
         publish({ type: 'match-updated', data: { matchId: match.id, status: match.status, homeScore: match.homeScore, awayScore: match.awayScore } });
       } catch {}
     } catch (error) {
+      const knownScorers = await prisma.matchScorer.findMany({
+        where: { matchId: match.id },
+        select: { goals: true },
+      });
+      const knownGoals = knownScorers.reduce((sum, row) => sum + row.goals, 0);
+      scorerDataComplete =
+        knownGoals === (match.homeScore ?? 0) + (match.awayScore ?? 0);
       console.warn(
         `[مزامنة هدافين] تخطي مباراة ${mapped.apiId}:`,
         error instanceof Error ? error.message : error
@@ -412,7 +427,7 @@ async function syncMatch(
     match.awayScore !== null &&
     (mapped.status === "LIVE" || isNowFinished);
 
-  if (canRecalculate && shouldSyncScorers) {
+  if (canRecalculate && shouldSyncScorers && scorerDataComplete) {
     try {
       await recalculateMatchScoring(match.id);
       // Broadcast match scoring update to connected clients (real-time UI)
@@ -428,8 +443,12 @@ async function syncMatch(
   }
 
   if (mapped.status === "LIVE" || mapped.status === "FINISHED") {
-    revalidateTag("matches-schedule");
-    revalidateTag(`match-${match.id}`);
+    try {
+      revalidateTag("matches-schedule");
+      revalidateTag(`match-${match.id}`);
+    } catch {
+      // Direct sync scripts do not have a Next.js request cache store.
+    }
   }
 
   return {
@@ -531,6 +550,9 @@ export async function syncMatchesFromApi(
   const playersCount = skipPlayers ? 0 : await syncPlayers(provider, options);
 
   let externalMatches = await provider.fetchMatches(options);
+  const sourceByApiId = new Map<string, FootballApiProvider>(
+    externalMatches.map((match) => [match.apiId, provider])
+  );
 
   if (provider.name === "sportscore") {
     const dbUpdates = await fetchSportScoreUpdatesForRound(
@@ -540,6 +562,29 @@ export async function syncMatchesFromApi(
     const merged = new Map(externalMatches.map((m) => [m.apiId, m]));
     for (const match of dbUpdates) {
       merged.set(match.apiId, match);
+      sourceByApiId.set(match.apiId, provider);
+    }
+
+    // SportScore can occasionally omit a live fixture. Football-Data is the
+    // status/scorer fallback so live scoring does not stall for that match.
+    if (process.env.FOOTBALL_DATA_API_KEY) {
+      try {
+        const fallbackProvider = new FootballDataProvider();
+        const fallbackMatches = await fallbackProvider.fetchMatches({
+          leagueId: process.env.FOOTBALL_LEAGUE_ID ?? "WC",
+          season: process.env.FOOTBALL_SEASON ?? "2026",
+        });
+        for (const match of fallbackMatches) {
+          if (match.status !== "LIVE") continue;
+          merged.set(match.apiId, match);
+          sourceByApiId.set(match.apiId, fallbackProvider);
+        }
+      } catch (error) {
+        console.warn(
+          "[live fallback] Football-Data unavailable:",
+          error instanceof Error ? error.message : error
+        );
+      }
     }
     externalMatches = Array.from(merged.values());
   }
@@ -549,7 +594,12 @@ export async function syncMatchesFromApi(
   let pointsCalculated = 0;
 
   for (const external of externalMatches) {
-    const result = await syncMatch(external, roundId, options);
+    const result = await syncMatch(
+      external,
+      roundId,
+      options,
+      sourceByApiId.get(external.apiId) ?? provider
+    );
     if (result.created) created++;
     if (result.updated) updated++;
     if (result.finished) pointsCalculated++;
@@ -567,7 +617,11 @@ export async function syncMatchesFromApi(
   await reconcileDuplicateMatchesInRound(roundId);
 
   if (updated > 0 || created > 0) {
-    revalidateTag("matches-schedule");
+    try {
+      revalidateTag("matches-schedule");
+    } catch {
+      // Direct sync scripts do not have a Next.js request cache store.
+    }
   }
 
   return {
@@ -611,7 +665,7 @@ export async function ensureMatchSyncedFromApi(matchId: string) {
     const external = await ss.fetchMatchBySlug(slug);
     if (!external) return { synced: false };
 
-    await syncMatch(external, match.roundId, { quickSync: true });
+    await syncMatch(external, match.roundId, { quickSync: true }, provider);
     await reconcileDuplicateMatchesInRound(match.roundId);
     return { synced: true };
   } catch (error) {
@@ -666,7 +720,11 @@ export async function syncStalePredictedMatches(
 
   if (synced > 0) {
     await reconcileDuplicateMatchesInRound(targetRoundId);
-    revalidateTag("matches-schedule");
+    try {
+      revalidateTag("matches-schedule");
+    } catch {
+      // Direct sync scripts do not have a Next.js request cache store.
+    }
   }
 
   return { synced };

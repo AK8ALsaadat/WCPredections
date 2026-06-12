@@ -36,6 +36,7 @@ export default async function OverallLeaderboardPage() {
 
       <LeaderboardTable
         entries={leaderboard}
+        realtimeEndpoint="/api/leaderboard/overall"
         highlightUserId={user?.userId}
         showRankTrend
         labels={{

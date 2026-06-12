@@ -134,21 +134,32 @@ export async function getUserPinnedTodayMatches(
     orderBy: { match: { matchTime: "asc" } },
   });
 
-const matches = predictions
-  .map((p) => p.match)
-  .sort(
-    (a, b) =>
-      new Date(b.matchTime).getTime() -
-      new Date(a.matchTime).getTime()
-  )
-  .slice(0, 3);
+  const statusPriority: Record<string, number> = {
+    LIVE: 0,
+    SCHEDULED: 1,
+    FINISHED: 2,
+    POSTPONED: 3,
+  };
 
-const uniqueById = new Map(matches.map((m) => [m.id, m]));
+  const matches = predictions
+    .map((p) => p.match)
+    .sort((a, b) => {
+      const statusDiff =
+        (statusPriority[a.status] ?? 4) - (statusPriority[b.status] ?? 4);
+      if (statusDiff !== 0) return statusDiff;
 
-return enrichMatchesWithUserPredictions(
-  Array.from(uniqueById.values()),
-  userId
-);
+      const aTime = new Date(a.matchTime).getTime();
+      const bTime = new Date(b.matchTime).getTime();
+      return a.status === "SCHEDULED" ? aTime - bTime : bTime - aTime;
+    })
+    .slice(0, 8);
+
+  const uniqueById = new Map(matches.map((m) => [m.id, m]));
+
+  return enrichMatchesWithUserPredictions(
+    Array.from(uniqueById.values()),
+    userId
+  );
 }
 
 export async function getScheduleMatches(roundId?: string) {

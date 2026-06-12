@@ -15,6 +15,8 @@ import {
 } from "@/lib/profile-history";
 import { formatDate } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
+import { getMatchTotalUserPoints } from "@/lib/match-points-breakdown";
 
 function OutcomeBadge({ outcome }: { outcome: ReturnType<typeof getPredictionOutcome> }) {
   const { messages: t } = useI18n();
@@ -56,8 +58,13 @@ export function PredictionHistoryCard({ entry, defaultOpen = false }: { entry: M
   const m = entry.match;
   const outcome = getPredictionOutcome(entry);
   const breakdownInput = entryToBreakdownInput(entry);
+  const isLive =
+    m.status === "LIVE" && m.homeScore != null && m.awayScore != null;
   const isFinished =
     m.status === "FINISHED" && m.homeScore != null && m.awayScore != null;
+  const livePoints = isLive && breakdownInput
+    ? getMatchTotalUserPoints(breakdownInput)
+    : null;
 
   return (
     <Card className="p-4">
@@ -91,6 +98,16 @@ export function PredictionHistoryCard({ entry, defaultOpen = false }: { entry: M
             <p className="text-sm text-muted">
               {t.profile.actual}: {m.homeScore}-{m.awayScore}
             </p>
+          )}
+          {isLive && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-danger/15 px-2 py-1 text-xs font-bold text-danger">
+                {t.status.LIVE} {m.homeScore}-{m.awayScore}
+              </span>
+              <span className="rounded-full bg-primary/15 px-2 py-1 text-xs font-bold text-primary">
+                {t.matches.pointsEarned}: {livePoints ?? 0}
+              </span>
+            </div>
           )}
           {entry.scorers.length > 0 && (
             <p className="mt-1 text-xs text-muted">
@@ -127,6 +144,12 @@ export function PredictionHistoryCard({ entry, defaultOpen = false }: { entry: M
       {open && breakdownInput && (
         <div className="mt-4 border-t border-card-border pt-4">
           <MatchPointsBreakdown {...breakdownInput} compact />
+        </div>
+      )}
+
+      {(isLive || isFinished) && (
+        <div className="mt-4">
+          <ViewLeaguePredictionsButton matchId={m.id} fullWidth />
         </div>
       )}
 

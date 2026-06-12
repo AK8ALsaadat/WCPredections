@@ -13,6 +13,7 @@ import {
   getUserPinnedTodayMatches,
   enrichMatchesWithUserPredictions,
 } from "@/services/match.service";
+import { syncLiveMatchesFreshQuick } from "@/services/live-scoring.service";
 
 export const dynamic = "force-dynamic";
 
@@ -33,8 +34,7 @@ export async function GET(request: Request) {
 
     const user = await getCurrentUser();
 
-    // Avoid live API sync during request handling in production.
-    // This request should only read current DB state.
+    void syncLiveMatchesFreshQuick().catch(() => {});
 
     const raw = completed
       ? await getCompletedMatches(roundId)
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       
       const matches = await enrichMatchesWithUserPredictions(items, user?.userId);
       const pinnedMatches =
-        user?.userId && page === 1 && !completed
+        user?.userId && page === 1
           ? await getUserPinnedTodayMatches(user.userId, roundId)
           : [];
       return apiSuccess({ matches, pinnedMatches, ...meta });

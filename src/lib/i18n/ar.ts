@@ -146,9 +146,9 @@ export const ar = {
     yourMatchesToday: "مبارياتك اليوم",
     yourMatchesTodayHint:
       "مباريات اليوم اللي توقعتها — تبقى هنا حتى بعد إغلاق التوقع وتقدر تشوف توقعك",
-    yourFinalPredictions: "توقعاتك النهائية",
+    yourFinalPredictions: "المباريات المتوقعة",
     yourFinalPredictionsHint:
-      "مباريات اليوم اللي سجّلت توقعك فيها — تبقى هنا بعد الإغلاق وتقدر تشوف توقعات الدوري",
+      "كل المباريات اللي توقعتها — المباراة المباشرة تظهر أولاً مع نقاطك وتفاصيل توقعات الدوري",
     viewLeaguePredictionsShort: "شف توقعات الدوري",
     yourPredictionShort: "توقعك",
     viewYourPrediction: "عرض توقعك",
@@ -358,8 +358,8 @@ export const ar = {
       n === 1 ? "مباراة واحدة" : `${n} مباراة`,
   },
   predictions: {
-    title: "توقعاتك السابقة",
-    subtitle: "كل توقعاتك مع حالة الصح والخطأ وتفصيل النقاط بعد انتهاء المباراة",
+    title: "المباريات المتوقعة",
+    subtitle: "كل مبارياتك المتوقعة، والمباشرة تظهر أولاً مع النقاط والتفاصيل لحظياً",
     pending: "في الانتظار",
     correctExact: "نتيجة صحيحة",
     correctWinner: "فائز صح",

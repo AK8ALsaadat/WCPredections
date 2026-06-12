@@ -1,5 +1,6 @@
 import { apiSuccess, handleApiError } from "@/lib/api";
 import { getRoundLeaderboard } from "@/services/leaderboard.service";
+import { syncLiveMatchesFreshQuick } from "@/services/live-scoring.service";
 
 export async function GET(
   _request: Request,
@@ -7,8 +8,11 @@ export async function GET(
 ) {
   try {
     const { roundId } = await params;
-    const leaderboard = await getRoundLeaderboard(roundId);
-    return apiSuccess(leaderboard);
+    void syncLiveMatchesFreshQuick().catch(() => {});
+    const leaderboard = await getRoundLeaderboard(roundId, { fresh: true });
+    return apiSuccess(leaderboard, 200, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     return handleApiError(error);
   }

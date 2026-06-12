@@ -97,11 +97,25 @@ export function buildMatchHistoryEntries(history: RawHistory): MatchHistoryEntry
     byMatch.set(bold.match.id, existing);
   }
 
-  return Array.from(byMatch.values()).sort(
-    (a, b) =>
+  const statusPriority: Record<string, number> = {
+    LIVE: 0,
+    SCHEDULED: 1,
+    FINISHED: 2,
+    POSTPONED: 3,
+    CANCELLED: 4,
+  };
+
+  return Array.from(byMatch.values()).sort((a, b) => {
+    const statusDiff =
+      (statusPriority[a.match.status] ?? 5) -
+      (statusPriority[b.match.status] ?? 5);
+    if (statusDiff !== 0) return statusDiff;
+
+    return (
       new Date(b.match.matchTime).getTime() -
       new Date(a.match.matchTime).getTime()
-  );
+    );
+  });
 }
 
 export type PredictionOutcome = "pending" | "exact" | "winner" | "wrong" | "none";
@@ -121,7 +135,11 @@ export function entryToBreakdownInput(
   entry: MatchHistoryEntry
 ): (MatchPointsBreakdownInput & { penaltyWinnerName?: string | null }) | null {
   const m = entry.match;
-  if (m.status !== "FINISHED" || m.homeScore == null || m.awayScore == null) {
+  if (
+    !["LIVE", "FINISHED"].includes(m.status) ||
+    m.homeScore == null ||
+    m.awayScore == null
+  ) {
     return null;
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { clientFetch } from "@/lib/client-fetch";
 import { PredictionHistoryCard } from "@/components/predictions/PredictionHistoryCard";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
@@ -20,19 +20,38 @@ export default function PredictionsHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const loadHistory = useCallback(async () => {
+    const response = await clientFetch("/api/profile", { cache: "no-store" });
+    const data = response ? await response.json() : null;
+    if (data?.success) {
+      setEntries(buildMatchHistoryEntries(data.data.history));
+      setError("");
+    } else {
+      setError(data?.error ?? t.errors.loadFailed);
+    }
+  }, [t.errors.loadFailed]);
+
   useEffect(() => {
-    void clientFetch("/api/profile")
-      .then((r) => (r ? r.json() : null))
-      .then((data) => {
-        if (data?.success) {
-          setEntries(buildMatchHistoryEntries(data.data.history));
-        } else {
-          setError(data?.error ?? t.errors.loadFailed);
-        }
-      })
+    void loadHistory()
       .catch(() => setError(t.errors.loadFailed))
       .finally(() => setLoading(false));
-  }, [t.errors.loadFailed]);
+  }, [loadHistory, t.errors.loadFailed]);
+
+  useEffect(() => {
+    const hasActiveMatch = entries.some(
+      (entry) =>
+        entry.match.status === "LIVE" ||
+        (entry.match.status === "SCHEDULED" &&
+          new Date(entry.match.matchTime).getTime() <= Date.now())
+    );
+    if (!hasActiveMatch) return;
+
+    const timer = setInterval(() => {
+      void loadHistory().catch(() => {});
+    }, 5_000);
+
+    return () => clearInterval(timer);
+  }, [entries, loadHistory]);
 
   const stats = useMemo(() => {
     let exact = 0;

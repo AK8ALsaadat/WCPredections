@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ensureLiveMatchScoringFresh } from '@/services/live-scoring.service';
 
 /**
  * Server-Sent Events endpoint للحصول على تحديثات المباراة الحية
@@ -35,6 +36,7 @@ export async function GET(
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        void ensureLiveMatchScoringFresh(matchId);
         // تحديث أولي: النقاط والأهداف الحالية
         const currentMatch = await prisma.match.findUnique({
           where: { id: matchId },
@@ -65,6 +67,7 @@ export async function GET(
         // استمع للتحديثات (polling بسيط كل 5 ثوان)
         const pollInterval = setInterval(async () => {
           try {
+            void ensureLiveMatchScoringFresh(matchId);
             const updated = await prisma.match.findUnique({
               where: { id: matchId },
               include: {

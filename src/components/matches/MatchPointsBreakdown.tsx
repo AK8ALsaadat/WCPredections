@@ -13,6 +13,7 @@ type MatchPointsBreakdownProps = MatchPointsBreakdownInput & {
   penaltyWinnerName?: string | null;
   compact?: boolean;
   className?: string;
+  defaultOpen?: boolean;
   /** أثناء المباراة — الهدافين والبطاقة الجريئة فقط */
   scorersOnly?: boolean;
 };
@@ -21,10 +22,11 @@ export function MatchPointsBreakdown({
   compact = false,
   className = "",
   scorersOnly = false,
+  defaultOpen = false,
   ...input
 }: MatchPointsBreakdownProps) {
   const { messages: t } = useI18n();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const breakdown = buildMatchPointsBreakdown(input, t, {
     showMisses: true,
     scorersOnly,

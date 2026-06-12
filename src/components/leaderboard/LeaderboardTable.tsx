@@ -1,9 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { LeaderboardEntry } from "@/types";
 import { Card } from "@/components/ui/Card";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
-import type { Messages } from "@/lib/i18n/index";
+import { clientFetch } from "@/lib/client-fetch";
 
 function RankTrend({ change }: { change?: number }) {
   const { messages: t } = useI18n();
@@ -113,11 +114,13 @@ export function LeaderboardTable({
   showRankTrend = false,
   pointsLabel,
   labels,
+  realtimeEndpoint,
 }: {
   entries: LeaderboardEntry[];
   highlightUserId?: string;
   showRankTrend?: boolean;
   pointsLabel?: string;
+  realtimeEndpoint?: string;
   labels?: {
     rank: string;
     trend: string;
@@ -130,6 +133,28 @@ export function LeaderboardTable({
 }) {
   const i18nCtx = useI18n();
   const t = i18nCtx.messages;
+  const [liveEntries, setLiveEntries] = useState(entries);
+
+  useEffect(() => {
+    setLiveEntries(entries);
+  }, [entries]);
+
+  useEffect(() => {
+    if (!realtimeEndpoint) return;
+
+    const refresh = async () => {
+      const response = await clientFetch(realtimeEndpoint, { cache: "no-store" });
+      const payload = response ? await response.json() : null;
+      if (payload?.success && Array.isArray(payload.data)) {
+        setLiveEntries(payload.data);
+      }
+    };
+
+    const timer = setInterval(() => {
+      void refresh();
+    }, 5_000);
+    return () => clearInterval(timer);
+  }, [realtimeEndpoint]);
   const L = labels ?? {
     rank: t.leaderboard.rank,
     trend: t.leaderboard.trend,
@@ -140,7 +165,7 @@ export function LeaderboardTable({
     rankDown: t.leaderboard.rankDown,
   } as const;
 
-  if (entries.length === 0) {
+  if (liveEntries.length === 0) {
     return (
       <Card>
         <p className="py-6 text-center text-sm text-muted">
@@ -153,7 +178,7 @@ export function LeaderboardTable({
   return (
     <>
           <MobileLeaderboardList
-        entries={entries}
+        entries={liveEntries}
         highlightUserId={highlightUserId}
         showRankTrend={showRankTrend}
         pointsLabel={pointsLabel}
@@ -180,7 +205,7 @@ export function LeaderboardTable({
             </tr>
           </thead>
           <tbody>
-              {entries.map((entry) => (
+              {liveEntries.map((entry) => (
               <tr
                 key={entry.userId}
                 className={`border-b border-card-border/40 transition-colors ${

@@ -50,6 +50,7 @@ export default async function RoundLeaderboardPage({
 
       <LeaderboardTable
         entries={leaderboard}
+        realtimeEndpoint={`/api/leaderboard/round/${roundId}`}
         highlightUserId={user?.userId}
         pointsLabel={t.leaderboard.roundPointsColumn}
         labels={{

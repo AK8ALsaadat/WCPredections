@@ -149,9 +149,9 @@ export const en = {
     yourMatchesToday: "Your matches today",
     yourMatchesTodayHint:
       "Today's matches you predicted — stay here after predictions close so you can review your picks",
-    yourFinalPredictions: "Your final predictions",
+    yourFinalPredictions: "Predicted matches",
     yourFinalPredictionsHint:
-      "Today's matches you locked in — they stay here after the window closes with league picks",
+      "All matches you predicted — live matches appear first with points and league details",
     viewLeaguePredictionsShort: "League predictions",
     yourPredictionShort: "Your pick",
     viewYourPrediction: "View your prediction",
@@ -364,8 +364,8 @@ export const en = {
       n === 1 ? "1 match" : `${n} matches`,
   },
   predictions: {
-    title: "Your predictions",
-    subtitle: "All your picks with correct/wrong status and points breakdown after each match",
+    title: "Predicted matches",
+    subtitle: "All your predicted matches, with live points and details shown first",
     pending: "Pending",
     correctExact: "Exact score",
     correctWinner: "Correct winner",

@@ -112,6 +112,7 @@ function PredictionScoreboard({
   awayScorers,
   scorePoints,
   showResults,
+  showMisses,
 }: {
   homeTeam: LeagueTeamInfo;
   awayTeam: LeagueTeamInfo;
@@ -121,6 +122,7 @@ function PredictionScoreboard({
   awayScorers: LeagueMatchPredictionRow["scorerPredictions"];
   scorePoints?: number | null;
   showResults: boolean;
+  showMisses: boolean;
 }) {
   const hasScore = predHome != null && predAway != null;
 
@@ -161,7 +163,11 @@ function PredictionScoreboard({
             <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
               {homeTeam.shortName}
             </p>
-            <ScorerChips scorers={homeScorers} showResults={showResults} />
+            <ScorerChips
+              scorers={homeScorers}
+              showResults={showResults}
+              showMisses={showMisses}
+            />
           </div>
           <div className="min-w-0 text-end">
             <div className="mb-1 flex items-center justify-end gap-1 md:hidden">
@@ -177,6 +183,7 @@ function PredictionScoreboard({
               scorers={awayScorers}
               align="end"
               showResults={showResults}
+              showMisses={showMisses}
             />
           </div>
         </div>
@@ -189,10 +196,12 @@ function ScorerChips({
   scorers,
   align = "start",
   showResults = false,
+  showMisses = false,
 }: {
   scorers: LeagueMatchPredictionRow["scorerPredictions"];
   align?: "start" | "end";
   showResults?: boolean;
+  showMisses?: boolean;
 }) {
   if (scorers.length === 0) {
     return <span className="text-xs text-muted/60">—</span>;
@@ -204,7 +213,7 @@ function ScorerChips({
     >
       {scorers.map((pick) => {
         const hit = showResults && (pick.points ?? 0) > 0;
-        const miss = showResults && (pick.points ?? 0) <= 0;
+        const miss = showMisses && (pick.points ?? 0) <= 0;
         return (
           <span
             key={pick.player.id}
@@ -341,8 +350,8 @@ function LeaguePredictionRow({
       : null;
 
   const breakdown = breakdownInput
-    ? buildMatchPointsBreakdown(breakdownInput, t, {
-        showMisses: true,
+      ? buildMatchPointsBreakdown(breakdownInput, t, {
+        showMisses: isFinished,
         scorersOnly: isLive && !isFinished,
       })
     : buildLeaguePendingBreakdown(
@@ -395,6 +404,7 @@ function LeaguePredictionRow({
           awayScorers={awayScorers}
           scorePoints={showScoreResults ? row.prediction?.points : undefined}
           showResults={showScorerResults}
+          showMisses={isFinished}
         />
       </div>
 

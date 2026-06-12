@@ -1,5 +1,6 @@
 import { apiSuccess, apiError, handleApiError } from "@/lib/api";
 import { requireAuth } from "@/lib/session";
+import { ensureLiveMatchScoringFresh } from "@/services/live-scoring.service";
 import { getLeagueMatchPredictions } from "@/services/prediction.service";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export async function GET(
   try {
     await requireAuth();
     const { id } = await params;
+    void ensureLiveMatchScoringFresh(id);
     const data = await getLeagueMatchPredictions(id);
 
     if (!data) {
