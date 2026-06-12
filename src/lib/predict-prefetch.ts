@@ -29,6 +29,10 @@ function lineupFreshMs(
 
 const inflight = new Map<string, Promise<void>>();
 
+// Radical performance switch: disable prefetch/seeding to avoid many parallel
+// network requests during page load. Set to `false` to re-enable.
+const DISABLE_PREFETCH = true;
+
 export function predictMatchCacheKey(matchId: string) {
   return `predict:match:${matchId}`;
 }
@@ -108,6 +112,7 @@ type PredictMatchCache = {
 
 /** يزرع كاش سريع من بيانات بطاقة المباراة قبل فتح صفحة التوقع */
 export function seedPredictMatchFromList(match: ListMatchSeed) {
+  if (DISABLE_PREFETCH) return;
   const existing = readClientCache<Record<string, unknown>>(
     predictMatchCacheKey(match.id)
   );
@@ -155,6 +160,7 @@ export function seedPredictMatchFromList(match: ListMatchSeed) {
 
 /** يحمّل بيانات التوقع مسبقاً — فور ظهور الرابط أو لمسه */
 export function prefetchPredictData(matchId: string) {
+  if (DISABLE_PREFETCH) return Promise.resolve();
   const matchFresh = isClientCacheFresh(
     predictMatchCacheKey(matchId),
     MATCH_FRESH_MS

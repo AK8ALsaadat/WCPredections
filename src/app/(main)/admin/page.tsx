@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { clientFetch } from "@/lib/client-fetch";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -51,20 +52,20 @@ export default function AdminPage() {
 
   async function loadData() {
     const [roundsRes, teamsRes, matchesRes] = await Promise.all([
-      fetch("/api/admin/rounds"),
-      fetch("/api/admin/teams"),
-      fetch("/api/matches"),
+      clientFetch("/api/admin/rounds"),
+      clientFetch("/api/admin/teams"),
+      clientFetch("/api/matches"),
     ]);
 
     const [roundsData, teamsData, matchesData] = await Promise.all([
-      roundsRes.json(),
-      teamsRes.json(),
-      matchesRes.json(),
+      roundsRes ? roundsRes.json() : null,
+      teamsRes ? teamsRes.json() : null,
+      matchesRes ? matchesRes.json() : null,
     ]);
 
-    if (roundsData.success) setRounds(roundsData.data);
-    if (teamsData.success) setTeams(teamsData.data);
-    if (matchesData.success) setMatches(matchesData.data);
+    if (roundsData?.success) setRounds(roundsData.data);
+    if (teamsData?.success) setTeams(teamsData.data);
+    if (matchesData?.success) setMatches(matchesData.data);
     setLoading(false);
   }
 
@@ -75,12 +76,12 @@ export default function AdminPage() {
   async function apiCall(url: string, method: string, body?: unknown) {
     setError("");
     setMessage("");
-    const res = await fetch(url, {
+    const res = await clientFetch(url, {
       method,
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
     });
-    const data = await res.json();
+    const data = res ? await res.json() : null;
     if (!data.success) {
       setError(data.error);
       return null;

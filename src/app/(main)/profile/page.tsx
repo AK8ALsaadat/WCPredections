@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { clientFetch } from "@/lib/client-fetch";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
-import { PredictionHistoryCard } from "@/components/predictions/PredictionHistoryCard";
+import dynamic from "next/dynamic";
+const PredictionHistoryCard = dynamic(
+  () => import("@/components/predictions/PredictionHistoryCard").then((m) => ({ default: m.PredictionHistoryCard })),
+  { loading: () => <div /> }
+);
 import { buildMatchHistoryEntries } from "@/lib/profile-history";
 import { formatDateShort } from "@/lib/utils";
 import Link from "next/link";
@@ -99,16 +104,16 @@ export default function ProfilePage() {
       return;
     }
 
-    fetch("/api/profile")
-      .then((r) => r.json())
+    void clientFetch("/api/profile")
+      .then((r) => (r ? r.json() : null))
       .then((data) => {
-        if (data.success) {
+        if (data && data.success) {
           writeClientCache(PROFILE_CACHE_KEY, data.data);
           setProfile(data.data);
           setNewUsername(data.data.username);
           setError("");
         } else if (!cached) {
-          setError(data.error);
+          setError(data?.error ?? t.errors.loadFailed);
         }
       })
       .catch(() => {
@@ -133,14 +138,14 @@ export default function ProfilePage() {
     setSavingUsername(true);
 
     try {
-      const res = await fetch("/api/profile", {
+      const res = await clientFetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ username: trimmed }),
       });
 
-      const data = await res.json();
+      const data = res ? await res.json() : null;
       if (!data.success) {
         const msg = data.error ?? "";
         setUsernameError(

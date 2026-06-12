@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
+import ClientProviders from "@/components/ClientProviders";
 import { getDir, getServerLocale } from "@/lib/i18n/server";
 import "./globals.css";
 
@@ -33,7 +33,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <LocaleProvider initialLocale={locale}>{children}</LocaleProvider>
+        <ClientProviders initialLocale={locale}>{children}</ClientProviders>
       </body>
     </html>
   );

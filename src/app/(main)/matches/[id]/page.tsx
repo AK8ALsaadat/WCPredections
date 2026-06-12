@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { TeamLogo } from "@/components/ui/TeamLogo";
+import { clientFetch } from "@/lib/client-fetch";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
@@ -11,7 +12,11 @@ import { Button } from "@/components/ui/Button";
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
 import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
-import { MatchPointsBreakdown } from "@/components/matches/MatchPointsBreakdown";
+import dynamic from "next/dynamic";
+const MatchPointsBreakdown = dynamic(
+  () => import("@/components/matches/MatchPointsBreakdown").then((m) => ({ default: m.MatchPointsBreakdown })),
+  { loading: () => <div /> }
+);
 import { asFinishType } from "@/lib/finish-type";
 import { formatDate, isPredictionAllowed } from "@/lib/utils";
 import {
@@ -31,8 +36,8 @@ export default function MatchDetailPage() {
   const loadMatch = useCallback(
     (opts?: { silent?: boolean }) => {
       if (!opts?.silent) setLoading(true);
-      return fetch(`/api/matches/${matchId}`)
-        .then((r) => r.json())
+      return clientFetch(`/api/matches/${matchId}`)
+        .then((r) => (r ? r.json() : null))
         .then((data) => {
           if (data.success) {
             setMatch(data.data);

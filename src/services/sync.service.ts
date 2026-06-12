@@ -161,6 +161,10 @@ export async function syncActiveRoundFromApi() {
 let syncInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startAutoSync() {
+  // Radical/debugging measure: disable auto sync to avoid heavy background
+  // work that affects local performance and may cause DB contention.
+  const DISABLE_AUTO_SYNC = true;
+  if (DISABLE_AUTO_SYNC) return;
   if (syncInterval || process.env.ENABLE_AUTO_SYNC === "false") return;
 
   const minutes = Number(process.env.SYNC_INTERVAL_MINUTES ?? "30");

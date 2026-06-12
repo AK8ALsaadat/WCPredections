@@ -1,6 +1,6 @@
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { getFlagUrl } from "@/lib/country-flags";
+import { OptimizedImage } from "@/components/ui/OptimizedImage";
 
 type TeamLogoProps = {
   name: string;
@@ -20,15 +20,15 @@ export function TeamLogo({ name, shortName, logoUrl, size = "md" }: TeamLogoProp
 
   if (finalLogoUrl) {
     return (
-      <Image
+      <OptimizedImage
         src={finalLogoUrl}
         alt={name}
         width={px}
         height={px}
-        loading="lazy"
-        quality={75}
         className={cn("rounded-full object-contain", flagUrl ? "border border-card-border/30" : "")}
-        unoptimized={!flagUrl} // السماح بـ unoptimized للشعارات الخارجية الأخرى
+        fallback={flagUrl || undefined}
+        blur={!!flagUrl}
+        unoptimized={!flagUrl}
       />
     );
   }

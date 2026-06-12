@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Card } from "@/components/ui/Card";
-import { MatchPointsBreakdown } from "@/components/matches/MatchPointsBreakdown";
+const MatchPointsBreakdown = dynamic(
+  () => import("@/components/matches/MatchPointsBreakdown").then((m) => ({ default: m.MatchPointsBreakdown })),
+  { ssr: false }
+);
 import {
   entryToBreakdownInput,
   getPredictionOutcome,

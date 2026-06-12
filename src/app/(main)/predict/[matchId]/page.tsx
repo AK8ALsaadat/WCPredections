@@ -598,7 +598,7 @@ export default function PredictPage() {
     setSubmitting(true);
 
     try {
-      const res = await fetch("/api/predictions", {
+      const res = await clientFetch("/api/predictions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -613,7 +613,7 @@ export default function PredictPage() {
         }),
       });
 
-      const data = await res.json();
+      const data = res ? await res.json() : null;
       if (!data.success) {
         setError(data.error);
         return;

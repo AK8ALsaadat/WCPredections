@@ -5,6 +5,7 @@ import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { PredictionHistoryCard } from "@/components/predictions/PredictionHistoryCard";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import { useApi } from "@/lib/use-swr";
 import type { MatchHistoryEntry } from "@/lib/profile-history";
 
 export default function PublicUserPage({
@@ -18,22 +19,32 @@ export default function PublicUserPage({
   const [error, setError] = useState("");
   const [entries, setEntries] = useState<MatchHistoryEntry[]>([]);
 
-  useEffect(() => {
-    setLoading(true);
+  const { data, error: swrError } = useApi<{
+    success: boolean;
+    data?: { history?: MatchHistoryEntry[] };
+    error?: string;
+  }>(`/api/users/${encodeURIComponent(username)}/history`);
 
-    fetch(`/api/users/${encodeURIComponent(username)}/history`)
-      .then((r) => r.json())
-      .then((data: { success: boolean; data?: { history?: MatchHistoryEntry[] }; error?: string }) => {
-        if (data.success) {
-          setEntries(data.data?.history ?? []);
-          setError("");
-        } else {
-          setError(data.error ?? t.errors.generic);
-        }
-      })
-      .catch(() => setError(t.errors.loadFailed))
-      .finally(() => setLoading(false));
-  }, [username, t.errors.generic, t.errors.loadFailed]);
+  useEffect(() => {
+    if (!data && !swrError) return;
+
+    setLoading(false);
+
+    if (swrError) {
+      setError(t.errors.loadFailed);
+      return;
+    }
+
+    if (data) {
+      if (data.success) {
+        setEntries(data.data?.history ?? []);
+        setError("");
+      } else {
+        setEntries([]);
+        setError(data.error ?? t.errors.generic);
+      }
+    }
+  }, [data, swrError, t.errors.generic, t.errors.loadFailed]);
 
   if (loading) return <LoadingPage />;
   if (error) return <ErrorMessage message={error} />;

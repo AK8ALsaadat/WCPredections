@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { clientFetch } from "@/lib/client-fetch";
 import { PredictionHistoryCard } from "@/components/predictions/PredictionHistoryCard";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
@@ -20,13 +21,13 @@ export default function PredictionsHistoryPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/profile")
-      .then((r) => r.json())
+    void clientFetch("/api/profile")
+      .then((r) => (r ? r.json() : null))
       .then((data) => {
-        if (data.success) {
+        if (data?.success) {
           setEntries(buildMatchHistoryEntries(data.data.history));
         } else {
-          setError(data.error ?? t.errors.loadFailed);
+          setError(data?.error ?? t.errors.loadFailed);
         }
       })
       .catch(() => setError(t.errors.loadFailed))

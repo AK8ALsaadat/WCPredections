@@ -10,6 +10,7 @@ import { LeaguePredictionsList } from "@/components/matches/LeaguePredictionsLis
 import { asFinishType } from "@/lib/finish-type";
 import { formatDate, isMatchStarted } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import { clientFetch } from "@/lib/client-fetch";
 import type { LeagueMatchPredictionRow } from "@/types";
 
 type LeaguePredictionsPayload = {
@@ -49,18 +50,20 @@ export default function LeagueMatchPredictionsPage() {
   const [error, setError] = useState("");
 
   async function loadPredictions() {
-    const [predData, meData] = await Promise.all([
-      fetch(`/api/matches/${matchId}/predictions`).then((r) => r.json()),
-      fetch("/api/auth/me").then((r) => r.json()),
+    const [predRes, meRes] = await Promise.all([
+      clientFetch(`/api/matches/${matchId}/predictions`),
+      clientFetch("/api/auth/me"),
     ]);
+    const predData = predRes ? await predRes.json() : null;
+    const meData = meRes ? await meRes.json() : null;
 
-    if (predData.success) {
+    if (predData?.success) {
       setData(predData.data);
       setError("");
     } else {
-      setError(predData.error ?? t.errors.loadFailed);
+      setError(predData?.error ?? t.errors.loadFailed);
     }
-    if (meData.success) {
+    if (meData?.success) {
       setCurrentUserId(meData.data.user?.userId);
     }
   }

@@ -171,6 +171,24 @@ export async function getUpcomingMatches(roundId?: string) {
   });
 }
 
+export async function getCompletedMatches(roundId?: string) {
+  return prisma.match.findMany({
+    where: {
+      roundId: roundId ?? undefined,
+      status: "FINISHED",
+    },
+    include: {
+      homeTeam: { select: teamSelect },
+      awayTeam: { select: teamSelect },
+      round: { select: { id: true, name: true } },
+      predictions: true,
+      scorerPredictions: true,
+      boldScorerBets: true,
+    },
+    orderBy: { matchTime: "desc" },
+  });
+}
+
 export async function getAllMatches(roundId?: string) {
   return prisma.match.findMany({
     where: { roundId: roundId ?? undefined },
