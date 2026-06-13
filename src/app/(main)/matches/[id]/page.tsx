@@ -333,7 +333,7 @@ export default function MatchDetailPage() {
         </Card>
       )}
 
-      <Link href={`/leaderboard/round/${m.round.id}`} className="block">
+      <Link href="/leaderboard/overall" className="block">
         <Card className="cursor-pointer transition-colors hover:border-primary/50">
           <p className="text-sm text-muted">{t.matches.viewRoundLb}</p>
           <p className="font-semibold text-primary">{m.round.name} →</p>

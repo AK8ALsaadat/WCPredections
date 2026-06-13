@@ -251,28 +251,16 @@ export async function getRoundLeaderboardStats(
 
 /** بيانات الرئيسية — استعلامات مجمّعة ومخزّنة مؤقتاً */
 export async function getDashboardData(userId: string) {
-  const [tournamentRound, subRound, totalPoints, overall] = await Promise.all([
+  const [tournamentRound, totalPoints, overall] = await Promise.all([
     getTournamentRound(),
-    getCurrentSubRound(),
     getUserTotalPoints(userId),
     getOverallLeaderboard({ withTrend: true }),
   ]);
 
-  const hasSubRound = Boolean(subRound && subRound._count.matches > 0);
-
-  const [tournamentLb, subRoundLb] = await Promise.all([
-    tournamentRound ? getRoundLeaderboard(tournamentRound.id) : [],
-    hasSubRound && subRound ? getRoundLeaderboard(subRound.id) : [],
-  ]);
-
   return {
     tournamentRound,
-    subRound,
-    hasSubRound,
     totalPoints,
     overall,
-    tournamentLb,
-    subRoundLb,
   };
 }
 

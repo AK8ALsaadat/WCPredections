@@ -1,13 +1,13 @@
 import { apiSuccess, handleApiError } from "@/lib/api";
-import { getRoundLeaderboard } from "@/services/leaderboard.service";
+import { getOverallLeaderboard } from "@/services/leaderboard.service";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ roundId: string }> }
 ) {
   try {
-    const { roundId } = await params;
-    const leaderboard = await getRoundLeaderboard(roundId);
+    await params;
+    const leaderboard = await getOverallLeaderboard();
     return apiSuccess(leaderboard, 200, {
       headers: { "Cache-Control": "no-store" },
     });

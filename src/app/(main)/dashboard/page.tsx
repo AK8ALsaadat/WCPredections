@@ -94,33 +94,26 @@ function StatPill({
 
 function DashboardHeaderStats({
   t,
-  roundPoints,
   tournamentPoints,
-  roundAverage,
+  tournamentAverage,
   participantCount,
 }: {
   t: Messages;
-  roundPoints: number;
   tournamentPoints: number;
-  roundAverage: number;
+  tournamentAverage: number;
   participantCount: number;
 }) {
-  const avgDisplay = participantCount > 0 ? roundAverage : "—";
+  const avgDisplay = participantCount > 0 ? tournamentAverage : "—";
 
   return (
     <div className="flex w-full flex-wrap gap-2 sm:gap-3 md:w-auto md:max-w-xl">
       <StatPill
-        label={t.dashboard.roundPoints}
-        value={roundPoints}
-        tone="warning"
-      />
-      <StatPill
-        label={t.dashboard.tournamentPoints}
+        label={t.dashboard.tournamentPointsSoFar}
         value={tournamentPoints}
         tone="primary"
       />
       <StatPill
-        label={t.dashboard.roundAverage}
+        label={t.dashboard.tournamentPointsAverage}
         value={avgDisplay}
         footer={
           participantCount > 0
@@ -140,35 +133,8 @@ export default async function DashboardPage() {
   const data = await getDashboardData(user.userId);
   const tournamentName =
     data.tournamentRound?.name ?? getTournamentRoundName();
-  const tournamentStats = statsFromLeaderboard(data.tournamentLb, user.userId);
-  const subRoundStats = data.hasSubRound
-    ? statsFromLeaderboard(data.subRoundLb, user.userId)
-    : null;
+  const tournamentStats = statsFromLeaderboard(data.overall, user.userId);
   const myOverall = data.overall.find((e) => e.userId === user.userId);
-
-  const subRoundLbHref = data.subRound
-    ? `/leaderboard/round/${data.subRound.id}`
-    : "/leaderboard/overall";
-  const tournamentLbHref = data.tournamentRound
-    ? `/leaderboard/round/${data.tournamentRound.id}`
-    : "/leaderboard/overall";
-
-  const headerRoundPoints =
-    data.hasSubRound && subRoundStats
-      ? subRoundStats.myPoints
-      : tournamentStats.myPoints;
-  const headerTournamentPoints =
-    data.hasSubRound && subRoundStats
-      ? tournamentStats.myPoints
-      : data.totalPoints;
-  const headerRoundAverage =
-    data.hasSubRound && subRoundStats
-      ? subRoundStats.averagePoints
-      : tournamentStats.averagePoints;
-  const headerParticipants =
-    data.hasSubRound && subRoundStats
-      ? subRoundStats.participantCount
-      : tournamentStats.participantCount;
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -184,26 +150,14 @@ export default async function DashboardPage() {
           </div>
           <DashboardHeaderStats
             t={t}
-            roundPoints={headerRoundPoints}
-            tournamentPoints={headerTournamentPoints}
-            roundAverage={headerRoundAverage}
-            participantCount={headerParticipants}
+            tournamentPoints={data.totalPoints}
+            tournamentAverage={tournamentStats.averagePoints}
+            participantCount={tournamentStats.participantCount}
           />
         </div>
       </div>
 
-      <div
-        className={`grid grid-cols-2 gap-3 md:gap-4 ${data.hasSubRound ? "md:grid-cols-2" : "md:grid-cols-2"}`}
-      >
-        {data.hasSubRound && subRoundStats && (
-          <RankStatCard
-            href={subRoundLbHref}
-            label={t.dashboard.yourRoundRank}
-            rank={subRoundStats.myRank ?? "—"}
-            fullLeaderboardLabel={t.dashboard.fullLeaderboard}
-          />
-        )}
-
+      <div className="grid gap-3 md:max-w-md md:gap-4">
         <RankStatCard
           href="/leaderboard/overall"
           label={t.dashboard.yourOverallRank}
@@ -214,54 +168,20 @@ export default async function DashboardPage() {
       </div>
 
       <section className="grid gap-6 md:gap-8">
-        {data.hasSubRound && data.subRound && subRoundStats && (
-          <div>
-            <div className="mb-3 flex items-center justify-between md:mb-4">
-              <div>
-                <h2 className="text-lg font-semibold md:text-xl">
-                  {t.leaderboard.round}
-                </h2>
-                <p className="mt-0.5 text-sm text-muted">{data.subRound.name}</p>
-              </div>
-              <Link
-                href={subRoundLbHref}
-                className="shrink-0 text-sm text-primary hover:underline"
-              >
-                {t.dashboard.fullLeaderboard} ←
-              </Link>
-            </div>
-
-            <LeaderboardTable
-              entries={data.subRoundLb.slice(0, 5)}
-              highlightUserId={user.userId}
-              pointsLabel={t.leaderboard.roundPointsColumn}
-              labels={{
-                rank: t.leaderboard.rank,
-                trend: t.leaderboard.trend,
-                username: t.leaderboard.username,
-                points: t.leaderboard.points,
-                empty: t.leaderboard.empty,
-                rankUp: t.leaderboard.rankUp,
-                rankDown: t.leaderboard.rankDown,
-              }}
-            />
-          </div>
-        )}
-
         <div>
           <div className="mb-3 flex items-center justify-between md:mb-4">
             <h2 className="text-lg font-semibold md:text-xl">{tournamentName}</h2>
             <Link
-              href={tournamentLbHref}
+              href="/leaderboard/overall"
               className="text-sm text-primary hover:underline"
             >
               {t.dashboard.fullLeaderboard} ←
             </Link>
           </div>
           <LeaderboardTable
-            entries={data.tournamentLb.slice(0, 5)}
+            entries={data.overall.slice(0, 5)}
             highlightUserId={user.userId}
-            pointsLabel={t.leaderboard.roundPointsColumn}
+            pointsLabel={t.leaderboard.points}
             labels={{
               rank: t.leaderboard.rank,
               trend: t.leaderboard.trend,
