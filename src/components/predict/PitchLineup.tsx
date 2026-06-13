@@ -4,6 +4,7 @@ import { layoutFormation, getPlayerLabel } from "@/lib/formation-layout";
 import type { ScorerPicks } from "@/lib/scorer-prediction";
 import type { LineupSource, MatchPlayerView } from "@/services/match-players.service";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
+import { useEffect, useState } from "react";
 
 type PitchLineupProps = {
   home: {
@@ -127,6 +128,13 @@ function positionFallback(position?: string | null) {
   return "?";
 }
 
+function playerImageUrl(player: MatchPlayerView) {
+  return (
+    player.photoUrl ??
+    `/api/player-avatar?name=${encodeURIComponent(player.name)}`
+  );
+}
+
 function PlayerDot({
   player,
   goals,
@@ -143,6 +151,13 @@ function PlayerDot({
   style: React.CSSProperties;
 }) {
   const gk = isGoalkeeper(player);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  // reset failure when photoUrl changes
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    setImageFailed(false);
+  }, [player.photoUrl]);
 
   return (
     <button
@@ -166,23 +181,25 @@ function PlayerDot({
                 : "bg-white/95 text-emerald-900"
           }`}
         >
-          {player.photoUrl ? (
+          {player.photoUrl && !imageFailed ? (
             <OptimizedImage
-              src={player.photoUrl}
+              src={playerImageUrl(player)}
               alt={player.name}
+              fallback={`/api/player-avatar?name=${encodeURIComponent(player.name)}`}
               width={44}
               height={44}
               className="h-full w-full object-cover"
+              onErrorFallback={() => setImageFailed(true)}
             />
           ) : (
-            player.shirtNumber ?? positionFallback(player.position)
+            <div className="flex h-full w-full items-center justify-center text-[14px] font-black">
+              <span className="text-emerald-950">{player.shirtNumber ?? positionFallback(player.position)}</span>
+            </div>
           )}
         </span>
-        {player.photoUrl && (
-          <span className="absolute -bottom-1 -left-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-white/70 bg-emerald-950 px-1 text-[9px] font-black text-white">
-            {player.shirtNumber ?? positionFallback(player.position)}
-          </span>
-        )}
+        <span className="absolute -bottom-1 -left-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-white/70 bg-emerald-950 px-1 text-[9px] font-black text-white">
+          {player.shirtNumber ?? positionFallback(player.position)}
+        </span>
         {selected && goals > 0 && (
           <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-0.5 text-[9px] font-bold text-black">
             {goals}
@@ -220,38 +237,76 @@ function BenchRow({
     <div className="mt-3">
       <p className="mb-2 text-xs font-medium text-muted">{label}</p>
       <div className="flex flex-wrap gap-2">
-        {players.map((player) => {
-          const selected = player.id in scorerPicks;
-          const selectable = selected || (canSelectPlayer?.(player.id) ?? true);
-          const goals = scorerPicks[player.id] ?? 1;
-          return (
-            <button
-              key={player.id}
-              type="button"
-              onClick={() => onToggle(player.id)}
-              disabled={!selectable}
-              className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                selected
-                  ? "border-primary bg-primary/15 text-primary"
-                  : selectable
-                    ? "border-card-border bg-card hover:border-primary/40"
-                    : "cursor-not-allowed border-card-border/60 bg-card/50 text-muted opacity-60"
-              }`}
-            >
-              {player.shirtNumber != null && (
-                <span className="ml-1 font-bold">{player.shirtNumber}</span>
-              )}
-              {getPlayerLabel(player)}
-              {selected && (
-                <span className="mr-1 rounded bg-warning/20 px-1 font-bold text-warning">
-                  ×{goals}
-                </span>
-              )}
-            </button>
-          );
-        })}
+        {players.map((player) => (
+          <BenchPlayerTile
+            key={player.id}
+            player={player}
+            selected={player.id in scorerPicks}
+            selectable={player.id in scorerPicks || (canSelectPlayer?.(player.id) ?? true)}
+            goals={scorerPicks[player.id] ?? 1}
+            onToggle={() => onToggle(player.id)}
+          />
+        ))}
       </div>
     </div>
+  );
+}
+
+function BenchPlayerTile({
+  player,
+  selected,
+  selectable,
+  goals,
+  onToggle,
+}: {
+  player: MatchPlayerView;
+  selected: boolean;
+  selectable: boolean;
+  goals: number;
+  onToggle: () => void;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => setImageFailed(false), [player.photoUrl]);
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={!selectable}
+      className={`flex items-center gap-2 rounded-full border py-1 pl-3 pr-1 text-xs transition-colors ${
+        selected
+          ? "border-primary bg-primary/15 text-primary"
+          : selectable
+            ? "border-card-border bg-card hover:border-primary/40"
+            : "cursor-not-allowed border-card-border/60 bg-card/50 text-muted opacity-60"
+      }`}
+    >
+      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-card-border text-[10px] font-bold">
+        {player.photoUrl && !imageFailed ? (
+          <OptimizedImage
+            src={playerImageUrl(player)}
+            alt={player.name}
+            fallback={`/api/player-avatar?name=${encodeURIComponent(player.name)}`}
+            width={32}
+            height={32}
+            className="h-8 w-8 rounded-full object-cover"
+            onErrorFallback={() => setImageFailed(true)}
+          />
+        ) : (
+          <div className="flex h-8 w-8 items-center justify-center font-black text-sm text-emerald-900">
+            {player.shirtNumber ?? positionFallback(player.position)}
+          </div>
+        )}
+        <span className="absolute -bottom-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-card bg-emerald-950 px-0.5 text-[8px] font-black text-white">
+          {player.shirtNumber ?? positionFallback(player.position)}
+        </span>
+      </span>
+      <span>{getPlayerLabel(player)}</span>
+      {selected && (
+        <span className="rounded bg-warning/20 px-1 font-bold text-warning">×{goals}</span>
+      )}
+    </button>
   );
 }
 

@@ -7,6 +7,7 @@ type OptimizedImageProps = Omit<ImageProps, "src" | "alt"> & {
   alt: string;
   fallback?: string;
   blur?: boolean;
+  onErrorFallback?: () => void;
 };
 
 /**
@@ -18,14 +19,15 @@ export function OptimizedImage({
   fallback,
   blur = true,
   className,
+  onErrorFallback,
   ...props
 }: OptimizedImageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   
-  const finalSrc = src || fallback;
-  
-  if (!finalSrc) {
+  const effectiveSrc = hasError ? fallback ?? null : src || fallback;
+
+  if (!effectiveSrc) {
     return (
       <div
         className={cn(
@@ -35,16 +37,57 @@ export function OptimizedImage({
       />
     );
   }
-  
+  const isSvg =
+    typeof effectiveSrc === "string" &&
+    (effectiveSrc.includes("/api/player-avatar") || /\.svg($|\?)/i.test(effectiveSrc));
+
+  if (isSvg) {
+    return (
+      <div className="relative overflow-hidden">
+        <img
+          src={effectiveSrc ?? undefined}
+          alt={alt}
+          loading="lazy"
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setHasError(true);
+            if (onErrorFallback) onErrorFallback();
+          }}
+          className={cn(
+            "transition-opacity duration-300",
+            isLoading ? "opacity-0" : "opacity-100",
+            className
+          )}
+          {...(function stripProps(p:any){
+            const { unoptimized, placeholder, priority, sizes, ...rest } = p || {};
+            return rest;
+          })(props as any)}
+        />
+        {isLoading && (
+          <div className={cn("absolute inset-0 bg-card-border animate-pulse", className)} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="relative overflow-hidden">
       <Image
-        src={finalSrc}
+        src={effectiveSrc!}
         alt={alt}
         loading="lazy"
-        quality={75} // تقليل جودة الصورة لتسريع التحميل
+        quality={75}
         onLoadingComplete={() => setIsLoading(false)}
-        onError={() => setHasError(true)}
+        onError={() => {
+          if (!hasError && fallback) {
+            setHasError(true);
+            setIsLoading(true);
+            if (onErrorFallback) onErrorFallback();
+            return;
+          }
+          setHasError(true);
+          if (onErrorFallback) onErrorFallback();
+        }}
         className={cn(
           "transition-opacity duration-300",
           isLoading ? "opacity-0" : "opacity-100",
@@ -53,12 +96,7 @@ export function OptimizedImage({
         {...props}
       />
       {isLoading && (
-        <div
-          className={cn(
-            "absolute inset-0 bg-card-border animate-pulse",
-            className
-          )}
-        />
+        <div className={cn("absolute inset-0 bg-card-border animate-pulse", className)} />
       )}
     </div>
   );

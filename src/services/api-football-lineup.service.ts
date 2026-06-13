@@ -8,6 +8,30 @@ type ApiFootballPlayer = {
   grid?: string | null;
 };
 
+export type ApiFootballSquadPlayer = {
+  id: number;
+  name: string;
+  number?: number | null;
+  position?: string | null;
+  photo?: string | null;
+};
+
+type ApiFootballPlayerSearchRow = {
+  player: {
+    id: number;
+    name: string;
+    firstname?: string | null;
+    lastname?: string | null;
+    photo?: string | null;
+  };
+  statistics?: {
+    games?: {
+      number?: number | null;
+      position?: string | null;
+    };
+  }[];
+};
+
 export type ExternalLineupPlayer = {
   id: number;
   name: string;
@@ -44,7 +68,7 @@ async function apiFetch<T>(
     url.searchParams.set(key, value);
   }
 
-  const cacheKey = `af2:${endpoint}?${url.searchParams.toString()}`;
+  const cacheKey = `af3:${endpoint}?${url.searchParams.toString()}`;
   return cachedFetch(cacheKey, async () => {
     const res = await fetch(url, {
       headers: { "x-apisports-key": apiKey },
@@ -83,29 +107,132 @@ function isSeniorNationalTeam(name: string) {
   );
 }
 
+const TEAM_NAME_ALIASES: Record<string, string> = {
+  "bosnia-herzegovina": "Bosnia & Herzegovina",
+};
+const teamIdCache = new Map<string, number | null>();
+
+function repairMojibake(value: string) {
+  if (!/[ÃÂ]/.test(value)) return value;
+  try {
+    return Buffer.from(value, "latin1").toString("utf8");
+  } catch {
+    return value;
+  }
+}
+
+function apiFootballTeamName(teamName: string) {
+  const repaired = repairMojibake(teamName).trim();
+  return TEAM_NAME_ALIASES[repaired.toLowerCase()] ?? repaired;
+}
+
 async function resolveTeamId(teamName: string): Promise<number | null> {
-  const teams = await apiFetch<{
+  type TeamRow = {
     team: {
       id: number;
       name: string;
       country?: string | null;
       national?: boolean;
     };
-  }>("/teams", { search: teamName });
+  };
+
+  const resolvedName = apiFootballTeamName(teamName);
+  const cacheKey = resolvedName.toLowerCase();
+  if (teamIdCache.has(cacheKey)) return teamIdCache.get(cacheKey) ?? null;
+
+  const exactRows = await apiFetch<TeamRow>("/teams", { name: resolvedName });
+  const exactNational = exactRows.find(
+    (row) =>
+      row.team.national &&
+      isSeniorNationalTeam(row.team.name) &&
+      row.team.name.toLowerCase() === resolvedName.toLowerCase()
+  );
+  if (exactNational) {
+    teamIdCache.set(cacheKey, exactNational.team.id);
+    return exactNational.team.id;
+  }
+
+  const teams = await apiFetch<TeamRow>("/teams", { search: resolvedName });
 
   const nationals = teams.filter(
     (row) => row.team.national && isSeniorNationalTeam(row.team.name)
   );
 
   const exact = nationals.find(
-    (row) => row.team.name.toLowerCase() === teamName.toLowerCase()
+    (row) => row.team.name.toLowerCase() === resolvedName.toLowerCase()
   );
-  if (exact) return exact.team.id;
+  if (exact) {
+    teamIdCache.set(cacheKey, exact.team.id);
+    return exact.team.id;
+  }
 
   const partial = nationals.find((row) =>
-    row.team.name.toLowerCase().includes(teamName.toLowerCase())
+    row.team.name.toLowerCase().includes(resolvedName.toLowerCase())
   );
-  return partial?.team.id ?? null;
+  const teamId = partial?.team.id ?? null;
+  teamIdCache.set(cacheKey, teamId);
+  return teamId;
+}
+
+export async function fetchApiFootballSquad(
+  teamName: string
+): Promise<ApiFootballSquadPlayer[]> {
+  if (!isEnabled()) return [];
+
+  try {
+    const teamId = await resolveTeamId(teamName);
+    if (!teamId) return [];
+
+    const rows = await apiFetch<{
+      players?: ApiFootballSquadPlayer[];
+    }>("/players/squads", { team: String(teamId) });
+
+    return rows[0]?.players ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchApiFootballPlayer(
+  teamName: string,
+  playerName: string
+): Promise<ApiFootballSquadPlayer | null> {
+  if (!isEnabled()) return null;
+
+  try {
+    const teamId = await resolveTeamId(teamName);
+    if (!teamId) return null;
+
+    const repairedName = repairMojibake(playerName);
+    const parts = repairedName
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .split(/[^a-zA-Z]+/)
+      .filter(Boolean);
+    const search = parts[parts.length - 1];
+    if (!search || search.length < 4) return null;
+
+    const rows = await apiFetch<ApiFootballPlayerSearchRow>("/players", {
+      search,
+      team: String(teamId),
+      season: "2024",
+    });
+    const row = rows[0];
+    if (!row) return null;
+
+    const games = row.statistics?.[0]?.games;
+    return {
+      id: row.player.id,
+      name:
+        [row.player.firstname, row.player.lastname].filter(Boolean).join(" ") ||
+        row.player.name,
+      number: games?.number ?? null,
+      position: games?.position ?? null,
+      photo: row.player.photo ?? null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function mapLineupPlayers(

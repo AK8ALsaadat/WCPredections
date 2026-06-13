@@ -3,14 +3,17 @@ import { buildExpectedLineup } from "@/lib/expected-lineup";
 import { isWithinLineupFastRefreshWindow } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import {
+  fetchApiFootballPlayer,
+  fetchApiFootballSquad,
   fetchProbableLineupFromApiFootball,
   type ExternalLineupPlayer,
 } from "@/services/api-football-lineup.service";
 import { fetchEspnRoster } from "@/services/espn-roster.service";
+import { fetchWikidataPlayerPhotos } from "@/services/wikidata-player-photos.service";
 
 const EXPECTED_LINEUP_CACHE_MS = 30 * 60 * 1000;
 const TEAM_PLAYERS_CACHE_MS = 10 * 60 * 1000;
-const TEAM_SQUAD_CACHE_MS = 10 * 60 * 1000;
+const TEAM_SQUAD_CACHE_MS = 24 * 60 * 60 * 1000;
 
 const expectedLineupCache = new Map<
   string,
@@ -19,13 +22,23 @@ const expectedLineupCache = new Map<
 const teamPlayersCache = new Map<
   string,
   {
-    players: { id: string; name: string; position?: string | null; shirtNumber?: number | null }[];
+    players: {
+      id: string;
+      name: string;
+      position?: string | null;
+      shirtNumber?: number | null;
+      photoUrl?: string | null;
+    }[];
     expiresAt: number;
   }
 >();
 const teamSquadCache = new Map<
   string,
   { squad: ApiLineupPlayer[]; expiresAt: number }
+>();
+const apiFootballSquadCache = new Map<
+  string,
+  { players: Awaited<ReturnType<typeof fetchApiFootballSquad>>; expiresAt: number }
 >();
 
 type ApiLineupPlayer = {
@@ -122,6 +135,122 @@ const PLAYER_NAME_ALIASES = new Map([
 function lastNameKey(name: string): string {
   const parts = normalizePlayerName(name).split(/\s+/);
   return parts[parts.length - 1] ?? name;
+}
+
+async function enrichWithApiFootballPhotos(
+  teamName: string,
+  view: TeamPlayersView
+): Promise<TeamPlayersView> {
+  if (view.players.length > 0 && view.players.every((player) => player.photoUrl)) {
+    return view;
+  }
+
+  let squad = apiFootballSquadCache.get(teamName);
+  if (!squad || squad.expiresAt <= Date.now()) {
+    const players = await fetchApiFootballSquad(teamName);
+    squad = { players, expiresAt: Date.now() + TEAM_SQUAD_CACHE_MS };
+    if (players.length > 0) {
+      apiFootballSquadCache.set(teamName, squad);
+    }
+  }
+  const matchPlayer = (
+    player: MatchPlayerView,
+    candidates: typeof squad.players
+  ) => {
+    const exact = candidates.find(
+      (candidate) =>
+        normalizePlayerName(candidate.name) === normalizePlayerName(player.name)
+    );
+    const lastMatches = candidates.filter(
+      (candidate) => lastNameKey(candidate.name) === lastNameKey(player.name)
+    );
+    const similar =
+      !exact && lastMatches.length !== 1
+        ? candidates
+            .map((candidate) => ({
+              candidate,
+              score: playerNameSimilarity(player.name, candidate.name),
+            }))
+            .sort((a, b) => b.score - a.score)[0]
+        : null;
+    return (
+      exact ??
+      (lastMatches.length === 1 ? lastMatches[0] : null) ??
+      (similar && similar.score >= 0.72 ? similar.candidate : null)
+    );
+  };
+
+  const unmatched = view.players.filter(
+    (player) => !matchPlayer(player, squad.players)
+  );
+  if (unmatched.length > 0) {
+    const searched = await Promise.all(
+      unmatched.slice(0, 8).map((player) =>
+        fetchApiFootballPlayer(teamName, player.name)
+      )
+    );
+    squad.players = [
+      ...squad.players,
+      ...searched.filter((player) => player != null),
+    ];
+  }
+
+  const byName = new Map(
+    squad.players.map((player) => [normalizePlayerName(player.name), player])
+  );
+  const stillMissing = view.players.filter(
+    (player) => !player.photoUrl && !matchPlayer(player, squad.players)
+  );
+  const wikidataPhotos = await fetchWikidataPlayerPhotos(
+    stillMissing.map((player) => player.name)
+  );
+
+  const enriched = {
+    ...view,
+    players: view.players.map((player) => {
+      const external =
+        byName.get(normalizePlayerName(player.name)) ??
+        matchPlayer(player, squad.players);
+      if (!external) {
+        if (player.photoUrl) {
+          return player;
+        }
+        const photoUrl = wikidataPhotos.get(player.name);
+        return photoUrl ? { ...player, photoUrl } : player;
+      }
+      return {
+        ...player,
+        shirtNumber: player.shirtNumber ?? external.number ?? null,
+        photoUrl:
+          player.photoUrl ??
+          external.photo ??
+          `https://media.api-sports.io/football/players/${external.id}.png`,
+      };
+    }),
+  };
+
+  const photosToPersist = enriched.players.filter(
+    (player) =>
+      !player.id.startsWith("temp-") &&
+      player.photoUrl &&
+      !view.players.find((original) => original.id === player.id)?.photoUrl
+  );
+  if (photosToPersist.length > 0) {
+    try {
+      await prisma.$transaction(
+        photosToPersist.map((player) =>
+          prisma.player.updateMany({
+            where: { id: player.id, photoUrl: null },
+            data: { photoUrl: player.photoUrl },
+          })
+        )
+      );
+    } catch {
+      // Photos still render from the provider response if persistence is unavailable.
+    }
+  }
+
+  return enriched;
 }
 
 async function addMissingShirtNumbers(
@@ -248,7 +377,7 @@ async function mapPlayersFromDatabase(
       name: row.name,
       position: player.position ?? row.position,
       shirtNumber: player.shirtNumber ?? row.shirtNumber,
-      photoUrl: player.photoUrl ?? null,
+      photoUrl: player.photoUrl ?? row.photoUrl ?? null,
       section: player.section,
       grid: player.grid ?? null,
     }];
@@ -295,7 +424,7 @@ async function mapProbableLineupByName(
         name: row.name,
         position: external.position ?? row.position,
         shirtNumber: external.shirtNumber ?? row.shirtNumber,
-        photoUrl: external.photoUrl ?? null,
+        photoUrl: external.photoUrl ?? row.photoUrl ?? null,
         section,
         grid: external.grid ?? null,
       });
@@ -331,6 +460,7 @@ async function getCachedSquad(
       name: true,
       position: true,
       shirtNumber: true,
+      photoUrl: true,
     },
   });
 
@@ -340,6 +470,7 @@ async function getCachedSquad(
       name: p.name,
       position: p.position,
       shirtNumber: p.shirtNumber,
+      photoUrl: p.photoUrl,
     })));
     teamSquadCache.set(cacheKey, {
       squad,
@@ -605,7 +736,7 @@ async function getTeamPlayersForMatch(
     const cacheKey = `team:${teamId}:players`;
     const cached = teamPlayersCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      return {
+      return enrichWithApiFootballPhotos(teamName, {
         formation: "4-3-3",
         players: cached.players.map((p, i) => ({
           id: p.id,
@@ -615,7 +746,7 @@ async function getTeamPlayersForMatch(
           section: i < 11 ? ("lineup" as const) : ("bench" as const),
         })),
         source: "estimated",
-      };
+      });
     }
 
     const existing = await prisma.player.findMany({
@@ -629,6 +760,7 @@ async function getTeamPlayersForMatch(
       name: p.name,
       position: p.position,
       shirtNumber: p.shirtNumber,
+      photoUrl: p.photoUrl,
       section: i < 11 ? ("lineup" as const) : ("bench" as const),
     }));
 
@@ -638,22 +770,29 @@ async function getTeamPlayersForMatch(
         name: p.name,
         position: p.position,
         shirtNumber: p.shirtNumber,
+        photoUrl: p.photoUrl,
       })),
       expiresAt: Date.now() + TEAM_PLAYERS_CACHE_MS,
     });
 
-    return {
+    return enrichWithApiFootballPhotos(teamName, {
       formation: "4-3-3",
       players,
       source: "estimated",
-    };
+    });
   }
 
   if ((apiTeamData?.lineup?.length ?? 0) > 0) {
-    return syncOfficialLineup(teamId, apiTeamId, apiTeamData!);
+    return enrichWithApiFootballPhotos(
+      teamName,
+      await syncOfficialLineup(teamId, apiTeamId, apiTeamData!)
+    );
   }
 
-  return syncExpectedLineup(teamId, apiTeamId, teamName);
+  return enrichWithApiFootballPhotos(
+    teamName,
+    await syncExpectedLineup(teamId, apiTeamId, teamName)
+  );
 }
 
 function resolveLineupStatus(
@@ -681,7 +820,7 @@ async function loadProbableBothTeams(match: {
     formation: null,
   };
 
-  const [home, away] = await Promise.all([
+  const [rawHome, rawAway] = await Promise.all([
     match.homeTeam.apiTeamId
       ? syncExpectedLineup(
           match.homeTeamId,
@@ -696,6 +835,10 @@ async function loadProbableBothTeams(match: {
           match.awayTeam.name
         )
       : getTeamPlayersForMatch(match.awayTeamId, null, match.awayTeam.name),
+  ]);
+  const [home, away] = await Promise.all([
+    enrichWithApiFootballPhotos(match.homeTeam.name, rawHome),
+    enrichWithApiFootballPhotos(match.awayTeam.name, rawAway),
   ]);
 
   return {

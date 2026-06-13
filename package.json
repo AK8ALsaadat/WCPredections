@@ -15,7 +15,9 @@
     "qa:smoke": "node scripts/qa-smoke.mjs",
     "qa:cleanup": "npx tsx scripts/cleanup-qa-users.ts",
     "qa:verify": "node scripts/qa-smoke.mjs && npm run qa:cleanup",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "enrich:wikimedia": "npx tsx scripts/enrich-wikimedia-photos.ts",
+    "enrich:api-football": "npx tsx scripts/enrich-api-football-photos.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.9.0",

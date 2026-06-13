@@ -240,7 +240,7 @@ export default function LeagueMatchPredictionsPage() {
 
       <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted md:gap-3 md:text-xs">
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 ring-1 ring-card-border">
-          <span className="rounded bg-violet-500/25 px-1.5 text-[10px] font-black text-violet-200 ring-1 ring-violet-400/50">
+          <span className="rounded bg-amber-500/25 px-1.5 text-[10px] font-black text-amber-300 ring-1 ring-amber-400/50">
             2×
           </span>
           {t.matches.featureDouble}

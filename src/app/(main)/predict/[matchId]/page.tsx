@@ -543,10 +543,6 @@ export default function PredictPage() {
   }
 
   function handleBoldToggle(checked: boolean) {
-    if (match?.userBoldScorerBet?.playerId && !checked) {
-      setError(t.predict.boldLocked);
-      return;
-    }
     const limits = match?.roundUsageLimits?.boldScorer;
     if (checked && limits && !limits.canUse && !limits.onThisMatch) {
       setError(t.predict.boldExhausted);
@@ -674,8 +670,11 @@ export default function PredictPage() {
     match.boldScorerRoundStatus?.onOtherMatch ??
     false;
   // ✅ منع الـ Double عند تفعيل الـ Bold والعكس
+  const matchLockReason = getPredictionLockReason(match.matchTime, match.status);
+  // allow unchecking an already-committed bold (so user can cancel), but
+  // prevent changing after prediction lock or when double is active / limits exhausted
   const boldCheckboxDisabled =
-    boldCommitted ||
+    Boolean(matchLockReason) ||
     (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
     isDouble; // منع البطاقة الجريئة إذا كان الـ Double مفعل
   const doubleCheckboxDisabled =

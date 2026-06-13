@@ -74,6 +74,7 @@ model Player {
   position  String?
   shirtNumber Int?  @map("shirt_number")
   apiPlayerId String? @map("api_player_id")
+  photoUrl   String? @map("photo_url")
 
   team              Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
   scorerPredictions ScorerPrediction[]

@@ -86,10 +86,13 @@ export async function submitBoldScorerBet(
     },
   });
 
+  // If no playerId is provided, treat as a cancellation request.
   if (!playerId) {
-    if (existing?.matchId === matchId) {
-      throw new Error("ما تقدر تلغي البطاقة الجريئة بعد تفعيلها");
-    }
+    if (!existing) return null;
+    if (existing.matchId !== matchId) return null;
+
+    // allow cancellation prior to lock (lockReason was checked above)
+    await prisma.boldScorerBet.delete({ where: { id: existing.id } });
     return null;
   }
 

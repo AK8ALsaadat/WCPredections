@@ -39,9 +39,31 @@ function spreadRow(
   }));
 }
 
+function spreadFormationRow(players: MatchPlayerView[], y: number) {
+  const isCompactMidfield =
+    players.length <= 3 &&
+    players.every((player) =>
+      (player.position ?? "").toLowerCase().includes("mid")
+    );
+
+  return isCompactMidfield
+    ? spreadRow(players, y, 24, 76)
+    : spreadRow(players, y, 8, 92);
+}
+
 function isGoalkeeper(player: MatchPlayerView) {
   const p = (player.position ?? "").toLowerCase();
   return p.includes("goal");
+}
+
+function positionRank(player: MatchPlayerView) {
+  const position = (player.position ?? "").toLowerCase();
+  if (position.includes("def")) return 0;
+  if (position.includes("mid")) return 1;
+  if (position.includes("attack") || position.includes("forward") || position.includes("offence")) {
+    return 2;
+  }
+  return 3;
 }
 
 function sortStartersByRole(starters: MatchPlayerView[]) {
@@ -49,7 +71,16 @@ function sortStartersByRole(starters: MatchPlayerView[]) {
   const outfield = starters.filter((p) => !isGoalkeeper(p));
   const gkPick = gk[0] ?? starters[0];
   const rest = gk.length > 0 ? outfield : starters.slice(1);
-  return { gk: gkPick ? [gkPick] : [], outfield: gk.length > 0 ? rest : starters.slice(1) };
+  const sortedOutfield = rest
+    .map((player, index) => ({ player, index }))
+    .sort(
+      (left, right) =>
+        positionRank(left.player) - positionRank(right.player) ||
+        left.index - right.index
+    )
+    .map(({ player }) => player);
+
+  return { gk: gkPick ? [gkPick] : [], outfield: sortedOutfield };
 }
 
 /** توزيع من grid الفعلي (مثل 1:1 للحارس من API-Football) */
@@ -102,9 +133,6 @@ export function layoutFormation(
   formation: string | null | undefined,
   side: "home" | "away"
 ): PitchSlot[] {
-  const gridLayout = layoutFromGrid(lineup, side);
-  if (gridLayout) return gridLayout;
-
   const starters = lineup.slice(0, 11);
   const { gk, outfield } = sortStartersByRole(starters);
   const rows = parseFormation(formation);
@@ -122,22 +150,27 @@ export function layoutFormation(
     else break;
   }
 
-  const lineCount = Math.max(lines.length, 1);
   const slots: PitchSlot[] = [];
+  const homeLineYs = lines.length === 3 ? [18, 31, 44] : null;
+  const awayLineYs = lines.length === 3 ? [82, 69, 56] : null;
 
   if (side === "home") {
-    slots.push(...spreadRow(gk, 7));
+    slots.push(...spreadRow(gk, 5));
     lines.forEach((players, lineIndex) => {
-      const y = 16 + ((lineIndex + 1) / (lineCount + 1)) * 36;
-      slots.push(...spreadRow(players, y, 8, 92));
+      const y =
+        homeLineYs?.[lineIndex] ??
+        12 + ((lineIndex + 1) / (lines.length + 1)) * 36;
+      slots.push(...spreadFormationRow(players, y));
     });
     return slots;
   }
 
-  slots.push(...spreadRow(gk, 93));
+  slots.push(...spreadRow(gk, 95));
   lines.forEach((players, lineIndex) => {
-    const y = 84 - ((lineIndex + 1) / (lineCount + 1)) * 36;
-    slots.push(...spreadRow(players, y, 8, 92));
+      const y =
+        awayLineYs?.[lineIndex] ??
+        88 - ((lineIndex + 1) / (lines.length + 1)) * 36;
+    slots.push(...spreadFormationRow(players, y));
   });
   return slots;
 }

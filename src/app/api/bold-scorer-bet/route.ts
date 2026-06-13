@@ -40,3 +40,17 @@ export async function POST(request: Request) {
     return handleApiError(error);
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await requireAuth();
+    const body = await request.json();
+    const data = parseBody(boldScorerBetSchema, body);
+
+    // passing null playerId will cancel/delete the bold bet (if allowed)
+    const bet = await submitBoldScorerBet(user.userId, data.matchId, null);
+    return apiSuccess(bet, 200);
+  } catch (error) {
+    return handleApiError(error);
+  }
+}

@@ -455,9 +455,9 @@ export async function submitMatchPredictionBundle(
 
   if (storedBold?.matchId === data.matchId) {
     if (!data.boldPlayerId) {
-      throw new Error("ما تقدر تلغي البطاقة الجريئة بعد تفعيلها");
-    }
-    if (data.boldPlayerId !== storedBold.playerId) {
+      // cancellation: remove the stored bold bet for this user/round
+      await prisma.boldScorerBet.delete({ where: { id: storedBold.id } });
+    } else if (data.boldPlayerId !== storedBold.playerId) {
       throw new Error("ما تقدر تغيّر لاعب البطاقة الجريئة بعد تفعيلها");
     }
   } else if (

@@ -95,6 +95,7 @@ export default function MatchesPage() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [dataSourceLabel, setDataSourceLabel] = useState(t.matches.dataSource);
   const [liveMatchesCount, setLiveMatchesCount] = useState(0);
+  const [todayLabel, setTodayLabel] = useState<string | null>(null);
 
   const predictionTimezone = getPredictionTimezone();
   const cacheKey = matchesCacheKey(selectedRound, page, matchType);
@@ -215,7 +216,9 @@ const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
           setRounds(data.data);
         }
       });
-  }, []);
+
+    setTodayLabel(formatDayHeader(new Date(), locale));
+  }, [locale]);
 
   useEffect(() => {
     for (const key of [
@@ -384,7 +387,7 @@ const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
       <p className="text-sm text-muted">
         {t.matches.predictWindow}{" "}
         <span className="text-primary">
-          ({formatDayHeader(new Date(), locale)} — {predictionTimezone})
+          ({todayLabel ?? "..."} — {predictionTimezone})
         </span>
       </p>
 
