@@ -16,7 +16,6 @@ export function OptimizedImage({
   src,
   alt,
   fallback,
-  blur = true,
   className,
   onErrorFallback,
   ...props
