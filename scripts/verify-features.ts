@@ -16,7 +16,10 @@ import {
   getScorerGoalsForPoints,
   PERFECT_PREDICTION_BONUS_POINTS,
 } from "../src/services/scoring.service";
-import { MAX_DOUBLES_PER_ROUND } from "../src/services/prediction.service";
+import {
+  MAX_DOUBLES_PER_ROUND,
+  shouldIgnorePositionMultiplierForScorerPrediction,
+} from "../src/services/prediction.service";
 import { MAX_BOLD_SCORER_BETS_PER_ROUND } from "../src/services/round-usage.service";
 import {
   buildMatchPointsBreakdown,
@@ -247,6 +250,13 @@ ok(
   "calculateScorerPredictionPoints",
   calculateScorerPredictionPoints(2, 1) === 1 &&
     calculateScorerPredictionPoints(1, 0) === 0
+);
+ok(
+  "استثناء توقع مدافع danger التاريخي من مضاعف المركز",
+  shouldIgnorePositionMultiplierForScorerPrediction(
+    "cmq9m49xg000jjr046zbmcy8a"
+  ) &&
+    !shouldIgnorePositionMultiplierForScorerPrediction("new-prediction")
 );
 
 const goalsById = new Map([

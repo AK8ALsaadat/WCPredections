@@ -26,6 +26,16 @@ import {
 
 export const MAX_DOUBLES_PER_ROUND = 2;
 
+const LEGACY_BASE_SCORER_PREDICTION_IDS = new Set([
+  "cmq9m49xg000jjr046zbmcy8a",
+]);
+
+export function shouldIgnorePositionMultiplierForScorerPrediction(
+  scorerPredictionId: string
+): boolean {
+  return LEGACY_BASE_SCORER_PREDICTION_IDS.has(scorerPredictionId);
+}
+
 export async function countDoublesUsedInRound(
   userId: string,
   roundId: string,
@@ -546,8 +556,7 @@ async function applyScorerAndBoldPoints(
     }[];
   },
   scorerGoalsByPlayer: Map<string, number>,
-  scorerPredictions: ScorerPredictionWithPlayer[],
-  ignorePositionMultiplier = false
+  scorerPredictions: ScorerPredictionWithPlayer[]
 ): Promise<Map<string, number>> {
   const pointsByUser = new Map<string, number>();
 
@@ -562,7 +571,10 @@ async function applyScorerAndBoldPoints(
       sp.predictedGoals,
       actualGoals,
       sp.player.position as Parameters<typeof calculateScorerPredictionPoints>[2],
-      { ignorePositionMultiplier }
+      {
+        ignorePositionMultiplier:
+          shouldIgnorePositionMultiplierForScorerPrediction(sp.id),
+      }
     );
     await prisma.scorerPrediction.update({
       where: { id: sp.id },
@@ -592,15 +604,6 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
       },
     },
   });
-
-  // Determine whether this match is one of the two most recently finished matches.
-  const lastTwoFinished = await prisma.match.findMany({
-    where: { status: "FINISHED" },
-    orderBy: { matchTime: "desc" },
-    take: 2,
-    select: { id: true },
-  });
-  const ignorePositionMultiplier = lastTwoFinished.some((m) => m.id === match.id);
 
   const finished = isMatchFinishedForScoring(match);
   const canScoreScorers = isMatchEligibleForScorerPoints(match);
@@ -643,8 +646,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
             matchScorers: match.matchScorers,
           },
           scorerGoalsByPlayer,
-          scorerPredictions,
-          ignorePositionMultiplier
+          scorerPredictions
         )
       : new Map<string, number>();
 
@@ -693,8 +695,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
             position: sp.player.position,
           })),
           match.matchTime,
-          match.status,
-          { ignorePositionMultiplier }
+          match.status
         );
       }
 
