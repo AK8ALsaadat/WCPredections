@@ -292,6 +292,86 @@ async function addMissingShirtNumbers(
   }
 }
 
+// Enhance: try API-Football squad and player search if ESPN didn't provide numbers
+async function addMissingShirtNumbersWithApiFootballFallback(
+  teamName: string,
+  squad: ApiLineupPlayer[]
+): Promise<ApiLineupPlayer[]> {
+  // fast path
+  if (squad.every((p) => p.shirtNumber != null)) return squad;
+
+  // first attempt: use existing ESPN-based function
+  const withEspn = await addMissingShirtNumbers(teamName, squad);
+  if (withEspn.every((p) => p.shirtNumber != null)) return withEspn;
+
+  const result = withEspn.slice();
+
+  try {
+    const afSquad = await fetchApiFootballSquad(teamName);
+    if (afSquad.length > 0) {
+      for (let i = 0; i < result.length; i++) {
+        const player = result[i];
+        if (player.shirtNumber != null) continue;
+        // try exact name match first
+        const exact = afSquad.find(
+          (c) => normalizePlayerName(c.name) === normalizePlayerName(player.name)
+        );
+        if (exact && exact.number != null) {
+          result[i] = { ...player, shirtNumber: exact.number };
+          continue;
+        }
+        // last-name match
+        const lastMatches = afSquad.filter(
+          (c) => lastNameKey(c.name) === lastNameKey(player.name)
+        );
+        if (lastMatches.length === 1 && lastMatches[0].number != null) {
+          result[i] = { ...player, shirtNumber: lastMatches[0].number };
+          continue;
+        }
+        // fuzzy match
+        const ranked = afSquad
+          .map((c) => ({ c, score: playerNameSimilarity(player.name, c.name) }))
+          .sort((a, b) => b.score - a.score);
+        const best = ranked[0];
+        const runner = ranked[1];
+        if (
+          best &&
+          best.score >= 0.72 &&
+          best.score - (runner?.score ?? 0) >= 0.08 &&
+          best.c.number != null
+        ) {
+          result[i] = { ...player, shirtNumber: best.c.number };
+          continue;
+        }
+      }
+    }
+  } catch {
+    // ignore API-Football failures
+  }
+
+  // final attempt: call search per-player (slower, limited)
+  const stillMissing = result.filter((p) => p.shirtNumber == null);
+  if (stillMissing.length > 0) {
+    try {
+      const looked = await Promise.all(
+        stillMissing.slice(0, 12).map((p) => fetchApiFootballPlayer(teamName, p.name))
+      );
+      for (let i = 0; i < result.length; i++) {
+        const player = result[i];
+        if (player.shirtNumber != null) continue;
+        const found = looked.find((f) => f && normalizePlayerName(f.name) === normalizePlayerName(player.name));
+        if (found && found.number != null) {
+          result[i] = { ...player, shirtNumber: found.number };
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return result;
+}
+
 function footballDataCacheKey(
   endpoint: string,
   options?: { unfoldLineups?: boolean }
@@ -465,7 +545,7 @@ async function getCachedSquad(
   });
 
   if (cachedPlayers.length >= 20) {
-    const squad = await addMissingShirtNumbers(teamName, cachedPlayers.map((p) => ({
+    const squad = await addMissingShirtNumbersWithApiFootballFallback(teamName, cachedPlayers.map((p) => ({
       id: Number(p.apiPlayerId),
       name: p.name,
       position: p.position,
@@ -482,7 +562,7 @@ async function getCachedSquad(
   const data = await fetchFootballData<{ squad?: ApiLineupPlayer[] }>(
     `/teams/${apiTeamId}`
   );
-  const squad = await addMissingShirtNumbers(
+  const squad = await addMissingShirtNumbersWithApiFootballFallback(
     teamName,
     data.squad ?? []
   );
