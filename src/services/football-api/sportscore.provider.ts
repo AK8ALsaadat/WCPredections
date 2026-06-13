@@ -239,6 +239,8 @@ export class SportScoreProvider implements FootballApiProvider {
         apiId,
         name: player.name,
         teamApiId,
+        position: player.position ?? null,
+        shirtNumber: player.number ?? null,
       });
     }
 

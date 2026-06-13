@@ -6,6 +6,7 @@ import {
   fetchProbableLineupFromApiFootball,
   type ExternalLineupPlayer,
 } from "@/services/api-football-lineup.service";
+import { fetchEspnRoster } from "@/services/espn-roster.service";
 
 const EXPECTED_LINEUP_CACHE_MS = 30 * 60 * 1000;
 const TEAM_PLAYERS_CACHE_MS = 10 * 60 * 1000;
@@ -68,12 +69,110 @@ function normalizePlayerName(name: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\b(?:al|el)\b/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
+
+function compactPlayerName(name: string): string {
+  return normalizePlayerName(name).replace(/\s+/g, "");
+}
+
+function editDistance(left: string, right: string): number {
+  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex++) {
+    let diagonal = row[0];
+    row[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex++) {
+      const previous = row[rightIndex];
+      row[rightIndex] = Math.min(
+        row[rightIndex] + 1,
+        row[rightIndex - 1] + 1,
+        diagonal +
+          (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1)
+      );
+      diagonal = previous;
+    }
+  }
+
+  return row[right.length];
+}
+
+function playerNameSimilarity(left: string, right: string): number {
+  const a = compactPlayerName(left);
+  const b = compactPlayerName(right);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.startsWith(b) || b.startsWith(a)) {
+    return Math.min(a.length, b.length) / Math.max(a.length, b.length);
+  }
+  return 1 - editDistance(a, b) / Math.max(a.length, b.length);
+}
+
+const PLAYER_NAME_ALIASES = new Map([
+  ["roro", "pedromiguel"],
+  ["jassemgaberabdulsallam", "jassemgaber"],
+  ["edmilson", "edmilsonjunior"],
+]);
 
 function lastNameKey(name: string): string {
   const parts = normalizePlayerName(name).split(/\s+/);
   return parts[parts.length - 1] ?? name;
+}
+
+async function addMissingShirtNumbers(
+  teamId: string,
+  teamName: string,
+  squad: ApiLineupPlayer[]
+): Promise<ApiLineupPlayer[]> {
+  if (squad.every((player) => player.shirtNumber != null)) return squad;
+
+  try {
+    const roster = await fetchEspnRoster(teamName);
+    if (roster.length === 0) return squad;
+
+    const updates: { id: number; shirtNumber: number }[] = [];
+    const enriched = squad.map((player) => {
+      if (player.shirtNumber != null) return player;
+      const playerKey = compactPlayerName(player.name);
+      const alias = PLAYER_NAME_ALIASES.get(playerKey);
+      const ranked = roster
+        .map((candidate) => ({
+          candidate,
+          score:
+            alias === compactPlayerName(candidate.name)
+              ? 1
+              : playerNameSimilarity(player.name, candidate.name),
+        }))
+        .sort((a, b) => b.score - a.score);
+      const best = ranked[0];
+      const runnerUp = ranked[1];
+      const shirtNumber =
+        best &&
+        best.score >= 0.72 &&
+        best.score - (runnerUp?.score ?? 0) >= 0.08
+          ? best.candidate.shirtNumber
+          : null;
+      if (shirtNumber == null) return player;
+      updates.push({ id: player.id, shirtNumber });
+      return { ...player, shirtNumber };
+    });
+
+    await Promise.all(
+      updates.map((player) =>
+        prisma.player.updateMany({
+          where: { teamId, apiPlayerId: String(player.id) },
+          data: { shirtNumber: player.shirtNumber },
+        })
+      )
+    );
+
+    return enriched;
+  } catch {
+    return squad;
+  }
 }
 
 function footballDataCacheKey(
@@ -145,21 +244,48 @@ async function batchUpsertPlayers(
 ): Promise<MatchPlayerView[]> {
   if (players.length === 0) return [];
 
-  const apiIds = players.map((p) => String(p.id));
-  const existing = await prisma.player.findMany({
-    where: { teamId, apiPlayerId: { in: apiIds } },
-  });
-  const existingMap = new Map(existing.map((p) => [p.apiPlayerId!, p]));
+  const uniquePlayers = new Map<string, PlayerInput>();
+  for (const player of players) {
+    uniquePlayers.set(String(player.id), player);
+  }
 
-  return players.map((p, index) => {
-    const row = existingMap.get(String(p.id));
+  const rows = await prisma.$transaction(
+    Array.from(uniquePlayers.values()).map((player) =>
+      prisma.player.upsert({
+        where: {
+          teamId_apiPlayerId: {
+            teamId,
+            apiPlayerId: String(player.id),
+          },
+        },
+        create: {
+          teamId,
+          apiPlayerId: String(player.id),
+          name: player.name,
+          position: player.position ?? null,
+          shirtNumber: player.shirtNumber ?? null,
+        },
+        update: {
+          name: player.name,
+          position: player.position ?? null,
+          ...(player.shirtNumber != null
+            ? { shirtNumber: player.shirtNumber }
+            : {}),
+        },
+      })
+    )
+  );
+  const rowsByApiId = new Map(rows.map((row) => [row.apiPlayerId!, row]));
+
+  return players.map((player) => {
+    const row = rowsByApiId.get(String(player.id))!;
     return {
-      id: row?.id ?? `temp-${teamId}-${String(p.id)}-${index}`,
-      name: row?.name ?? p.name,
-      position: row?.position ?? p.position ?? null,
-      shirtNumber: row?.shirtNumber ?? p.shirtNumber ?? null,
-      section: p.section,
-      grid: p.grid ?? null,
+      id: row.id,
+      name: row.name,
+      position: row.position ?? player.position ?? null,
+      shirtNumber: row.shirtNumber ?? player.shirtNumber ?? null,
+      section: player.section,
+      grid: player.grid ?? null,
     };
   });
 }
@@ -223,7 +349,8 @@ async function mapProbableLineupByName(
 
 async function getCachedSquad(
   teamId: string,
-  apiTeamId: string
+  apiTeamId: string,
+  teamName: string
 ): Promise<ApiLineupPlayer[]> {
   const cacheKey = `squad:${teamId}:${apiTeamId}`;
   const cached = teamSquadCache.get(cacheKey);
@@ -242,12 +369,12 @@ async function getCachedSquad(
   });
 
   if (cachedPlayers.length >= 20) {
-    const squad = cachedPlayers.map((p) => ({
+    const squad = await addMissingShirtNumbers(teamId, teamName, cachedPlayers.map((p) => ({
       id: Number(p.apiPlayerId),
       name: p.name,
       position: p.position,
       shirtNumber: p.shirtNumber,
-    }));
+    })));
     teamSquadCache.set(cacheKey, {
       squad,
       expiresAt: Date.now() + TEAM_SQUAD_CACHE_MS,
@@ -258,7 +385,11 @@ async function getCachedSquad(
   const data = await fetchFootballData<{ squad?: ApiLineupPlayer[] }>(
     `/teams/${apiTeamId}`
   );
-  const squad = data.squad ?? [];
+  const squad = await addMissingShirtNumbers(
+    teamId,
+    teamName,
+    data.squad ?? []
+  );
   teamSquadCache.set(cacheKey, {
     squad,
     expiresAt: Date.now() + TEAM_SQUAD_CACHE_MS,
@@ -331,12 +462,13 @@ async function fetchLastFootballDataLineup(
 /** تشكيلة متوقعة من قائمة المنتخب عبر Football-Data */
 async function fetchProbableLineupFromFootballDataSquad(
   teamId: string,
-  apiTeamId: string
+  apiTeamId: string,
+  teamName: string
 ): Promise<TeamPlayersView | null> {
   if (!isFootballDataLineupEnabled()) return null;
 
   try {
-    const squad = await getCachedSquad(teamId, apiTeamId);
+    const squad = await getCachedSquad(teamId, apiTeamId, teamName);
     if (squad.length < 11) return null;
 
     const expected = buildExpectedLineup(squad);
@@ -425,7 +557,8 @@ async function syncProbableLineup(
 
   const fromFootballDataSquad = await fetchProbableLineupFromFootballDataSquad(
     teamId,
-    apiTeamId
+    apiTeamId,
+    teamName
   );
   if (fromFootballDataSquad) {
     expectedLineupCache.set(cacheKey, {
@@ -457,7 +590,8 @@ async function syncProbableLineup(
 
 async function syncEstimatedLineup(
   teamId: string,
-  apiTeamId: string
+  apiTeamId: string,
+  teamName: string
 ): Promise<TeamPlayersView> {
   const cacheKey = `${teamId}:${apiTeamId}:estimated`;
   const cached = expectedLineupCache.get(cacheKey);
@@ -465,7 +599,7 @@ async function syncEstimatedLineup(
     return cached.data;
   }
 
-  const squad = await getCachedSquad(teamId, apiTeamId);
+  const squad = await getCachedSquad(teamId, apiTeamId, teamName);
   const expected = buildExpectedLineup(squad);
   const view = await buildTeamView(
     teamId,
@@ -492,7 +626,7 @@ async function syncExpectedLineup(
   const probable = await syncProbableLineup(teamId, apiTeamId, teamName);
   if (probable) return probable;
 
-  return syncEstimatedLineup(teamId, apiTeamId);
+  return syncEstimatedLineup(teamId, apiTeamId, teamName);
 }
 
 async function getTeamPlayersForMatch(

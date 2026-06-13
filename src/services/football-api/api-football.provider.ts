@@ -123,7 +123,14 @@ export class ApiFootballProvider implements FootballApiProvider {
     }
 
     const response = await this.fetch<
-      { players: { id: number; name: string; position?: string }[] }[]
+      {
+        players: {
+          id: number;
+          name: string;
+          position?: string;
+          number?: number | null;
+        }[];
+      }[]
     >("/players/squads", { team: teamApiId });
 
     return response.flatMap((item) =>
@@ -132,6 +139,7 @@ export class ApiFootballProvider implements FootballApiProvider {
         name: player.name,
         teamApiId,
         position: player.position || null,
+        shirtNumber: player.number ?? null,
       }))
     );
   }

@@ -10,6 +10,7 @@ export type ExternalPlayer = {
   name: string;
   teamApiId: string;
   position?: string | null;
+  shirtNumber?: number | null;
 };
 
 export type ExternalMatch = {

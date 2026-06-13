@@ -154,6 +154,11 @@ function trimToScorerLimits(
   awayPlayerIds: Set<string>
 ): ScorerPicks {
   const next = { ...picks };
+  const validPlayerIds = new Set([...homePlayerIds, ...awayPlayerIds]);
+
+  for (const id of Object.keys(next)) {
+    if (!validPlayerIds.has(id)) delete next[id];
+  }
 
   for (const teamPlayerIds of [homePlayerIds, awayPlayerIds]) {
     const ids = Object.keys(next).filter((id) => teamPlayerIds.has(id));

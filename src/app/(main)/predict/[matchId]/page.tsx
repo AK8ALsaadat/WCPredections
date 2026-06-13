@@ -288,6 +288,17 @@ export default function PredictPage() {
   }, [predHome, predAway, teamSets]);
 
   useEffect(() => {
+    if (!lineup || !boldPlayerId) return;
+    if (
+      !teamSets.home.has(boldPlayerId) &&
+      !teamSets.away.has(boldPlayerId)
+    ) {
+      setBoldPlayerId("");
+      if (!match?.userBoldScorerBet?.playerId) setBoldEnabled(false);
+    }
+  }, [lineup, teamSets, boldPlayerId, match?.userBoldScorerBet?.playerId]);
+
+  useEffect(() => {
     const cachedMatch = readPredictMatchCache<MatchData>(matchId);
     const cachedLineup = readPredictLineupCache<LineupData>(matchId);
 

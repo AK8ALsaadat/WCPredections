@@ -83,10 +83,14 @@ async function syncPlayers(
           name: player.name,
           apiPlayerId: player.apiId,
           position: player.position || null,
+          shirtNumber: player.shirtNumber ?? null,
         },
         update: { 
           name: player.name,
           position: player.position || null,
+          ...(player.shirtNumber != null
+            ? { shirtNumber: player.shirtNumber }
+            : {}),
         },
       });
       count++;

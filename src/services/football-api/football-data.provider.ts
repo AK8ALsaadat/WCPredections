@@ -98,13 +98,20 @@ export class FootballDataProvider implements FootballApiProvider {
     _options: SyncOptions
   ): Promise<ExternalPlayer[]> {
     const data = await this.fetch<{
-      squad: { id: number; name: string }[];
+      squad: {
+        id: number;
+        name: string;
+        position?: string | null;
+        shirtNumber?: number | null;
+      }[];
     }>(`/teams/${teamApiId}`);
 
     return (data.squad ?? []).map((player) => ({
       apiId: String(player.id),
       name: player.name,
       teamApiId,
+      position: player.position ?? null,
+      shirtNumber: player.shirtNumber ?? null,
     }));
   }
 
