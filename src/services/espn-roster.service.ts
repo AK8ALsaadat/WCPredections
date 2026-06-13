@@ -16,6 +16,13 @@ export type EspnRosterPlayer = {
   shirtNumber: number;
 };
 
+const ROSTER_CACHE_MS = 24 * 60 * 60 * 1000;
+const rosterCache = new Map<
+  string,
+  { players: EspnRosterPlayer[]; expiresAt: number }
+>();
+const rosterInflight = new Map<string, Promise<EspnRosterPlayer[]>>();
+
 function decodeHtml(value: string): string {
   return value
     .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
@@ -35,7 +42,10 @@ async function resolveEspnTeamId(teamName: string): Promise<string | null> {
   url.searchParams.set("query", teamName);
   url.searchParams.set("limit", "20");
 
-  const response = await fetch(url, { next: { revalidate: 24 * 60 * 60 } });
+  const response = await fetch(url, {
+    next: { revalidate: 24 * 60 * 60 },
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!response.ok) return null;
 
   const data = (await response.json()) as EspnSearchResponse;
@@ -53,7 +63,7 @@ async function resolveEspnTeamId(teamName: string): Promise<string | null> {
   return team?.uid?.match(/~t:(\d+)$/)?.[1] ?? null;
 }
 
-export async function fetchEspnRoster(
+async function loadEspnRoster(
   teamName: string
 ): Promise<EspnRosterPlayer[]> {
   const teamId = await resolveEspnTeamId(teamName);
@@ -61,7 +71,10 @@ export async function fetchEspnRoster(
 
   const response = await fetch(
     `https://www.espn.com/soccer/team/squad/_/id/${teamId}`,
-    { next: { revalidate: 24 * 60 * 60 } }
+    {
+      next: { revalidate: 24 * 60 * 60 },
+      signal: AbortSignal.timeout(10_000),
+    }
   );
   if (!response.ok) return [];
 
@@ -78,4 +91,32 @@ export async function fetchEspnRoster(
   }
 
   return Array.from(players.values());
+}
+
+export async function fetchEspnRoster(
+  teamName: string
+): Promise<EspnRosterPlayer[]> {
+  const cacheKey = teamName.trim().toLowerCase();
+  const cached = rosterCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.players;
+
+  const inflight = rosterInflight.get(cacheKey);
+  if (inflight) return inflight;
+
+  const request = loadEspnRoster(teamName)
+    .then((players) => {
+      if (players.length > 0) {
+        rosterCache.set(cacheKey, {
+          players,
+          expiresAt: Date.now() + ROSTER_CACHE_MS,
+        });
+      }
+      return players;
+    })
+    .finally(() => {
+      rosterInflight.delete(cacheKey);
+    });
+
+  rosterInflight.set(cacheKey, request);
+  return request;
 }

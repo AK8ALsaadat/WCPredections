@@ -123,7 +123,6 @@ function lastNameKey(name: string): string {
 }
 
 async function addMissingShirtNumbers(
-  teamId: string,
   teamName: string,
   squad: ApiLineupPlayer[]
 ): Promise<ApiLineupPlayer[]> {
@@ -133,8 +132,7 @@ async function addMissingShirtNumbers(
     const roster = await fetchEspnRoster(teamName);
     if (roster.length === 0) return squad;
 
-    const updates: { id: number; shirtNumber: number }[] = [];
-    const enriched = squad.map((player) => {
+    return squad.map((player) => {
       if (player.shirtNumber != null) return player;
       const playerKey = compactPlayerName(player.name);
       const alias = PLAYER_NAME_ALIASES.get(playerKey);
@@ -156,20 +154,8 @@ async function addMissingShirtNumbers(
           ? best.candidate.shirtNumber
           : null;
       if (shirtNumber == null) return player;
-      updates.push({ id: player.id, shirtNumber });
       return { ...player, shirtNumber };
     });
-
-    await Promise.all(
-      updates.map((player) =>
-        prisma.player.updateMany({
-          where: { teamId, apiPlayerId: String(player.id) },
-          data: { shirtNumber: player.shirtNumber },
-        })
-      )
-    );
-
-    return enriched;
   } catch {
     return squad;
   }
@@ -238,55 +224,31 @@ async function fetchFootballData<T>(
   );
 }
 
-async function batchUpsertPlayers(
+async function mapPlayersFromDatabase(
   teamId: string,
   players: PlayerInput[]
 ): Promise<MatchPlayerView[]> {
   if (players.length === 0) return [];
 
-  const uniquePlayers = new Map<string, PlayerInput>();
-  for (const player of players) {
-    uniquePlayers.set(String(player.id), player);
-  }
-
-  const rows = await prisma.$transaction(
-    Array.from(uniquePlayers.values()).map((player) =>
-      prisma.player.upsert({
-        where: {
-          teamId_apiPlayerId: {
-            teamId,
-            apiPlayerId: String(player.id),
-          },
-        },
-        create: {
-          teamId,
-          apiPlayerId: String(player.id),
-          name: player.name,
-          position: player.position ?? null,
-          shirtNumber: player.shirtNumber ?? null,
-        },
-        update: {
-          name: player.name,
-          position: player.position ?? null,
-          ...(player.shirtNumber != null
-            ? { shirtNumber: player.shirtNumber }
-            : {}),
-        },
-      })
-    )
+  const apiPlayerIds = Array.from(
+    new Set(players.map((player) => String(player.id)))
   );
+  const rows = await prisma.player.findMany({
+    where: { teamId, apiPlayerId: { in: apiPlayerIds } },
+  });
   const rowsByApiId = new Map(rows.map((row) => [row.apiPlayerId!, row]));
 
-  return players.map((player) => {
-    const row = rowsByApiId.get(String(player.id))!;
-    return {
+  return players.flatMap((player) => {
+    const row = rowsByApiId.get(String(player.id));
+    if (!row) return [];
+    return [{
       id: row.id,
       name: row.name,
-      position: row.position ?? player.position ?? null,
-      shirtNumber: row.shirtNumber ?? player.shirtNumber ?? null,
+      position: player.position ?? row.position,
+      shirtNumber: player.shirtNumber ?? row.shirtNumber,
       section: player.section,
       grid: player.grid ?? null,
-    };
+    }];
   });
 }
 
@@ -369,7 +331,7 @@ async function getCachedSquad(
   });
 
   if (cachedPlayers.length >= 20) {
-    const squad = await addMissingShirtNumbers(teamId, teamName, cachedPlayers.map((p) => ({
+    const squad = await addMissingShirtNumbers(teamName, cachedPlayers.map((p) => ({
       id: Number(p.apiPlayerId),
       name: p.name,
       position: p.position,
@@ -386,7 +348,6 @@ async function getCachedSquad(
     `/teams/${apiTeamId}`
   );
   const squad = await addMissingShirtNumbers(
-    teamId,
     teamName,
     data.squad ?? []
   );
@@ -499,7 +460,7 @@ async function buildTeamView(
   ];
 
   const players = apiTeamId
-    ? await batchUpsertPlayers(teamId, inputs)
+    ? await mapPlayersFromDatabase(teamId, inputs)
     : inputs.map((p, i) => ({
         id: `temp-${i}`,
         name: p.name,
