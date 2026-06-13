@@ -513,11 +513,21 @@ async function mapProbableLineupByName(
   };
 
   const mappedLineup = mapSection(lineup, "lineup");
+  const mappedBench = mapSection(bench, "bench");
+  // If there are fewer than 11 mapped starters, promote bench players
+  // from the last match into the lineup until we reach 11 starters.
+  if (mappedLineup.length < 11 && mappedBench.length > 0) {
+    const need = 11 - mappedLineup.length;
+    const toPromote = mappedBench.slice(0, need).map((p) => ({ ...p, section: "lineup" as const }));
+    // remove promoted from bench list
+    mappedBench.splice(0, toPromote.length);
+    mappedLineup.push(...toPromote);
+  }
   if (mappedLineup.length < 11) return null;
 
   return {
     formation,
-    players: [...mappedLineup, ...mapSection(bench, "bench")],
+    players: [...mappedLineup, ...mappedBench],
     source: "probable",
   };
 }
