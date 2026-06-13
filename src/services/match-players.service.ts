@@ -732,19 +732,7 @@ async function syncProbableLineup(
     return view;
   }
 
-  const fromFootballDataSquad = await fetchProbableLineupFromFootballDataSquad(
-    teamId,
-    apiTeamId,
-    teamName
-  );
-  if (fromFootballDataSquad) {
-    expectedLineupCache.set(cacheKey, {
-      data: fromFootballDataSquad,
-      expiresAt: Date.now() + EXPECTED_LINEUP_CACHE_MS,
-    });
-    return fromFootballDataSquad;
-  }
-
+  // Prefer last actual lineup from API-Football as a second-choice source
   const fromApiFootball = await fetchProbableLineupFromApiFootball(teamName);
   if (fromApiFootball) {
     const mapped = await mapProbableLineupByName(
@@ -760,6 +748,20 @@ async function syncProbableLineup(
       });
       return mapped;
     }
+  }
+
+  // Fallback: build probable lineup from the team's squad (expected starters)
+  const fromFootballDataSquad = await fetchProbableLineupFromFootballDataSquad(
+    teamId,
+    apiTeamId,
+    teamName
+  );
+  if (fromFootballDataSquad) {
+    expectedLineupCache.set(cacheKey, {
+      data: fromFootballDataSquad,
+      expiresAt: Date.now() + EXPECTED_LINEUP_CACHE_MS,
+    });
+    return fromFootballDataSquad;
   }
 
   return null;
