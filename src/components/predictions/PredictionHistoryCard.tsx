@@ -16,6 +16,7 @@ import {
 import { formatDate } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
+import { PredictionFeatureTag } from "@/components/ui/PredictionFeatureTag";
 import { getMatchTotalUserPoints } from "@/lib/match-points-breakdown";
 
 function OutcomeBadge({ outcome }: { outcome: ReturnType<typeof getPredictionOutcome> }) {
@@ -90,7 +91,12 @@ export function PredictionHistoryCard({ entry, defaultOpen = false }: { entry: M
                 {entry.prediction.predHome}-{entry.prediction.predAway}
               </span>
               {entry.prediction.isDouble && (
-                <span className="mr-1 text-warning"> 2×</span>
+                    <PredictionFeatureTag
+                      type="double"
+                      icon="2×"
+                      label={t.matches.featureDouble}
+                      className="mr-1"
+                    />
               )}
             </p>
           )}
@@ -122,9 +128,13 @@ export function PredictionHistoryCard({ entry, defaultOpen = false }: { entry: M
             </p>
           )}
           {entry.bold && (
-            <p className="mt-1 text-xs text-amber-400">
-              ✦ {entry.bold.player.name}
-            </p>
+            <div className="mt-2">
+              <PredictionFeatureTag
+                type="bold"
+                icon="✦"
+                label={entry.bold.player.name}
+              />
+            </div>
           )}
         </div>
 

@@ -6,6 +6,7 @@ import { formatDate, isPredictionAllowed, getPredictionLockReason } from "@/lib/
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { Card } from "@/components/ui/Card";
+import { PredictionFeatureTag } from "@/components/ui/PredictionFeatureTag";
 import dynamic from "next/dynamic";
 const MatchPointsBreakdown = dynamic(
   () => import("@/components/matches/MatchPointsBreakdown").then((m) => ({ default: m.MatchPointsBreakdown })),
@@ -244,15 +245,21 @@ export function MatchCard({
               <span className="text-lg font-medium text-muted">{t.matches.vs}</span>
             )}
             {match.userPrediction?.isDouble && showPredictionInfo && (
-              <span className="mt-1 rounded-lg bg-violet-500/25 px-2 py-0.5 text-xs font-black text-violet-200 ring-1 ring-violet-400/50">
-                ×2 {t.matches.featureDouble}
-              </span>
+              <PredictionFeatureTag
+                type="double"
+                icon="2×"
+                label={t.matches.featureDouble}
+                className="mt-1"
+              />
             )}
 
             {match.userBoldScorerBet && !isFinished && (
-              <span className="mt-1 rounded-lg bg-red-500/10 px-2 py-0.5 text-xs font-black text-red-400 ring-1 ring-red-300">
-                {t.matches.featureBold}
-              </span>
+              <PredictionFeatureTag
+                type="bold"
+                icon="✦"
+                label={t.matches.featureBold}
+                className="mt-1"
+              />
             )}
             <span className="mt-1 text-xs text-muted">
               {formatDate(match.matchTime, locale)}

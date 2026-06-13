@@ -11,6 +11,7 @@ import {
 } from "@/lib/match-points-breakdown";
 import { PointsBreakdownLines } from "@/components/matches/PointsBreakdownLines";
 import { TeamLogo } from "@/components/ui/TeamLogo";
+import { PredictionFeatureTag } from "@/components/ui/PredictionFeatureTag";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import type { Messages } from "@/lib/i18n/ar";
 
@@ -61,23 +62,20 @@ function FeatureBadges({
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-1">
       {hasDouble && (
-        <span
-          title={t.matches.featureDouble}
-          className="inline-flex h-7 min-w-10 items-center justify-center rounded-lg bg-violet-500/25 px-2 text-xs font-black text-violet-200 ring-1 ring-violet-400/60 shadow-sm shadow-violet-950/40"
-        >
-          2×
-        </span>
+        <PredictionFeatureTag
+          type="double"
+          icon="2×"
+          label={t.matches.featureDouble}
+        />
       )}
       {hasBold && (
-        <span
+        <PredictionFeatureTag
+          type="bold"
+          icon="✦"
           title={`${t.matches.featureBold}: ${row.boldScorerBet!.player.name}`}
-          className="inline-flex h-7 items-center gap-1 rounded-lg bg-amber-500/20 px-2 text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/50 shadow-sm shadow-amber-950/30"
-        >
-          <span aria-hidden>✦</span>
-          <span className="max-w-[4rem] truncate">
-            {shortPlayerName(row.boldScorerBet!.player.name)}
-          </span>
-        </span>
+          label={shortPlayerName(row.boldScorerBet!.player.name)}
+          className="max-w-[5.5rem]"
+        />
       )}
       {isKnockout && finishType && (
         <span
