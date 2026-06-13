@@ -11,8 +11,8 @@ import {
 import { fetchEspnRoster } from "@/services/espn-roster.service";
 import { fetchWikidataPlayerPhotos } from "@/services/wikidata-player-photos.service";
 
-const EXPECTED_LINEUP_CACHE_MS = 30 * 60 * 1000;
-const TEAM_PLAYERS_CACHE_MS = 10 * 60 * 1000;
+const EXPECTED_LINEUP_CACHE_MS = 60 * 60 * 1000;
+const TEAM_PLAYERS_CACHE_MS = 30 * 60 * 1000;
 const TEAM_SQUAD_CACHE_MS = 24 * 60 * 60 * 1000;
 
 const expectedLineupCache = new Map<

@@ -6,7 +6,6 @@ type OptimizedImageProps = Omit<ImageProps, "src" | "alt"> & {
   src: string | null | undefined;
   alt: string;
   fallback?: string;
-  blur?: boolean;
   onErrorFallback?: () => void;
 };
 
@@ -24,7 +23,7 @@ export function OptimizedImage({
 }: OptimizedImageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  
+
   const effectiveSrc = hasError ? fallback ?? null : src || fallback;
 
   if (!effectiveSrc) {
@@ -41,10 +40,12 @@ export function OptimizedImage({
     typeof effectiveSrc === "string" &&
     (effectiveSrc.includes("/api/player-avatar") || /\.svg($|\?)/i.test(effectiveSrc));
 
-  function stripProps(
-    p: Omit<ImageProps, "src" | "alt"> | null | undefined
-  ) {
-    const { unoptimized, placeholder, priority, sizes, ...rest } = p ?? {};
+  function stripProps(p: Omit<ImageProps, "src" | "alt"> | null | undefined) {
+    const rest = { ...(p ?? {}) } as Record<string, unknown>;
+    delete rest.unoptimized;
+    delete rest.placeholder;
+    delete rest.priority;
+    delete rest.sizes;
     return rest as React.ComponentPropsWithoutRef<"img">;
   }
 
