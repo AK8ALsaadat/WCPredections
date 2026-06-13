@@ -764,7 +764,7 @@ export default function PredictPage() {
           </div>
         )}
 
-        <Card className="border-orange-400/35 bg-gradient-to-br from-orange-950/35 via-card to-amber-500/5 shadow-xl shadow-orange-950/20">
+        <Card>
           <CardHeader>
             <CardTitle>{t.predict.scorePrediction}</CardTitle>
           </CardHeader>
@@ -792,18 +792,30 @@ export default function PredictPage() {
           <p className="mt-3 text-center text-sm text-muted">
             {t.predict.scoreFirstHint}
           </p>
+        </Card>
 
-          <div className="mt-4 space-y-3">
+        <Card className="relative overflow-hidden border-orange-400/45 bg-gradient-to-br from-orange-950/50 via-card to-amber-500/10 shadow-xl shadow-orange-950/25">
+          <div className="pointer-events-none absolute -left-16 -top-20 h-44 w-44 rounded-full bg-orange-500/15 blur-3xl" />
+          <CardHeader className="relative">
+            <CardTitle className="flex items-center gap-3 text-orange-100">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-orange-300/40 bg-orange-500/20 text-lg font-black text-orange-200 shadow-inner">
+                x2
+              </span>
+              {t.predict.doublePoints}
+            </CardTitle>
+          </CardHeader>
+
+          <div className="relative space-y-3">
             {doubleLimits && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm">
-                <span className="font-semibold text-warning">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-orange-400/30 bg-orange-500/10 px-3 py-2 text-sm">
+                <span className="font-semibold text-orange-200">
                   {t.predict.doubleCounter(
                     doubleLimits.used,
                     doubleLimits.max
                   )}
                 </span>
                 {doubleLimits.onThisMatch ? (
-                  <span className="text-warning">
+                  <span className="text-orange-200">
                     {t.predict.doubleOnThisMatch}
                   </span>
                 ) : doubleLimits.remaining > 0 ? (
@@ -822,18 +834,18 @@ export default function PredictPage() {
               className={`flex items-center gap-3 rounded-lg border p-4 transition-colors ${
                 doubleCheckboxDisabled
                   ? "cursor-not-allowed border-card-border/60 opacity-60"
-                  : "cursor-pointer border-card-border hover:border-warning/50"
-              } ${doubleCommitted ? "border-warning/40 bg-warning/10" : ""}`}
+                  : "cursor-pointer border-orange-400/30 bg-black/10 hover:border-orange-300/60"
+              } ${doubleCommitted ? "border-orange-400/50 bg-orange-500/15" : ""}`}
             >
               <input
                 type="checkbox"
                 checked={isDouble}
                 disabled={doubleCheckboxDisabled}
                 onChange={(e) => handleDoubleToggle(e.target.checked)}
-                className="h-5 w-5 rounded accent-warning disabled:cursor-not-allowed"
+                className="h-5 w-5 rounded accent-orange-500 disabled:cursor-not-allowed"
               />
               <div>
-                <p className="font-medium text-warning">
+                <p className="font-medium text-orange-100">
                   {t.predict.doublePoints}
                 </p>
                 <p className="text-sm text-muted">

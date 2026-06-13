@@ -59,25 +59,6 @@ function sourceBadgeLabel(
   return labels.estimatedBadge;
 }
 
-function statusNote(
-  status: LineupSource,
-  labels: PitchLineupProps["labels"]
-) {
-  if (status === "official") return labels.officialNote;
-  if (status === "probable") return labels.probableNote;
-  return labels.estimatedNote;
-}
-
-function statusNoteClass(status: LineupSource) {
-  if (status === "official") {
-    return "border border-primary/30 bg-primary/10 text-primary";
-  }
-  if (status === "probable") {
-    return "border border-warning/30 bg-warning/10 text-warning";
-  }
-  return "border border-card-border bg-card text-muted";
-}
-
 function GoalsStepper({
   goals,
   maxGoals,
@@ -404,7 +385,6 @@ function SelectedScorersPanel({
 export function PitchLineup({
   home,
   away,
-  lineupStatus,
   scorerPicks,
   canSelectPlayer,
   maxGoalsForPlayer,
@@ -439,11 +419,6 @@ export function PitchLineup({
       <div>
         <p className="font-medium">{labels.title}</p>
         <p className="text-sm text-muted">{labels.hint}</p>
-        <p
-          className={`mt-2 rounded-lg px-3 py-2 text-xs ${statusNoteClass(lineupStatus)}`}
-        >
-          {statusNote(lineupStatus, labels)}
-        </p>
       </div>
 
       <div className="overflow-x-auto pb-2">
