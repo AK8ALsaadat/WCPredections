@@ -41,6 +41,13 @@ export function OptimizedImage({
     typeof effectiveSrc === "string" &&
     (effectiveSrc.includes("/api/player-avatar") || /\.svg($|\?)/i.test(effectiveSrc));
 
+  function stripProps(
+    p: Omit<ImageProps, "src" | "alt"> | null | undefined
+  ) {
+    const { unoptimized, placeholder, priority, sizes, ...rest } = p ?? {};
+    return rest as React.ComponentPropsWithoutRef<"img">;
+  }
+
   if (isSvg) {
     return (
       <div className="relative overflow-hidden">
@@ -58,10 +65,7 @@ export function OptimizedImage({
             isLoading ? "opacity-0" : "opacity-100",
             className
           )}
-          {...(function stripProps(p:any){
-            const { unoptimized, placeholder, priority, sizes, ...rest } = p || {};
-            return rest;
-          })(props as any)}
+          {...stripProps(props)}
         />
         {isLoading && (
           <div className={cn("absolute inset-0 bg-card-border animate-pulse", className)} />

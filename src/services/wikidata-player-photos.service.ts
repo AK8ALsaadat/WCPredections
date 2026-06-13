@@ -120,11 +120,16 @@ export async function fetchWikidataPlayerPhotos(
         return res.json();
       }, 24 * 60 * 60 * 1000);
 
-      const pageMap = new Map<string, { url: string; width?: number; height?: number; title: string }>(); // fileTitle -> thumb info
+      type ThumbPage = {
+        title?: string;
+        thumbnail?: { source?: string; width?: number; height?: number };
+      };
+
+      const pageMap = new Map<string, { url: string; width?: number; height?: number; title: string }>();
       const pages = thumbData?.query?.pages ?? {};
       for (const key of Object.keys(pages)) {
-        const p = (pages as any)[key];
-        if (p && p.title && p.thumbnail && p.thumbnail.source) {
+        const p = pages[key] as ThumbPage | undefined;
+        if (p?.title && p.thumbnail?.source) {
           pageMap.set(p.title, {
             url: p.thumbnail.source.replace(/^http:/, 'https:'),
             width: p.thumbnail.width,
