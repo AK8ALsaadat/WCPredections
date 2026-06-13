@@ -219,6 +219,9 @@ export const en = {
     winnerCorrect: "Correct winner",
     scoreWrong: "Wrong score prediction",
     doubled: "doubled",
+    doubleFinalTotal: "Double final match total ×2",
+    doubleFinalTotalDetail: "Applied once after score, scorer, and bonus points are added",
+    doublePendingDetail: "The final match points total will be doubled after full time",
     exactDetail: (predH: number, predA: number, actH: number, actA: number) =>
       `You predicted ${predH}-${predA}, result ${actH}-${actA}`,
     winnerDetail: (predH: number, predA: number, actH: number, actA: number) =>

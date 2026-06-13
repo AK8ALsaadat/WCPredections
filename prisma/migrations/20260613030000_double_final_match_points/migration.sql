@@ -1,0 +1,2 @@
+ALTER TABLE "predictions"
+ADD COLUMN IF NOT EXISTS "double_bonus" INTEGER NOT NULL DEFAULT 0;

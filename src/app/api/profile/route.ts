@@ -22,7 +22,11 @@ export async function GET() {
     const roundPoints: Record<string, number> = {};
     for (const p of history.predictions) {
       const roundId = p.match.round.id;
-      const pts = p.points + p.finishTypePoints + p.penaltyWinnerPoints;
+      const pts =
+        p.points +
+        p.doubleBonus +
+        p.finishTypePoints +
+        p.penaltyWinnerPoints;
       roundPoints[roundId] = (roundPoints[roundId] ?? 0) + pts;
     }
     for (const sp of history.scorerPredictions) {

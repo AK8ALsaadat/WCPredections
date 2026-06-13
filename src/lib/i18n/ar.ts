@@ -216,6 +216,9 @@ export const ar = {
     winnerCorrect: "توقعت الفائز صح",
     scoreWrong: "توقع النتيجة خاطئ",
     doubled: "مضاعفة",
+    doubleFinalTotal: "مضاعفة مجموع نقاط المباراة ×2",
+    doubleFinalTotalDetail: "تُضاف مرة واحدة بعد جمع نقاط النتيجة والهدافين والبونص",
+    doublePendingDetail: "سيُضاعف مجموع نقاط المباراة النهائي بعد انتهائها",
     exactDetail: (predH: number, predA: number, actH: number, actA: number) =>
       `توقعت ${predH}-${predA} والنتيجة ${actH}-${actA}`,
     winnerDetail: (predH: number, predA: number, actH: number, actA: number) =>

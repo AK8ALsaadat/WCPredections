@@ -10,6 +10,7 @@ import {
 import type { LeagueMatchPredictionRow } from "@/types";
 import { calculateBoldScorerBetPointsForMatch } from "@/services/bold-scorer-bet.service";
 import {
+  calculateDoubleBonus,
   calculateFinishTypePoints,
   calculatePenaltyWinnerPoints,
   calculatePerfectPredictionBonus,
@@ -545,10 +546,11 @@ async function applyScorerAndBoldPoints(
     }[];
   },
   scorerGoalsByPlayer: Map<string, number>,
-  scorerPredictions: ScorerPredictionWithPlayer[]
-  ,
+  scorerPredictions: ScorerPredictionWithPlayer[],
   ignorePositionMultiplier = false
-) {
+): Promise<Map<string, number>> {
+  const pointsByUser = new Map<string, number>();
+
   for (const sp of scorerPredictions) {
     const actualGoals = resolveScorerGoalsForPlayer(
       sp.playerId,
@@ -566,6 +568,10 @@ async function applyScorerAndBoldPoints(
       where: { id: sp.id },
       data: { points },
     });
+    pointsByUser.set(
+      sp.userId,
+      (pointsByUser.get(sp.userId) ?? 0) + points
+    );
   }
 
   await calculateBoldScorerBetPointsForMatch(
@@ -573,6 +579,8 @@ async function applyScorerAndBoldPoints(
     scorerGoalsByPlayer,
     match.matchScorers
   );
+
+  return pointsByUser;
 }
 
 export async function recalculateMatchScoring(matchId: string): Promise<void> {
@@ -621,6 +629,25 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
       })
     : [];
 
+  const scorerPointsByUser =
+    canScoreScorers && scorerGoalsByPlayer
+      ? await applyScorerAndBoldPoints(
+          {
+            id: match.id,
+            roundId: match.roundId,
+            homeTeamId: match.homeTeamId,
+            awayTeamId: match.awayTeamId,
+            homeScore: match.homeScore!,
+            awayScore: match.awayScore!,
+            actualFinishType: match.actualFinishType,
+            matchScorers: match.matchScorers,
+          },
+          scorerGoalsByPlayer,
+          scorerPredictions,
+          ignorePositionMultiplier
+        )
+      : new Map<string, number>();
+
   if (finished) {
     const predictions = await prisma.prediction.findMany({
       where: { matchId },
@@ -639,7 +666,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
         prediction.predAway,
         match.homeScore!,
         match.awayScore!,
-        prediction.isDouble
+        false
       );
 
       let bonusPoints = 0;
@@ -686,33 +713,26 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
             )
           : 0;
 
+      const baseMatchPoints =
+        scorePoints +
+        bonusPoints +
+        finishTypePoints +
+        penaltyWinnerPoints +
+        (scorerPointsByUser.get(prediction.userId) ?? 0);
+
       await prisma.prediction.update({
         where: { id: prediction.id },
         data: {
           points: scorePoints + bonusPoints,
+          doubleBonus: calculateDoubleBonus(
+            prediction.isDouble,
+            baseMatchPoints
+          ),
           finishTypePoints,
           penaltyWinnerPoints,
         },
       });
     }
-  }
-
-  if (canScoreScorers && scorerGoalsByPlayer) {
-    await applyScorerAndBoldPoints(
-      {
-        id: match.id,
-        roundId: match.roundId,
-        homeTeamId: match.homeTeamId,
-        awayTeamId: match.awayTeamId,
-        homeScore: match.homeScore!,
-        awayScore: match.awayScore!,
-        actualFinishType: match.actualFinishType,
-        matchScorers: match.matchScorers,
-      },
-      scorerGoalsByPlayer,
-      scorerPredictions,
-      ignorePositionMultiplier
-    );
   }
 
   try {
@@ -858,6 +878,7 @@ export async function getLeagueMatchPredictions(matchId: string) {
         predictedFinishType: prediction.predictedFinishType,
         predictedPenaltyWinnerTeamId: prediction.predictedPenaltyWinnerTeamId,
         points: prediction.points,
+        doubleBonus: prediction.doubleBonus,
         finishTypePoints: prediction.finishTypePoints,
         penaltyWinnerPoints: prediction.penaltyWinnerPoints,
       },
@@ -901,12 +922,14 @@ export async function getLeagueMatchPredictions(matchId: string) {
     if (match.status === "LIVE" || match.status === "FINISHED") {
       const totalA =
         (a.prediction?.points ?? 0) +
+        (a.prediction?.doubleBonus ?? 0) +
         (a.prediction?.finishTypePoints ?? 0) +
         (a.prediction?.penaltyWinnerPoints ?? 0) +
         a.scorerPredictions.reduce((s, p) => s + (p.points ?? 0), 0) +
         (a.boldScorerBet?.points ?? 0);
       const totalB =
         (b.prediction?.points ?? 0) +
+        (b.prediction?.doubleBonus ?? 0) +
         (b.prediction?.finishTypePoints ?? 0) +
         (b.prediction?.penaltyWinnerPoints ?? 0) +
         b.scorerPredictions.reduce((s, p) => s + (p.points ?? 0), 0) +

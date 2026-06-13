@@ -51,6 +51,7 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
         where,
         _sum: {
           points: true,
+          doubleBonus: true,
           finishTypePoints: true,
           penaltyWinnerPoints: true,
         },
@@ -75,6 +76,7 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
   for (const g of predictionGroups) {
     const total =
       (g._sum.points ?? 0) +
+      (g._sum.doubleBonus ?? 0) +
       (g._sum.finishTypePoints ?? 0) +
       (g._sum.penaltyWinnerPoints ?? 0);
     const existing = pointsMap.get(g.userId);
@@ -322,6 +324,7 @@ export async function getUserTotalPoints(userId: string): Promise<number> {
       where: { userId },
       _sum: {
         points: true,
+        doubleBonus: true,
         finishTypePoints: true,
         penaltyWinnerPoints: true,
       },
@@ -338,6 +341,7 @@ export async function getUserTotalPoints(userId: string): Promise<number> {
 
   return (
     (predictionAgg._sum.points ?? 0) +
+    (predictionAgg._sum.doubleBonus ?? 0) +
     (predictionAgg._sum.finishTypePoints ?? 0) +
     (predictionAgg._sum.penaltyWinnerPoints ?? 0) +
     (scorerAgg._sum.points ?? 0) +

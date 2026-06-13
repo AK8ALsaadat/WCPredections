@@ -46,6 +46,7 @@ export type LeagueMatchPredictionRow = {
     predictedFinishType: string | null;
     predictedPenaltyWinnerTeamId: string | null;
     points?: number;
+    doubleBonus?: number;
     finishTypePoints?: number;
     penaltyWinnerPoints?: number;
   } | null;

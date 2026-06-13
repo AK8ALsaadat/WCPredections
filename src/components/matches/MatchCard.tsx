@@ -42,6 +42,7 @@ type MatchCardProps = {
       predAway: number;
       isDouble: boolean;
       points?: number;
+      doubleBonus?: number;
       finishTypePoints?: number;
       penaltyWinnerPoints?: number;
       predictedFinishType?: string | null;
@@ -151,7 +152,15 @@ export function MatchCard({
   }, [showPredictButton, canPredict, match]);
 
   return (
-    <Card className="transition-colors hover:border-primary/30">
+    <Card
+      className={`transition-colors ${
+        match.userPrediction?.isDouble
+          ? "border-violet-400/60 bg-violet-500/[0.08] shadow-violet-950/20 hover:border-violet-300"
+          : match.userBoldScorerBet
+            ? "border-amber-400/50 bg-amber-500/[0.07] shadow-amber-950/20 hover:border-amber-300"
+            : "hover:border-primary/30"
+      }`}
+    >
       <div className="mb-3 flex items-center justify-between text-xs text-muted">
         <span>{stageLabel}</span>
         <div className="flex items-center gap-2">
@@ -235,7 +244,9 @@ export function MatchCard({
               <span className="text-lg font-medium text-muted">{t.matches.vs}</span>
             )}
             {match.userPrediction?.isDouble && showPredictionInfo && (
-              <span className="mt-0.5 text-[10px] font-semibold text-warning">2x</span>
+              <span className="mt-1 rounded-lg bg-violet-500/25 px-2 py-0.5 text-xs font-black text-violet-200 ring-1 ring-violet-400/50">
+                ×2 {t.matches.featureDouble}
+              </span>
             )}
             <span className="mt-1 text-xs text-muted">
               {formatDate(match.matchTime, locale)}
@@ -352,6 +363,7 @@ export function MatchCard({
                       predAway: match.userPrediction.predAway,
                       isDouble: match.userPrediction.isDouble,
                       points: match.userPrediction.points ?? 0,
+                      doubleBonus: match.userPrediction.doubleBonus ?? 0,
                       finishTypePoints:
                         match.userPrediction.finishTypePoints ?? 0,
                       penaltyWinnerPoints:

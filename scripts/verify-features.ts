@@ -6,6 +6,7 @@ import {
   buildRegulationScorerGoalsMap,
   BOLD_SCORER_POINTS,
   calculateBoldScorerBetPoints,
+  calculateDoubleBonus,
   calculateFinishTypePoints,
   calculatePenaltyWinnerPoints,
   calculatePerfectPredictionBonus,
@@ -52,8 +53,9 @@ ok("EXACT_SCORE_POINTS = 5", EXACT_SCORE_POINTS === 5);
 ok("نتيجة دقيقة = 5", calculateScorePredictionPoints(2, 1, 2, 1, false) === 5);
 ok("فائز صح = 1", calculateScorePredictionPoints(2, 0, 3, 1, false) === 1);
 ok("خطأ = 0", calculateScorePredictionPoints(1, 0, 0, 2, false) === 0);
-ok("مضاعفة نتيجة دقيقة = 10", calculateScorePredictionPoints(1, 1, 1, 1, true) === 10);
-ok("مضاعفة فائز = 2", calculateScorePredictionPoints(2, 0, 3, 1, true) === 2);
+ok("الدبل لا يغيّر نقاط سطر النتيجة", calculateScorePredictionPoints(1, 1, 1, 1, true) === 5);
+ok("الدبل يضيف مجموع المباراة مرة واحدة", calculateDoubleBonus(true, 4) === 4);
+ok("بدون دبل لا توجد إضافة", calculateDoubleBonus(false, 4) === 0);
 
 console.log("\n=== بونص التوقع المثالي ===");
 ok("PERFECT_PREDICTION_BONUS_POINTS = 3", PERFECT_PREDICTION_BONUS_POINTS === 3);
@@ -61,7 +63,7 @@ ok(
   "نتيجة دقيقة + هدافين كاملين = بونص 3",
   calculatePerfectPredictionBonus(true, [
     { predictedGoals: 1, actualGoals: 1 },
-    { predictedGoals: 1, actualGoals: 2 },
+    { predictedGoals: 1, actualGoals: 1 },
   ]) === 3
 );
 ok(
@@ -115,6 +117,7 @@ const breakdown = buildMatchPointsBreakdown({
     predAway: 1,
     isDouble: false,
     points: 5,
+    doubleBonus: 0,
     finishTypePoints: 1,
     penaltyWinnerPoints: 1,
     predictedFinishType: "PENALTIES",
@@ -143,6 +146,7 @@ const perfectBreakdown = buildMatchPointsBreakdown({
     predAway: 0,
     isDouble: false,
     points: 5,
+    doubleBonus: 0,
     finishTypePoints: 0,
     penaltyWinnerPoints: 0,
   },
@@ -177,11 +181,38 @@ ok(
       predAway: 0,
       isDouble: false,
       points: 1,
+      doubleBonus: 0,
       finishTypePoints: 0,
       penaltyWinnerPoints: 0,
     },
     userScorerPredictions: [{ predictedGoals: 1, points: 1, player: { name: "X" } }],
   }) === 2
+);
+
+const doubledBreakdown = buildMatchPointsBreakdown({
+  homeScore: 2,
+  awayScore: 1,
+  isKnockout: false,
+  homeTeamName: "A",
+  awayTeamName: "B",
+  userPrediction: {
+    predHome: 1,
+    predAway: 0,
+    isDouble: true,
+    points: 1,
+    doubleBonus: 3,
+    finishTypePoints: 0,
+    penaltyWinnerPoints: 0,
+  },
+  userScorerPredictions: [
+    { predictedGoals: 2, points: 2, player: { name: "X" } },
+  ],
+}, ar);
+ok("الدبل يضاعف مجموع المباراة النهائي", doubledBreakdown.total === 6);
+ok(
+  "الدبل يظهر كسطر واحد مستقل",
+  doubledBreakdown.lines.filter((line) => line.id === "double-bonus").length === 1 &&
+    doubledBreakdown.lines.find((line) => line.id === "double-bonus")?.points === 3
 );
 
 console.log("\n=== الهدافين وركلات الترجيح ===");
@@ -240,12 +271,12 @@ console.log("\n=== حدود الجولة ===");
 ok("مضاعفة: حد أقصى 2 لكل جولة", MAX_DOUBLES_PER_ROUND === 2);
 ok("البطاقة الجريئة: مرة واحدة لكل جولة", MAX_BOLD_SCORER_BETS_PER_ROUND === 1);
 ok(
-  "مضاعفة نتيجة دقيقة = 10 نقاط",
-  calculateScorePredictionPoints(1, 1, 1, 1, true) === 10
+  "مضاعفة مجموع 8 نقاط = إضافة 8 نقاط",
+  calculateDoubleBonus(true, 8) === 8
 );
 ok(
-  "مضاعفة فائز صح = 2 نقاط",
-  calculateScorePredictionPoints(2, 0, 3, 1, true) === 2
+  "المجموع النهائي مع الدبل = 16 نقطة",
+  8 + calculateDoubleBonus(true, 8) === 16
 );
 
 console.log("\n=== البطاقة الجريئة ===");

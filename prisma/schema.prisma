@@ -125,6 +125,7 @@ model Prediction {
   predictedFinishType           FinishType? @map("predicted_finish_type")
   predictedPenaltyWinnerTeamId  String?     @map("predicted_penalty_winner_team_id")
   points                        Int         @default(0)
+  doubleBonus                   Int         @default(0) @map("double_bonus")
   finishTypePoints              Int         @default(0) @map("finish_type_points")
   penaltyWinnerPoints           Int         @default(0) @map("penalty_winner_points")
   createdAt                     DateTime    @default(now()) @map("created_at")

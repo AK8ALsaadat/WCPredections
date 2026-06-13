@@ -22,6 +22,7 @@ export type MatchHistoryEntry = {
     predAway: number;
     isDouble: boolean;
     points: number;
+    doubleBonus: number;
     finishTypePoints: number;
     penaltyWinnerPoints: number;
     predictedFinishType: string | null;
@@ -44,6 +45,7 @@ type RawHistory = {
     predAway: number;
     isDouble: boolean;
     points: number;
+    doubleBonus: number;
     finishTypePoints: number;
     penaltyWinnerPoints: number;
     predictedFinishType: string | null;
@@ -165,6 +167,7 @@ export function entryToBreakdownInput(
           predAway: entry.prediction.predAway,
           isDouble: entry.prediction.isDouble,
           points: entry.prediction.points,
+          doubleBonus: entry.prediction.doubleBonus,
           finishTypePoints: entry.prediction.finishTypePoints,
           penaltyWinnerPoints: entry.prediction.penaltyWinnerPoints,
           predictedFinishType: asFinishType(entry.prediction.predictedFinishType),

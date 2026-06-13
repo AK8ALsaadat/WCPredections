@@ -63,7 +63,7 @@ function FeatureBadges({
       {hasDouble && (
         <span
           title={t.matches.featureDouble}
-          className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-warning/20 px-1.5 text-[10px] font-bold text-warning ring-1 ring-warning/30"
+          className="inline-flex h-7 min-w-10 items-center justify-center rounded-lg bg-violet-500/25 px-2 text-xs font-black text-violet-200 ring-1 ring-violet-400/60 shadow-sm shadow-violet-950/40"
         >
           2×
         </span>
@@ -71,7 +71,7 @@ function FeatureBadges({
       {hasBold && (
         <span
           title={`${t.matches.featureBold}: ${row.boldScorerBet!.player.name}`}
-          className="inline-flex h-6 items-center gap-0.5 rounded-md bg-amber-500/15 px-1.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/25"
+          className="inline-flex h-7 items-center gap-1 rounded-lg bg-amber-500/20 px-2 text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/50 shadow-sm shadow-amber-950/30"
         >
           <span aria-hidden>✦</span>
           <span className="max-w-[4rem] truncate">
@@ -336,6 +336,8 @@ function LeaguePredictionRow({
   const hasScoringContext = !!matchResult && (isFinished || isLive);
   const showScorerResults = hasScoringContext;
   const showScoreResults = isFinished && !!matchResult;
+  const hasDouble = Boolean(row.prediction?.isDouble);
+  const hasBold = Boolean(row.boldScorerBet);
 
   const homeScorers = row.scorerPredictions.filter(
     (p) => p.player.teamId === homeTeamId
@@ -372,12 +374,16 @@ function LeaguePredictionRow({
 
   return (
     <li
-      className={`px-3 py-3 transition-colors md:px-5 md:py-4 ${
-        isMe
-          ? "bg-primary/[0.07] ring-1 ring-inset ring-primary/25"
-          : index % 2 === 0
-            ? "bg-transparent"
-            : "bg-background/20"
+      className={`relative px-3 py-3 transition-colors md:px-5 md:py-4 ${
+        hasDouble
+          ? "border-s-4 border-violet-400 bg-violet-500/[0.12] ring-1 ring-inset ring-violet-400/30"
+          : hasBold
+            ? "border-s-4 border-amber-400 bg-amber-500/[0.10] ring-1 ring-inset ring-amber-400/25"
+            : isMe
+              ? "bg-primary/[0.07] ring-1 ring-inset ring-primary/25"
+              : index % 2 === 0
+                ? "bg-transparent"
+                : "bg-background/20"
       }`}
     >
       <div className="flex flex-col gap-2.5 md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:items-start md:gap-4">

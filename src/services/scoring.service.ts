@@ -12,7 +12,7 @@ export function calculateScorePredictionPoints(
   predAway: number,
   actualHome: number,
   actualAway: number,
-  isDouble: boolean
+  _isDouble = false
 ): number {
   let basePoints = 0;
 
@@ -26,7 +26,14 @@ export function calculateScorePredictionPoints(
     }
   }
 
-  return isDouble ? basePoints * 2 : basePoints;
+  return basePoints;
+}
+
+export function calculateDoubleBonus(
+  isDouble: boolean,
+  baseMatchPoints: number
+): number {
+  return isDouble ? baseMatchPoints : 0;
 }
 
 export function isExactScorePrediction(

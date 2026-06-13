@@ -61,6 +61,7 @@ export type MatchPointsBreakdownInput = {
     predAway: number;
     isDouble: boolean;
     points: number;
+    doubleBonus: number;
     finishTypePoints: number;
     penaltyWinnerPoints: number;
     predictedFinishType?: FinishType | null;
@@ -115,15 +116,11 @@ function scoreBreakdownLine(
     input.awayScore
   );
 
-  const multiplier = p.isDouble
-    ? ` (${messages.pointsBreakdown.doubled})`
-    : "";
-
   if (exact) {
     const bonus = computePerfectBonus(input);
     return {
       id: "score",
-      label: messages.pointsBreakdown.exactScore + multiplier,
+      label: messages.pointsBreakdown.exactScore,
       detail,
       points: p.points - bonus,
       correct: true,
@@ -133,7 +130,7 @@ function scoreBreakdownLine(
   if (winnerCorrect) {
     return {
       id: "score",
-      label: messages.pointsBreakdown.winnerCorrect + multiplier,
+      label: messages.pointsBreakdown.winnerCorrect,
       detail,
       points: p.points,
       correct: true,
@@ -142,7 +139,7 @@ function scoreBreakdownLine(
 
   return {
     id: "score",
-    label: messages.pointsBreakdown.scoreWrong + multiplier,
+    label: messages.pointsBreakdown.scoreWrong,
     detail,
     points: 0,
     correct: false,
@@ -263,6 +260,16 @@ export function buildMatchPointsBreakdown(
     }
   }
 
+  if (!scorersOnly && (input.userPrediction?.doubleBonus ?? 0) > 0) {
+    lines.push({
+      id: "double-bonus",
+      label: messages.pointsBreakdown.doubleFinalTotal,
+      detail: messages.pointsBreakdown.doubleFinalTotalDetail,
+      points: input.userPrediction!.doubleBonus,
+      correct: true,
+    });
+  }
+
   const total = scorersOnly
     ? (input.userScorerPredictions?.reduce((s, sp) => s + sp.points, 0) ?? 0) +
       (input.userBoldScorerBet?.points ?? 0)
@@ -275,6 +282,7 @@ export function getMatchTotalUserPoints(input: MatchPointsBreakdownInput) {
   const p = input.userPrediction;
   const scoreTotal =
     (p?.points ?? 0) +
+    (p?.doubleBonus ?? 0) +
     (p?.finishTypePoints ?? 0) +
     (p?.penaltyWinnerPoints ?? 0);
   const scorerTotal =
@@ -300,6 +308,7 @@ export function buildLeaguePendingBreakdown(
       predHome: number;
       predAway: number;
       isDouble: boolean;
+      doubleBonus?: number;
       predictedFinishType?: string | null;
       predictedPenaltyWinnerTeamId?: string | null;
     } | null;
@@ -324,15 +333,20 @@ export function buildLeaguePendingBreakdown(
   const p = row.prediction;
 
   if (p) {
-    const multiplier = p.isDouble
-      ? ` (${messages.pointsBreakdown.doubled})`
-      : "";
     lines.push({
       id: "score",
-      label: messages.pointsBreakdown.pendingScore + multiplier,
+      label: messages.pointsBreakdown.pendingScore,
       detail: messages.pointsBreakdown.pendingScoreDetail(p.predHome, p.predAway),
       points: 0,
     });
+    if (p.isDouble) {
+      lines.push({
+        id: "double-bonus",
+        label: messages.pointsBreakdown.doubleFinalTotal,
+        detail: messages.pointsBreakdown.doublePendingDetail,
+        points: 0,
+      });
+    }
   }
 
   if (options.isKnockout && p?.predictedFinishType) {
@@ -392,6 +406,7 @@ export function leagueRowToBreakdownInput(
       predictedFinishType?: string | null;
       predictedPenaltyWinnerTeamId?: string | null;
       points?: number;
+      doubleBonus?: number;
       finishTypePoints?: number;
       penaltyWinnerPoints?: number;
     } | null;
@@ -422,6 +437,7 @@ export function leagueRowToBreakdownInput(
           predAway: row.prediction.predAway,
           isDouble: row.prediction.isDouble,
           points: row.prediction.points ?? 0,
+          doubleBonus: row.prediction.doubleBonus ?? 0,
           finishTypePoints: row.prediction.finishTypePoints ?? 0,
           penaltyWinnerPoints: row.prediction.penaltyWinnerPoints ?? 0,
           predictedFinishType: row.prediction

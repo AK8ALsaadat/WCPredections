@@ -50,6 +50,7 @@ type ProfileData = {
       predAway: number;
       isDouble: boolean;
       points: number;
+      doubleBonus: number;
       finishTypePoints: number;
       penaltyWinnerPoints: number;
       predictedFinishType: string | null;
