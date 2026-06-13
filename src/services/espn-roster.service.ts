@@ -14,6 +14,13 @@ type EspnSearchResponse = {
 export type EspnRosterPlayer = {
   name: string;
   shirtNumber: number;
+  photoUrl?: string | null;
+};
+
+const ESPN_TEAM_ALIASES: Record<string, string> = {
+  turkey: "Türkiye",
+  curacao: "Curaçao",
+  usa: "United States",
 };
 
 const ROSTER_CACHE_MS = 24 * 60 * 60 * 1000;
@@ -38,8 +45,10 @@ function decodeHtml(value: string): string {
 }
 
 async function resolveEspnTeamId(teamName: string): Promise<string | null> {
+  const searchName =
+    ESPN_TEAM_ALIASES[teamName.trim().toLowerCase()] ?? teamName;
   const url = new URL("https://site.web.api.espn.com/apis/search/v2");
-  url.searchParams.set("query", teamName);
+  url.searchParams.set("query", searchName);
   url.searchParams.set("limit", "20");
 
   const response = await fetch(url, {
@@ -52,7 +61,7 @@ async function resolveEspnTeamId(teamName: string): Promise<string | null> {
   const candidates = (data.results ?? []).flatMap(
     (result) => result.contents ?? []
   );
-  const exactName = teamName.trim().toLowerCase();
+  const exactName = searchName.trim().toLowerCase();
   const team = candidates.find(
     (item) =>
       item.sport === "soccer" &&
@@ -63,34 +72,38 @@ async function resolveEspnTeamId(teamName: string): Promise<string | null> {
   return team?.uid?.match(/~t:(\d+)$/)?.[1] ?? null;
 }
 
-async function loadEspnRoster(
-  teamName: string
-): Promise<EspnRosterPlayer[]> {
+async function loadEspnRoster(teamName: string): Promise<EspnRosterPlayer[]> {
   const teamId = await resolveEspnTeamId(teamName);
   if (!teamId) return [];
 
   const response = await fetch(
-    `https://www.espn.com/soccer/team/squad/_/id/${teamId}`,
+    `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/teams/${teamId}/roster`,
     {
       next: { revalidate: 24 * 60 * 60 },
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(6_000),
     }
   );
   if (!response.ok) return [];
 
-  const html = await response.text();
-  const playerPattern =
-    /data-resource-id="AthleteName"[^>]*>([^<]+)<\/a><span class="pl2 roster-jersey">(\d+)<\/span>/g;
-  const players = new Map<string, EspnRosterPlayer>();
+  const data = (await response.json()) as {
+    athletes?: {
+      fullName?: string;
+      displayName?: string;
+      jersey?: string;
+      headshot?: { href?: string };
+    }[];
+  };
 
-  for (const match of html.matchAll(playerPattern)) {
-    const name = decodeHtml(match[1]);
-    const shirtNumber = Number.parseInt(match[2], 10);
-    if (!name || !Number.isInteger(shirtNumber)) continue;
-    players.set(name, { name, shirtNumber });
-  }
-
-  return Array.from(players.values());
+  return (data.athletes ?? []).flatMap((athlete) => {
+    const name = decodeHtml(athlete.fullName ?? athlete.displayName ?? "");
+    const shirtNumber = Number.parseInt(athlete.jersey ?? "", 10);
+    if (!name || !Number.isInteger(shirtNumber)) return [];
+    return [{
+      name,
+      shirtNumber,
+      photoUrl: athlete.headshot?.href ?? null,
+    }];
+  });
 }
 
 export async function fetchEspnRoster(

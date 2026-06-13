@@ -3,13 +3,10 @@ import { buildExpectedLineup } from "@/lib/expected-lineup";
 import { isWithinLineupFastRefreshWindow } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import {
-  fetchApiFootballPlayer,
   fetchApiFootballSquad,
   fetchProbableLineupFromApiFootball,
   type ExternalLineupPlayer,
 } from "@/services/api-football-lineup.service";
-import { fetchEspnRoster } from "@/services/espn-roster.service";
-import { fetchWikidataPlayerPhotos } from "@/services/wikidata-player-photos.service";
 
 const EXPECTED_LINEUP_CACHE_MS = 60 * 60 * 1000;
 const TEAM_PLAYERS_CACHE_MS = 30 * 60 * 1000;
@@ -126,28 +123,52 @@ function playerNameSimilarity(left: string, right: string): number {
   return 1 - editDistance(a, b) / Math.max(a.length, b.length);
 }
 
-const PLAYER_NAME_ALIASES = new Map([
-  ["roro", "pedromiguel"],
-  ["jassemgaberabdulsallam", "jassemgaber"],
-  ["edmilson", "edmilsonjunior"],
-]);
-
 function lastNameKey(name: string): string {
   const parts = normalizePlayerName(name).split(/\s+/);
   return parts[parts.length - 1] ?? name;
+}
+
+function isOfficialPlayerPhoto(photoUrl?: string | null) {
+  if (!photoUrl) return false;
+  try {
+    return new URL(photoUrl).hostname.endsWith("api-sports.io");
+  } catch {
+    return false;
+  }
+}
+
+async function within<T>(promise: Promise<T>, ms: number, fallback: T) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 async function enrichWithApiFootballPhotos(
   teamName: string,
   view: TeamPlayersView
 ): Promise<TeamPlayersView> {
-  if (view.players.length > 0 && view.players.every((player) => player.photoUrl)) {
+  if (
+    view.players.length > 0 &&
+    view.players.every(
+      (player) =>
+        isOfficialPlayerPhoto(player.photoUrl) &&
+        player.shirtNumber != null
+    )
+  ) {
     return view;
   }
 
   let squad = apiFootballSquadCache.get(teamName);
   if (!squad || squad.expiresAt <= Date.now()) {
-    const players = await fetchApiFootballSquad(teamName);
+    const players = await within(fetchApiFootballSquad(teamName), 1_200, []);
     squad = { players, expiresAt: Date.now() + TEAM_SQUAD_CACHE_MS };
     if (players.length > 0) {
       apiFootballSquadCache.set(teamName, squad);
@@ -180,29 +201,8 @@ async function enrichWithApiFootballPhotos(
     );
   };
 
-  const unmatched = view.players.filter(
-    (player) => !matchPlayer(player, squad.players)
-  );
-  if (unmatched.length > 0) {
-    const searched = await Promise.all(
-      unmatched.slice(0, 8).map((player) =>
-        fetchApiFootballPlayer(teamName, player.name)
-      )
-    );
-    squad.players = [
-      ...squad.players,
-      ...searched.filter((player) => player != null),
-    ];
-  }
-
   const byName = new Map(
     squad.players.map((player) => [normalizePlayerName(player.name), player])
-  );
-  const stillMissing = view.players.filter(
-    (player) => !player.photoUrl && !matchPlayer(player, squad.players)
-  );
-  const wikidataPhotos = await fetchWikidataPlayerPhotos(
-    stillMissing.map((player) => player.name)
   );
 
   const enriched = {
@@ -212,36 +212,36 @@ async function enrichWithApiFootballPhotos(
         byName.get(normalizePlayerName(player.name)) ??
         matchPlayer(player, squad.players);
       if (!external) {
-        if (player.photoUrl) {
-          return player;
-        }
-        const photoUrl = wikidataPhotos.get(player.name);
-        return photoUrl ? { ...player, photoUrl } : player;
+        return player;
       }
       return {
         ...player,
         shirtNumber: player.shirtNumber ?? external.number ?? null,
         photoUrl:
-          player.photoUrl ??
           external.photo ??
           `https://media.api-sports.io/football/players/${external.id}.png`,
       };
     }),
   };
 
-  const photosToPersist = enriched.players.filter(
+  const playersToPersist = enriched.players.filter(
     (player) =>
       !player.id.startsWith("temp-") &&
-      player.photoUrl &&
-      !view.players.find((original) => original.id === player.id)?.photoUrl
+      (isOfficialPlayerPhoto(player.photoUrl) ||
+        player.shirtNumber != null)
   );
-  if (photosToPersist.length > 0) {
+  if (playersToPersist.length > 0) {
     try {
       await prisma.$transaction(
-        photosToPersist.map((player) =>
+        playersToPersist.map((player) =>
           prisma.player.updateMany({
-            where: { id: player.id, photoUrl: null },
-            data: { photoUrl: player.photoUrl },
+            where: { id: player.id },
+            data: {
+              photoUrl: isOfficialPlayerPhoto(player.photoUrl)
+                ? player.photoUrl
+                : undefined,
+              shirtNumber: player.shirtNumber ?? undefined,
+            },
           })
         )
       );
@@ -251,125 +251,6 @@ async function enrichWithApiFootballPhotos(
   }
 
   return enriched;
-}
-
-async function addMissingShirtNumbers(
-  teamName: string,
-  squad: ApiLineupPlayer[]
-): Promise<ApiLineupPlayer[]> {
-  if (squad.every((player) => player.shirtNumber != null)) return squad;
-
-  try {
-    const roster = await fetchEspnRoster(teamName);
-    if (roster.length === 0) return squad;
-
-    return squad.map((player) => {
-      if (player.shirtNumber != null) return player;
-      const playerKey = compactPlayerName(player.name);
-      const alias = PLAYER_NAME_ALIASES.get(playerKey);
-      const ranked = roster
-        .map((candidate) => ({
-          candidate,
-          score:
-            alias === compactPlayerName(candidate.name)
-              ? 1
-              : playerNameSimilarity(player.name, candidate.name),
-        }))
-        .sort((a, b) => b.score - a.score);
-      const best = ranked[0];
-      const runnerUp = ranked[1];
-      const shirtNumber =
-        best &&
-        best.score >= 0.72 &&
-        best.score - (runnerUp?.score ?? 0) >= 0.08
-          ? best.candidate.shirtNumber
-          : null;
-      if (shirtNumber == null) return player;
-      return { ...player, shirtNumber };
-    });
-  } catch {
-    return squad;
-  }
-}
-
-// Enhance: try API-Football squad and player search if ESPN didn't provide numbers
-async function addMissingShirtNumbersWithApiFootballFallback(
-  teamName: string,
-  squad: ApiLineupPlayer[]
-): Promise<ApiLineupPlayer[]> {
-  // fast path
-  if (squad.every((p) => p.shirtNumber != null)) return squad;
-
-  // first attempt: use existing ESPN-based function
-  const withEspn = await addMissingShirtNumbers(teamName, squad);
-  if (withEspn.every((p) => p.shirtNumber != null)) return withEspn;
-
-  const result = withEspn.slice();
-
-  try {
-    const afSquad = await fetchApiFootballSquad(teamName);
-    if (afSquad.length > 0) {
-      for (let i = 0; i < result.length; i++) {
-        const player = result[i];
-        if (player.shirtNumber != null) continue;
-        // try exact name match first
-        const exact = afSquad.find(
-          (c) => normalizePlayerName(c.name) === normalizePlayerName(player.name)
-        );
-        if (exact && exact.number != null) {
-          result[i] = { ...player, shirtNumber: exact.number };
-          continue;
-        }
-        // last-name match
-        const lastMatches = afSquad.filter(
-          (c) => lastNameKey(c.name) === lastNameKey(player.name)
-        );
-        if (lastMatches.length === 1 && lastMatches[0].number != null) {
-          result[i] = { ...player, shirtNumber: lastMatches[0].number };
-          continue;
-        }
-        // fuzzy match
-        const ranked = afSquad
-          .map((c) => ({ c, score: playerNameSimilarity(player.name, c.name) }))
-          .sort((a, b) => b.score - a.score);
-        const best = ranked[0];
-        const runner = ranked[1];
-        if (
-          best &&
-          best.score >= 0.72 &&
-          best.score - (runner?.score ?? 0) >= 0.08 &&
-          best.c.number != null
-        ) {
-          result[i] = { ...player, shirtNumber: best.c.number };
-          continue;
-        }
-      }
-    }
-  } catch {
-    // ignore API-Football failures
-  }
-
-  // final attempt: call search per-player (slower, limited)
-  const stillMissing = result.filter((p) => p.shirtNumber == null);
-  if (stillMissing.length > 0) {
-    try {
-      const looked = await Promise.all(
-        stillMissing.slice(0, 12).map((p) => fetchApiFootballPlayer(teamName, p.name))
-      );
-      for (let i = 0; i < result.length; i++) {
-        const player = result[i];
-        if (player.shirtNumber != null) continue;
-        const found = looked.find((f) => f && normalizePlayerName(f.name) === normalizePlayerName(player.name));
-        if (found && found.number != null) {
-          result[i] = { ...player, shirtNumber: found.number };
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  return result;
 }
 
 function footballDataCacheKey(
@@ -534,8 +415,7 @@ async function mapProbableLineupByName(
 
 async function getCachedSquad(
   teamId: string,
-  apiTeamId: string,
-  teamName: string
+  apiTeamId: string
 ): Promise<ApiLineupPlayer[]> {
   const cacheKey = `squad:${teamId}:${apiTeamId}`;
   const cached = teamSquadCache.get(cacheKey);
@@ -555,13 +435,57 @@ async function getCachedSquad(
   });
 
   if (cachedPlayers.length >= 20) {
-    const squad = await addMissingShirtNumbersWithApiFootballFallback(teamName, cachedPlayers.map((p) => ({
+    let squad = cachedPlayers.map((p) => ({
       id: Number(p.apiPlayerId),
       name: p.name,
       position: p.position,
       shirtNumber: p.shirtNumber,
       photoUrl: p.photoUrl,
-    })));
+    }));
+
+    if (squad.some((player) => player.shirtNumber == null)) {
+      try {
+        const data = await within(
+          fetchFootballData<{ squad?: ApiLineupPlayer[] }>(
+            `/teams/${apiTeamId}`
+          ),
+          1_500,
+          { squad: [] }
+        );
+        const officialById = new Map(
+          (data.squad ?? []).map((player) => [String(player.id), player])
+        );
+        squad = squad.map((player) => {
+          const official = officialById.get(String(player.id));
+          return {
+            ...player,
+            shirtNumber:
+              player.shirtNumber ?? official?.shirtNumber ?? null,
+          };
+        });
+
+        const withNumbers = squad.filter(
+          (player) => player.shirtNumber != null
+        );
+        if (withNumbers.length > 0) {
+          await prisma.$transaction(
+            withNumbers.map((player) =>
+              prisma.player.updateMany({
+                where: {
+                  teamId,
+                  apiPlayerId: String(player.id),
+                  shirtNumber: null,
+                },
+                data: { shirtNumber: player.shirtNumber },
+              })
+            )
+          );
+        }
+      } catch {
+        // Keep the cached squad; the UI falls back cleanly when a number is absent.
+      }
+    }
+
     teamSquadCache.set(cacheKey, {
       squad,
       expiresAt: Date.now() + TEAM_SQUAD_CACHE_MS,
@@ -572,10 +496,7 @@ async function getCachedSquad(
   const data = await fetchFootballData<{ squad?: ApiLineupPlayer[] }>(
     `/teams/${apiTeamId}`
   );
-  const squad = await addMissingShirtNumbersWithApiFootballFallback(
-    teamName,
-    data.squad ?? []
-  );
+  const squad = data.squad ?? [];
   teamSquadCache.set(cacheKey, {
     squad,
     expiresAt: Date.now() + TEAM_SQUAD_CACHE_MS,
@@ -594,10 +515,16 @@ function isFootballDataLineupEnabled() {
 async function listFinishedFootballDataMatches(apiTeamId: string) {
   try {
     const list = await fetchFootballData<{
-      matches?: { id: number; status: string }[];
+      matches?: { id: number; status: string; utcDate?: string }[];
     }>(`/teams/${apiTeamId}/matches?limit=30`);
 
-    return (list.matches ?? []).filter((match) => match.status === "FINISHED");
+    return (list.matches ?? [])
+      .filter((match) => match.status === "FINISHED")
+      .sort(
+        (left, right) =>
+          new Date(right.utcDate ?? 0).getTime() -
+          new Date(left.utcDate ?? 0).getTime()
+      );
   } catch {
     return [];
   }
@@ -614,29 +541,31 @@ async function fetchLastFootballDataLineup(
 
   try {
     const matches = await listFinishedFootballDataMatches(apiTeamId);
-
-    for (const match of matches.slice(0, 3)) {
-      try {
-        const detail = await fetchFootballData<{
-          homeTeam: ApiTeamPlayers & { id: number };
-          awayTeam: ApiTeamPlayers & { id: number };
-        }>(`/matches/${match.id}`, { unfoldLineups: true });
-
-        const teamData =
-          String(detail.homeTeam.id) === apiTeamId
-            ? detail.homeTeam
-            : detail.awayTeam;
-
-        if ((teamData.lineup?.length ?? 0) >= 11) {
-          return {
-            formation: teamData.formation ?? null,
-            lineup: teamData.lineup ?? [],
-            bench: teamData.bench ?? [],
-          };
+    const details = await Promise.all(
+      matches.slice(0, 3).map(async (match) => {
+        try {
+          return await fetchFootballData<{
+            homeTeam: ApiTeamPlayers & { id: number };
+            awayTeam: ApiTeamPlayers & { id: number };
+          }>(`/matches/${match.id}`, { unfoldLineups: true });
+        } catch {
+          return null;
         }
-      } catch {
-        continue;
-      }
+      })
+    );
+
+    for (const detail of details) {
+      if (!detail) continue;
+      const teamData =
+        String(detail.homeTeam.id) === apiTeamId
+          ? detail.homeTeam
+          : detail.awayTeam;
+      if ((teamData.lineup?.length ?? 0) < 11) continue;
+      return {
+        formation: teamData.formation ?? null,
+        lineup: teamData.lineup ?? [],
+        bench: teamData.bench ?? [],
+      };
     }
   } catch {
     return null;
@@ -648,13 +577,12 @@ async function fetchLastFootballDataLineup(
 /** تشكيلة متوقعة من قائمة المنتخب عبر Football-Data */
 async function fetchProbableLineupFromFootballDataSquad(
   teamId: string,
-  apiTeamId: string,
-  teamName: string
+  apiTeamId: string
 ): Promise<TeamPlayersView | null> {
   if (!isFootballDataLineupEnabled()) return null;
 
   try {
-    const squad = await getCachedSquad(teamId, apiTeamId, teamName);
+    const squad = await getCachedSquad(teamId, apiTeamId);
     if (squad.length < 11) return null;
 
     const expected = buildExpectedLineup(squad);
@@ -763,10 +691,45 @@ async function syncProbableLineup(
   // Fallback: build probable lineup from the team's squad (expected starters)
   const fromFootballDataSquad = await fetchProbableLineupFromFootballDataSquad(
     teamId,
-    apiTeamId,
-    teamName
+    apiTeamId
   );
   if (fromFootballDataSquad) {
+    // Ensure any player who appeared in the last actual match is included
+    // in the probable lineup (promote from bench into lineup where needed).
+    const playedNames = new Set<string>();
+    if (fromApiFootball) {
+      for (const p of [...(fromApiFootball.lineup ?? []), ...(fromApiFootball.bench ?? [])]) {
+        playedNames.add(normalizePlayerName(p.name));
+      }
+    }
+
+    if (playedNames.size > 0) {
+      const adjustedPlayers = fromFootballDataSquad.players.map((p) =>
+        playedNames.has(normalizePlayerName(p.name)) ? { ...p, section: "lineup" as const } : p
+      );
+
+      const starters = adjustedPlayers.filter((p) => p.section === "lineup");
+      let benchPlayers = adjustedPlayers.filter((p) => p.section !== "lineup");
+
+      if (starters.length < 11 && benchPlayers.length > 0) {
+        const need = 11 - starters.length;
+        const promote = benchPlayers.slice(0, need).map((p) => ({ ...p, section: "lineup" as const }));
+        starters.push(...promote);
+        benchPlayers = benchPlayers.slice(promote.length);
+      }
+
+      const mergedView = {
+        ...fromFootballDataSquad,
+        players: [...starters, ...benchPlayers],
+      };
+
+      expectedLineupCache.set(cacheKey, {
+        data: mergedView,
+        expiresAt: Date.now() + EXPECTED_LINEUP_CACHE_MS,
+      });
+      return mergedView;
+    }
+
     expectedLineupCache.set(cacheKey, {
       data: fromFootballDataSquad,
       expiresAt: Date.now() + EXPECTED_LINEUP_CACHE_MS,
@@ -779,8 +742,7 @@ async function syncProbableLineup(
 
 async function syncEstimatedLineup(
   teamId: string,
-  apiTeamId: string,
-  teamName: string
+  apiTeamId: string
 ): Promise<TeamPlayersView> {
   const cacheKey = `${teamId}:${apiTeamId}:estimated`;
   const cached = expectedLineupCache.get(cacheKey);
@@ -788,7 +750,7 @@ async function syncEstimatedLineup(
     return cached.data;
   }
 
-  const squad = await getCachedSquad(teamId, apiTeamId, teamName);
+  const squad = await getCachedSquad(teamId, apiTeamId);
   const expected = buildExpectedLineup(squad);
   const view = await buildTeamView(
     teamId,
@@ -815,7 +777,7 @@ async function syncExpectedLineup(
   const probable = await syncProbableLineup(teamId, apiTeamId, teamName);
   if (probable) return probable;
 
-  return syncEstimatedLineup(teamId, apiTeamId, teamName);
+  return syncEstimatedLineup(teamId, apiTeamId);
 }
 
 async function getTeamPlayersForMatch(

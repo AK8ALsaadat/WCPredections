@@ -1,8 +1,7 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -11,6 +10,7 @@ import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { PredictPageSkeleton } from "@/components/predict/PredictPageSkeleton";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PitchLineup } from "@/components/predict/PitchLineup";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { PredictionCountdown } from "@/components/matches/PredictionCountdown";
 import { clientFetch, isAbortError } from "@/lib/client-fetch";
@@ -57,13 +57,7 @@ async function fetchLineupForMatch(
   matchTime: string | Date | undefined,
   options?: { fresh?: boolean }
 ) {
-  const inFastWindow =
-    matchTime && isWithinLineupFastRefreshWindow(matchTime);
-  const cachedLineup = readPredictLineupCache<LineupData>(matchId);
-  const needsFresh =
-    options?.fresh ||
-    (inFastWindow &&
-      (!cachedLineup || cachedLineup.lineupStatus !== "official"));
+  const needsFresh = options?.fresh === true;
   const res = await clientFetch(
     `/api/matches/${matchId}/lineup${needsFresh ? "?fresh=1" : ""}`
   );
@@ -74,20 +68,6 @@ async function fetchLineupForMatch(
   writePredictLineupCache(matchId, payload);
   return payload;
 }
-
-const PitchLineup = dynamic(
-  () =>
-    import("@/components/predict/PitchLineup").then((mod) => ({
-      default: mod.PitchLineup,
-    })),
-  {
-    loading: () => (
-      <div className="py-12">
-        <LoadingSpinner />
-      </div>
-    ),
-  }
-);
 
 type MatchData = {
   id: string;
@@ -251,6 +231,7 @@ export default function PredictPage() {
   );
   const [boldEnabled, setBoldEnabled] = useState(initialForm.boldEnabled);
   const [boldPlayerId, setBoldPlayerId] = useState(initialForm.boldPlayerId);
+  const lineupRefreshStartedRef = useRef<string | null>(null);
 
   const teamSets = useMemo(() => {
     if (!lineup) return { home: new Set<string>(), away: new Set<string>() };
@@ -465,6 +446,28 @@ export default function PredictPage() {
       if (interval) clearInterval(interval);
       if (windowTimer) clearTimeout(windowTimer);
     };
+  }, [matchId, match?.matchTime, lineup?.lineupStatus]);
+
+  useEffect(() => {
+    if (
+      !match?.matchTime ||
+      lineup?.lineupStatus == null ||
+      lineup.lineupStatus === "official" ||
+      lineupRefreshStartedRef.current === matchId
+    ) {
+      return;
+    }
+    lineupRefreshStartedRef.current = matchId;
+
+    const timer = setTimeout(() => {
+      void fetchLineupForMatch(matchId, match.matchTime, { fresh: true }).then(
+        (payload) => {
+          if (payload) setLineup(payload);
+        }
+      );
+    }, 800);
+
+    return () => clearTimeout(timer);
   }, [matchId, match?.matchTime, lineup?.lineupStatus]);
 
   function toggleScorer(playerId: string) {
@@ -761,7 +764,7 @@ export default function PredictPage() {
           </div>
         )}
 
-        <Card>
+        <Card className="border-orange-400/35 bg-gradient-to-br from-orange-950/35 via-card to-amber-500/5 shadow-xl shadow-orange-950/20">
           <CardHeader>
             <CardTitle>{t.predict.scorePrediction}</CardTitle>
           </CardHeader>
@@ -845,7 +848,7 @@ export default function PredictPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="border-red-400/40 bg-gradient-to-br from-red-950/40 via-card to-rose-500/5 shadow-xl shadow-red-950/25">
           <CardHeader>
             <CardTitle>{t.predict.boldScorerBet.title}</CardTitle>
           </CardHeader>

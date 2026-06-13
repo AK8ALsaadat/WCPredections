@@ -156,9 +156,9 @@ export function MatchCard({
     <Card
       className={`transition-colors ${
         match.userBoldScorerBet
-          ? "border-red-400/60 bg-red-500/[0.07] shadow-red-950/20 hover:border-red-300"
+          ? "border-red-400/70 bg-gradient-to-br from-red-950/75 via-red-900/30 to-rose-500/10 shadow-xl shadow-red-950/30 ring-1 ring-inset ring-red-300/15 hover:border-red-300"
           : match.userPrediction?.isDouble
-            ? "border-amber-400/60 bg-amber-500/[0.08] shadow-amber-950/20 hover:border-amber-300"
+            ? "border-orange-300/70 bg-gradient-to-br from-orange-950/75 via-orange-900/30 to-amber-400/10 shadow-xl shadow-orange-950/30 ring-1 ring-inset ring-orange-200/15 hover:border-orange-200"
             : "hover:border-primary/30"
       }`}
     >

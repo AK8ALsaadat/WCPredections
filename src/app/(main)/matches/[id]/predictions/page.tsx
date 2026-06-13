@@ -227,12 +227,12 @@ export default function LeagueMatchPredictionsPage() {
                 : t.matches.predictorPlural}
             </p>
           </div>
-          <div className="rounded-xl bg-background/40 px-2 py-2">
-            <p className="text-lg font-bold text-violet-300">{withDouble}</p>
+          <div className="rounded-xl border border-orange-400/30 bg-gradient-to-br from-orange-950/70 to-amber-500/10 px-2 py-2 shadow-lg shadow-orange-950/20">
+            <p className="text-lg font-black text-orange-300">{withDouble}</p>
             <p className="text-[10px] text-muted">{t.matches.featureDouble}</p>
           </div>
-          <div className="rounded-xl bg-background/40 px-2 py-2">
-            <p className="text-lg font-bold text-amber-400">{withBold}</p>
+          <div className="rounded-xl border border-red-400/30 bg-gradient-to-br from-red-950/70 to-rose-500/10 px-2 py-2 shadow-lg shadow-red-950/20">
+            <p className="text-lg font-black text-red-300">{withBold}</p>
             <p className="text-[10px] text-muted">{t.matches.featureBold}</p>
           </div>
         </div>
@@ -240,7 +240,7 @@ export default function LeagueMatchPredictionsPage() {
 
       <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted md:gap-3 md:text-xs">
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 ring-1 ring-card-border">
-          <span className="rounded bg-amber-500/25 px-1.5 text-[10px] font-black text-amber-300 ring-1 ring-amber-400/50">
+          <span className="rounded bg-orange-500/25 px-1.5 text-[10px] font-black text-orange-200 ring-1 ring-orange-300/60">
             2×
           </span>
           {t.matches.featureDouble}

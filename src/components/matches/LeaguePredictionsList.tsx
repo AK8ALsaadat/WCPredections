@@ -374,9 +374,9 @@ function LeaguePredictionRow({
     <li
       className={`relative px-3 py-3 transition-colors md:px-5 md:py-4 ${
         hasDouble
-          ? "border-s-4 border-violet-400 bg-violet-500/[0.12] ring-1 ring-inset ring-violet-400/30"
+          ? "border-s-4 border-orange-300 bg-gradient-to-br from-orange-950/80 via-orange-900/45 to-amber-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_35px_rgba(124,45,18,0.28)] ring-1 ring-inset ring-orange-300/50"
           : hasBold
-            ? "border-s-4 border-amber-400 bg-amber-500/[0.10] ring-1 ring-inset ring-amber-400/25"
+            ? "border-s-4 border-red-400 bg-gradient-to-br from-red-950/85 via-red-900/45 to-rose-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_35px_rgba(127,29,29,0.28)] ring-1 ring-inset ring-red-400/50"
             : isMe
               ? "bg-primary/[0.07] ring-1 ring-inset ring-primary/25"
               : index % 2 === 0

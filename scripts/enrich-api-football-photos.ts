@@ -45,51 +45,32 @@ function similarity(a: string, b: string) {
 async function main() {
   console.log("Starting API-Football enrichment...");
 
-  const teams = await prisma.team.findMany();
+  const teams = await prisma.team.findMany({
+    where: { players: { some: {} } },
+  });
   console.log(`Found ${teams.length} teams in DB`);
-
-  // quick connectivity test
-  try {
-    const testRes = await fetch(
-      `https://v3.football.api-sports.io/teams?name=Brazil`,
-      { headers: { "x-apisports-key": process.env.API_FOOTBALL_KEY! } }
-    );
-    console.log(`API-Football test status: ${testRes.status}`);
-    try {
-      const j = await testRes.json();
-      console.log("API-Football test response keys:", Object.keys(j));
-    } catch (e) {
-      console.warn("API-Football test JSON parse failed", String(e));
-    }
-  } catch (e) {
-    console.warn("API-Football test fetch failed", String(e));
-  }
 
   let totalUpdated = 0;
 
   for (const team of teams) {
     try {
-      // try a direct team search to diagnose resolution
-      try {
-        const teamSearch = await fetch(`https://v3.football.api-sports.io/teams?search=${encodeURIComponent(team.name)}`, { headers: { "x-apisports-key": process.env.API_FOOTBALL_KEY! } });
-        const tjson = await teamSearch.json().catch(() => null);
-        const found = Array.isArray(tjson?.response) ? tjson.response.length : 0;
-        // console.log(`  search results: ${found}`);
-      } catch (e) {
-        // ignore
-      }
-
       const squad = await fetchApiFootballSquad(team.name);
       console.log(`Team: ${team.name} — squad players: ${squad.length}`);
       if (!squad || squad.length === 0) continue;
+      const candidates = await prisma.player.findMany({
+        where: { teamId: team.id },
+      });
 
       for (const p of squad) {
         const photo = p.photo ?? `https://media.api-sports.io/football/players/${p.id}.png`;
         try {
           // try exact apiPlayerId match first
-          let res = await prisma.player.updateMany({
-            where: { teamId: team.id, apiPlayerId: String(p.id), photoUrl: null },
-            data: { photoUrl: photo },
+          const res = await prisma.player.updateMany({
+            where: { teamId: team.id, apiPlayerId: String(p.id) },
+            data: {
+              photoUrl: photo,
+              shirtNumber: p.number ?? undefined,
+            },
           });
           if (res.count > 0) {
             totalUpdated += res.count;
@@ -97,18 +78,19 @@ async function main() {
             continue;
           }
 
-          // otherwise load candidates by team and try name similarity
-          const candidates = await prisma.player.findMany({ where: { teamId: team.id } });
           let best: { player: any; score: number } | null = null;
           for (const c of candidates) {
             const score = similarity(c.name, p.name);
             if (!best || score > best.score) best = { player: c, score };
           }
 
-          if (best && best.score >= 0.78 && best.player.photoUrl == null) {
-            const upd = await prisma.player.update({
+          if (best && best.score >= 0.78) {
+            await prisma.player.update({
               where: { id: best.player.id },
-              data: { photoUrl: photo, apiPlayerId: String(p.id) },
+              data: {
+                photoUrl: photo,
+                shirtNumber: p.number ?? best.player.shirtNumber,
+              },
             });
             totalUpdated += 1;
             console.log(`  matched '${p.name}' -> '${best.player.name}' (score=${best.score.toFixed(2)}), updated`);

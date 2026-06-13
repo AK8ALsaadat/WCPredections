@@ -12,7 +12,7 @@ function scheduleRunner() {
 
   const runner = (deadline: IdleDeadline) => {
     idleHandle = null;
-    runTasks(deadline);
+    void runTasks(deadline);
   };
 
   if (typeof window.requestIdleCallback === "function") {
@@ -25,16 +25,13 @@ function scheduleRunner() {
   }
 }
 
-function runTasks(deadline: IdleDeadline) {
+async function runTasks(deadline: IdleDeadline) {
   while (true) {
     const next = dequeueTask();
     if (!next) break;
 
     try {
-      const result = next();
-      if (result instanceof Promise) {
-        result.catch(() => {});
-      }
+      await next();
     } catch {
       // ignore failed prefetch task
     }

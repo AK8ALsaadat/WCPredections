@@ -97,7 +97,7 @@ export async function submitBoldScorerBet(
   }
 
   if (existing?.matchId === matchId && existing.playerId !== playerId) {
-    throw new Error("ما تقدر تغيّر لاعب البطاقة الجريئة بعد تفعيلها");
+    throw new Error("ما تقدر تغيّر لاعب الرهان بعد تفعيله");
   }
 
   const player = await prisma.player.findFirst({
@@ -113,7 +113,7 @@ export async function submitBoldScorerBet(
 
   if (existing && existing.matchId !== matchId) {
     throw new Error(
-      "استخدمت بطاقتك الجريئة في مباراة ثانية هالجولة — مرة واحدة بس"
+      "استخدمت الرهان في مباراة ثانية هالجولة — مرة واحدة بس"
     );
   }
 

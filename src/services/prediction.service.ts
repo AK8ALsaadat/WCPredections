@@ -449,7 +449,7 @@ export async function submitMatchPredictionBundle(
   // ✅ منع استخدام الـ Double والـ Bold معاً على نفس المباراة
   if (isDouble && data.boldPlayerId) {
     throw new Error(
-      "ما تقدر تستخدم المضاعفة والبطاقة الجريئة معاً على نفس المباراة"
+      "ما تقدر تستخدم المضاعفة والرهان معاً على نفس المباراة"
     );
   }
 
@@ -458,7 +458,7 @@ export async function submitMatchPredictionBundle(
       // cancellation: remove the stored bold bet for this user/round
       await prisma.boldScorerBet.delete({ where: { id: storedBold.id } });
     } else if (data.boldPlayerId !== storedBold.playerId) {
-      throw new Error("ما تقدر تغيّر لاعب البطاقة الجريئة بعد تفعيلها");
+      throw new Error("ما تقدر تغيّر لاعب الرهان بعد تفعيله");
     }
   } else if (
     data.boldPlayerId &&
@@ -466,7 +466,7 @@ export async function submitMatchPredictionBundle(
     storedBold.matchId !== data.matchId
   ) {
     throw new Error(
-      "استخدمت بطاقتك الجريئة في مباراة ثانية هالجولة — مرة واحدة بس"
+      "استخدمت الرهان في مباراة ثانية هالجولة — مرة واحدة بس"
     );
   }
 

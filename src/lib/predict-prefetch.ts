@@ -40,7 +40,7 @@ export function predictMatchCacheKey(matchId: string) {
 }
 
 export function predictLineupCacheKey(matchId: string) {
-  return `predict:lineup:v4:${matchId}`;
+  return `predict:lineup:v6:${matchId}`;
 }
 
 type ListMatchSeed = {
@@ -89,16 +89,7 @@ async function fetchPredictMatch(matchId: string) {
 }
 
 async function fetchPredictLineup(matchId: string) {
-  const cached = readClientCache<LineupCacheMeta>(predictLineupCacheKey(matchId));
-  const matchCached = readClientCache<{ matchTime?: string }>(
-    predictMatchCacheKey(matchId)
-  );
-  const inFastWindow =
-    matchCached?.matchTime &&
-    isWithinLineupFastRefreshWindow(matchCached.matchTime);
-  const freshParam =
-    inFastWindow && cached?.lineupStatus !== "official" ? "?fresh=1" : "";
-  const res = await fetch(`/api/matches/${matchId}/lineup${freshParam}`, {
+  const res = await fetch(`/api/matches/${matchId}/lineup`, {
     credentials: "same-origin",
   });
   if (!res.ok) return;
@@ -190,8 +181,10 @@ export function prefetchPredictData(matchId: string) {
   inflight.set(matchId, task);
 
   enqueueBackgroundPrefetch(async () => {
-    if (!matchFresh) await fetchPredictMatch(matchId);
-    if (!lineupFresh) await fetchPredictLineup(matchId);
+    await Promise.all([
+      matchFresh ? Promise.resolve() : fetchPredictMatch(matchId),
+      lineupFresh ? Promise.resolve() : fetchPredictLineup(matchId),
+    ]);
     inflight.delete(matchId);
     resolveTask();
   }, 3);

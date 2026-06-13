@@ -1,5 +1,7 @@
 import { cachedFetch } from "@/lib/api-cache";
 
+let apiUnavailableUntil = 0;
+
 type ApiFootballPlayer = {
   id: number;
   name: string;
@@ -50,6 +52,7 @@ export type ExternalProbableLineup = {
 
 function isEnabled() {
   return (
+    Date.now() >= apiUnavailableUntil &&
     !!process.env.API_FOOTBALL_KEY &&
     process.env.LINEUP_USE_API_FOOTBALL !== "false"
   );
@@ -72,6 +75,7 @@ async function apiFetch<T>(
   return cachedFetch(cacheKey, async () => {
     const res = await fetch(url, {
       headers: { "x-apisports-key": apiKey },
+      signal: AbortSignal.timeout(6_000),
       next: { revalidate: 0 },
     });
 
@@ -91,6 +95,7 @@ async function apiFetch<T>(
       (data.response?.length ?? 0) === 0;
 
     if (hasBlockingErrors) {
+      apiUnavailableUntil = Date.now() + 30 * 60 * 1000;
       throw new Error("API-Football returned errors");
     }
 

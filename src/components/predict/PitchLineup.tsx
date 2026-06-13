@@ -1,9 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { layoutFormation, getPlayerLabel } from "@/lib/formation-layout";
 import type { ScorerPicks } from "@/lib/scorer-prediction";
 import type { LineupSource, MatchPlayerView } from "@/services/match-players.service";
-import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { useEffect, useState } from "react";
 
 type PitchLineupProps = {
@@ -128,11 +128,58 @@ function positionFallback(position?: string | null) {
   return "?";
 }
 
-function playerImageUrl(player: MatchPlayerView) {
+function PlayerPortrait({
+  player,
+  sizeClass,
+  enabled,
+}: {
+  player: MatchPlayerView;
+  sizeClass: string;
+  enabled: boolean;
+}) {
+  const photoUrl = player.photoUrl ?? null;
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setLoaded(false);
+    setFailed(false);
+  }, [photoUrl]);
+
+  if (!enabled || !photoUrl || failed) return null;
+
   return (
-    player.photoUrl ??
-    `/api/player-avatar?name=${encodeURIComponent(player.name)}`
+    <Image
+      src={photoUrl}
+      alt=""
+      width={96}
+      height={128}
+      unoptimized
+      loading="lazy"
+      decoding="async"
+      onLoad={() => setLoaded(true)}
+      onError={() => setFailed(true)}
+      className={`absolute inset-0 object-cover object-top transition-opacity duration-150 ${sizeClass} ${
+        loaded ? "opacity-100" : "opacity-0"
+      }`}
+    />
   );
+}
+
+function withDisplayNumbers(players: MatchPlayerView[]) {
+  const used = new Set(
+    players.flatMap((player) =>
+      player.shirtNumber == null ? [] : [player.shirtNumber]
+    )
+  );
+  let fallback = 1;
+  return players.map((player) => {
+    if (player.shirtNumber != null) return player;
+    while (used.has(fallback)) fallback++;
+    const displayNumber = fallback++;
+    used.add(displayNumber);
+    return { ...player, shirtNumber: displayNumber };
+  });
 }
 
 function PlayerDot({
@@ -142,6 +189,7 @@ function PlayerDot({
   selectable,
   onToggle,
   style,
+  showPhotos,
 }: {
   player: MatchPlayerView;
   goals: number;
@@ -149,15 +197,9 @@ function PlayerDot({
   selectable: boolean;
   onToggle: () => void;
   style: React.CSSProperties;
+  showPhotos: boolean;
 }) {
   const gk = isGoalkeeper(player);
-  const [imageFailed, setImageFailed] = useState(false);
-
-  // reset failure when photoUrl changes
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  useEffect(() => {
-    setImageFailed(false);
-  }, [player.photoUrl]);
 
   return (
     <button
@@ -181,21 +223,14 @@ function PlayerDot({
                 : "bg-white/95 text-emerald-900"
           }`}
         >
-          {player.photoUrl && !imageFailed ? (
-            <OptimizedImage
-              src={playerImageUrl(player)}
-              alt={player.name}
-              fallback={`/api/player-avatar?name=${encodeURIComponent(player.name)}`}
-              width={44}
-              height={44}
-              className="h-full w-full object-cover"
-              onErrorFallback={() => setImageFailed(true)}
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-[14px] font-black">
-              <span className="text-emerald-950">{player.shirtNumber ?? positionFallback(player.position)}</span>
-            </div>
-          )}
+          <span className="flex h-full w-full items-center justify-center text-[14px] font-black text-emerald-950">
+            {player.shirtNumber ?? positionFallback(player.position)}
+          </span>
+          <PlayerPortrait
+            player={player}
+            sizeClass="h-[130%] w-full origin-top scale-110"
+            enabled={showPhotos}
+          />
         </span>
         <span className="absolute -bottom-1 -left-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-white/70 bg-emerald-950 px-1 text-[9px] font-black text-white">
           {player.shirtNumber ?? positionFallback(player.position)}
@@ -224,12 +259,14 @@ function BenchRow({
   canSelectPlayer,
   onToggle,
   label,
+  showPhotos,
 }: {
   players: MatchPlayerView[];
   scorerPicks: ScorerPicks;
   canSelectPlayer?: (id: string) => boolean;
   onToggle: (id: string) => void;
   label: string;
+  showPhotos: boolean;
 }) {
   if (players.length === 0) return null;
 
@@ -245,6 +282,7 @@ function BenchRow({
             selectable={player.id in scorerPicks || (canSelectPlayer?.(player.id) ?? true)}
             goals={scorerPicks[player.id] ?? 1}
             onToggle={() => onToggle(player.id)}
+            showPhotos={showPhotos}
           />
         ))}
       </div>
@@ -258,17 +296,15 @@ function BenchPlayerTile({
   selectable,
   goals,
   onToggle,
+  showPhotos,
 }: {
   player: MatchPlayerView;
   selected: boolean;
   selectable: boolean;
   goals: number;
   onToggle: () => void;
+  showPhotos: boolean;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => setImageFailed(false), [player.photoUrl]);
-
   return (
     <button
       type="button"
@@ -282,22 +318,17 @@ function BenchPlayerTile({
             : "cursor-not-allowed border-card-border/60 bg-card/50 text-muted opacity-60"
       }`}
     >
-      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-card-border text-[10px] font-bold">
-        {player.photoUrl && !imageFailed ? (
-          <OptimizedImage
-            src={playerImageUrl(player)}
-            alt={player.name}
-            fallback={`/api/player-avatar?name=${encodeURIComponent(player.name)}`}
-            width={32}
-            height={32}
-            className="h-8 w-8 rounded-full object-cover"
-            onErrorFallback={() => setImageFailed(true)}
-          />
-        ) : (
-          <div className="flex h-8 w-8 items-center justify-center font-black text-sm text-emerald-900">
+      <span className="relative h-8 w-8 shrink-0">
+        <span className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-card-border text-[10px] font-bold">
+          <span className="font-black text-sm text-emerald-900">
             {player.shirtNumber ?? positionFallback(player.position)}
-          </div>
-        )}
+          </span>
+          <PlayerPortrait
+            player={player}
+            sizeClass="h-[130%] w-full origin-top scale-110"
+            enabled={showPhotos}
+          />
+        </span>
         <span className="absolute -bottom-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-card bg-emerald-950 px-0.5 text-[8px] font-black text-white">
           {player.shirtNumber ?? positionFallback(player.position)}
         </span>
@@ -381,16 +412,25 @@ export function PitchLineup({
   onGoalsChange,
   labels,
 }: PitchLineupProps) {
-  const homeLineup = home.players.filter((p) => p.section === "lineup");
-  const awayLineup = away.players.filter((p) => p.section === "lineup");
-  const homeBench = home.players.filter((p) => p.section === "bench");
-  const awayBench = away.players.filter((p) => p.section === "bench");
+  const [showPhotos, setShowPhotos] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowPhotos(true), 650);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const homePlayers = withDisplayNumbers(home.players);
+  const awayPlayers = withDisplayNumbers(away.players);
+  const homeLineup = homePlayers.filter((p) => p.section === "lineup");
+  const awayLineup = awayPlayers.filter((p) => p.section === "lineup");
+  const homeBench = homePlayers.filter((p) => p.section === "bench");
+  const awayBench = awayPlayers.filter((p) => p.section === "bench");
 
   const homeSlots = layoutFormation(homeLineup, home.formation, "home");
   const awaySlots = layoutFormation(awayLineup, away.formation, "away");
 
   const playersById = new Map<string, MatchPlayerView>();
-  for (const p of [...home.players, ...away.players]) {
+  for (const p of [...homePlayers, ...awayPlayers]) {
     playersById.set(p.id, p);
   }
 
@@ -459,6 +499,7 @@ export function PitchLineup({
               }
               onToggle={() => onToggle(player.id)}
               style={{ left: `${x}%`, top: `${y}%` }}
+              showPhotos={showPhotos}
             />
           ))}
 
@@ -474,6 +515,7 @@ export function PitchLineup({
               }
               onToggle={() => onToggle(player.id)}
               style={{ left: `${x}%`, top: `${y}%` }}
+              showPhotos={showPhotos}
             />
           ))}
         </div>
@@ -486,6 +528,7 @@ export function PitchLineup({
           scorerPicks={scorerPicks}
           canSelectPlayer={canSelectPlayer}
           onToggle={onToggle}
+          showPhotos={showPhotos}
           label={`${labels.bench} — ${home.teamName}`}
         />
         <BenchRow
@@ -493,6 +536,7 @@ export function PitchLineup({
           scorerPicks={scorerPicks}
           canSelectPlayer={canSelectPlayer}
           onToggle={onToggle}
+          showPhotos={showPhotos}
           label={`${labels.bench} — ${away.teamName}`}
         />
       </div>

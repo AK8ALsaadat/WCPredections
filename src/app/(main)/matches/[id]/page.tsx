@@ -291,8 +291,7 @@ export default function MatchDetailPage() {
         </Card>
       )}
 
-      {(isFinished || isLive) &&
-        m.userScorerPredictions &&
+      {m.userScorerPredictions &&
         m.userScorerPredictions.length > 0 && (
         <Card>
           <CardHeader>
@@ -305,9 +304,11 @@ export default function MatchDetailPage() {
                   {sp.player.name}
                   <span className="mr-2 text-muted"> (×{sp.predictedGoals ?? 1})</span>
                 </span>
-                <span className={sp.points > 0 ? "text-primary" : "text-muted"}>
-                  {sp.points > 0 ? `+${sp.points}` : "0"}
-                </span>
+                {(isFinished || isLive) && (
+                  <span className={sp.points > 0 ? "text-primary" : "text-muted"}>
+                    {sp.points > 0 ? `+${sp.points}` : "0"}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
