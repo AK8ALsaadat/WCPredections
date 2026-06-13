@@ -61,6 +61,17 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
+function LeaderTag() {
+  const { messages: t } = useI18n();
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-warning/20 px-2 py-0.5 text-[10px] font-black text-warning ring-1 ring-warning/40">
+      <span aria-hidden>♛</span>
+      {t.leaderboard.leaderTag}
+    </span>
+  );
+}
+
 function MobileLeaderboardList({
   entries,
   highlightUserId,
@@ -87,9 +98,12 @@ function MobileLeaderboardList({
               : "border-card-border bg-card"
           }`}
         >
-          <RankBadge rank={entry.rank} />
           <div className="min-w-0 flex-1 text-end">
-            <p className="truncate font-medium">{entry.username}</p>
+            <div className="flex min-w-0 items-center justify-end gap-2">
+              {entry.rank === 1 && <LeaderTag />}
+              <span className="truncate font-medium">{entry.username}</span>
+              <RankBadge rank={entry.rank} />
+            </div>
             {showRankTrend && (
               <div className="mt-0.5">
                 <RankTrend change={entry.rankChange} />
@@ -214,9 +228,6 @@ export function LeaderboardTable({
         <table className="w-full">
           <thead>
             <tr className="border-b border-card-border bg-background/60">
-              <th className="px-4 py-3 text-end text-xs font-semibold uppercase tracking-wider text-muted">
-                {L.rank}
-              </th>
               {showRankTrend && (
                 <th className="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted">
                   {L.trend}
@@ -240,23 +251,24 @@ export function LeaderboardTable({
                     : "hover:bg-card-border/15"
                 }`}
               >
-                <td className="px-4 py-3">
-                  <RankBadge rank={entry.rank} />
-                </td>
                 {showRankTrend && (
                   <td className="px-2 py-3 text-center">
                     <RankTrend change={entry.rankChange} />
                   </td>
                 )}
-                <td className="px-4 py-3 font-medium">{
-                  /* link to public user page */
-                }<Link
-                  href={`/user/${encodeURIComponent(entry.username)}`}
-                  prefetch={false}
-                  className="font-medium text-primary hover:underline"
-                >
-                  {entry.username}
-                </Link></td>
+                <td className="px-4 py-3 font-medium">
+                  <div className="flex items-center justify-end gap-2">
+                    {entry.rank === 1 && <LeaderTag />}
+                    <Link
+                      href={`/user/${encodeURIComponent(entry.username)}`}
+                      prefetch={false}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {entry.username}
+                    </Link>
+                    <RankBadge rank={entry.rank} />
+                  </div>
+                </td>
                 <td
                   className={`px-4 py-3 text-start text-lg font-bold tabular-nums ${pointsTone(entry.points)}`}
                 >

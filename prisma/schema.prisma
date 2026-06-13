@@ -28,6 +28,7 @@ model User {
   passwordHash    String   @map("password_hash")
   isAdmin         Boolean  @default(false) @map("is_admin")
   hasSeenTutorial Boolean  @default(false) @map("has_seen_tutorial")
+  hasSeenBoldFiveNotice Boolean @default(false) @map("has_seen_bold_five_notice")
   createdAt       DateTime @default(now()) @map("created_at")
 
   predictions        Prediction[]
@@ -179,6 +180,7 @@ model BoldScorerBet {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
   roundId   String   @map("round_id")
+  usageRoundKey String @map("usage_round_key")
   matchId   String   @map("match_id")
   playerId  String   @map("player_id")
   points    Int      @default(0)
@@ -189,7 +191,7 @@ model BoldScorerBet {
   match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, roundId])
+  @@unique([userId, usageRoundKey])
   @@index([matchId])
   @@index([userId])
   @@map("bold_scorer_bets")

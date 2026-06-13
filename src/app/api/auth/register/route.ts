@@ -1,5 +1,5 @@
 import { revalidatePath, revalidateTag } from "next/cache";
-import { createUser } from "@/lib/auth";
+import { claimBoldFiveNotice, createUser } from "@/lib/auth";
 import { apiSuccess, handleApiError } from "@/lib/api";
 import { getSession } from "@/lib/session";
 import { parseBody, registerSchema } from "@/lib/validations";
@@ -19,7 +19,9 @@ export async function POST(request: Request) {
     revalidatePath("/leaderboard", "layout");
     revalidatePath("/dashboard");
 
-    return apiSuccess({ user }, 201);
+    const showBoldFiveNotice = await claimBoldFiveNotice(user.userId);
+
+    return apiSuccess({ user, showBoldFiveNotice }, 201);
   } catch (error) {
     return handleApiError(error);
   }

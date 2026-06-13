@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { WorldCupFlagGarland } from "@/components/auth/WorldCupFlagGarland";
+import { BoldFiveNotice } from "@/components/auth/BoldFiveNotice";
 import { LocaleBar } from "@/components/layout/LocaleBar";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
@@ -19,6 +20,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showBoldFiveNotice, setShowBoldFiveNotice] = useState(false);
+
+  function continueToDashboard() {
+    setShowBoldFiveNotice(false);
+    router.push("/dashboard");
+    router.refresh();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,8 +47,11 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
-      router.refresh();
+      if (data.data.showBoldFiveNotice) {
+        setShowBoldFiveNotice(true);
+      } else {
+        continueToDashboard();
+      }
     } catch {
       setError(t.errors.generic);
     } finally {
@@ -50,6 +61,10 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-8">
+      <BoldFiveNotice
+        open={showBoldFiveNotice}
+        onContinue={continueToDashboard}
+      />
       <LocaleBar />
       <div className="w-full max-w-md">
         <WorldCupFlagGarland />

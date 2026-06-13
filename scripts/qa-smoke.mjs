@@ -36,8 +36,22 @@ function fail(name, detail) {
   });
   const regData = await reg.json();
   const cookie = getCookie(reg.headers);
-  if (regData.success) pass("register");
+  if (regData.success && regData.data?.showBoldFiveNotice === true) {
+    pass("register + first bold-five notice");
+  }
   else fail("register", regData.error);
+
+  const login = await fetch(`${base}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: user, password: "testpass123" }),
+  });
+  const loginData = await login.json();
+  if (loginData.success && loginData.data?.showBoldFiveNotice === false) {
+    pass("bold-five notice only once");
+  } else {
+    fail("bold-five notice only once", JSON.stringify(loginData));
+  }
 
   const me = await fetch(`${base}/api/auth/me`, {
     headers: { Cookie: cookie },

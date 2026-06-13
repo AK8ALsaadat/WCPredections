@@ -254,7 +254,7 @@ export function calculateScorerPredictionPoints(
 }
 
 /** البطاقة الجريئة — تراهن على هداف مرة واحدة كل جولة */
-export const BOLD_SCORER_POINTS = 4;
+export const BOLD_SCORER_POINTS = 5;
 
 export function calculateBoldScorerBetPoints(regulationGoals: number): number {
   return regulationGoals > 0 ? BOLD_SCORER_POINTS : -BOLD_SCORER_POINTS;

@@ -149,3 +149,17 @@ export async function authenticateUser(
     hasSeenTutorial: user.hasSeenTutorial,
   };
 }
+
+export async function claimBoldFiveNotice(userId: string): Promise<boolean> {
+  const result = await prisma.user.updateMany({
+    where: {
+      id: userId,
+      hasSeenBoldFiveNotice: false,
+    },
+    data: {
+      hasSeenBoldFiveNotice: true,
+    },
+  });
+
+  return result.count === 1;
+}

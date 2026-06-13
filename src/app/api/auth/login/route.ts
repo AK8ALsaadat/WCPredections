@@ -1,4 +1,4 @@
-import { authenticateUser } from "@/lib/auth";
+import { authenticateUser, claimBoldFiveNotice } from "@/lib/auth";
 import { apiSuccess, handleApiError } from "@/lib/api";
 import { getSession } from "@/lib/session";
 import { parseBody, loginSchema } from "@/lib/validations";
@@ -17,7 +17,9 @@ export async function POST(request: Request) {
     session.user = user;
     await session.save();
 
-    return apiSuccess({ user });
+    const showBoldFiveNotice = await claimBoldFiveNotice(user.userId);
+
+    return apiSuccess({ user, showBoldFiveNotice });
   } catch (error) {
     return handleApiError(error);
   }

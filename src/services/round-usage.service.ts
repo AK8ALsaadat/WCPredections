@@ -1,6 +1,7 @@
 import { getBoldScorerBetStatus } from "@/services/bold-scorer-bet.service";
 import { MAX_DOUBLES_PER_ROUND } from "@/services/prediction.service";
 import { prisma } from "@/lib/prisma";
+import { getUsageRoundScope } from "@/services/usage-round.service";
 
 export const MAX_BOLD_SCORER_BETS_PER_ROUND = 1;
 
@@ -9,24 +10,18 @@ export async function getRoundUsageLimits(
   matchId: string,
   roundId?: string
 ) {
-  const resolvedRoundId =
-    roundId ??
-    (
-      await prisma.match.findUniqueOrThrow({
-        where: { id: matchId },
-        select: { roundId: true },
-      })
-    ).roundId;
+  const scope = await getUsageRoundScope(matchId);
+  const resolvedRoundId = roundId ?? scope.databaseRoundId;
 
   const [roundPredictions, boldStatus] = await Promise.all([
     prisma.prediction.findMany({
       where: {
         userId,
-        match: { roundId: resolvedRoundId },
+        matchId: { in: scope.matchIds },
       },
       select: { matchId: true, isDouble: true },
     }),
-    getBoldScorerBetStatus(userId, matchId, resolvedRoundId),
+    getBoldScorerBetStatus(userId, matchId),
   ]);
 
   const doubleOnThisMatch =

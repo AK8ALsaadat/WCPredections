@@ -86,7 +86,7 @@ export function PredictionHistoryCard({ entry, defaultOpen = false }: { entry: M
           {entry.prediction && (
             <p className="mt-2 text-sm">
               <span className="text-muted">{t.profile.predicted}: </span>
-              <span className="font-bold tabular-nums">
+              <span dir="ltr" className="inline-block font-bold tabular-nums">
                 {entry.prediction.predHome}-{entry.prediction.predAway}
               </span>
               {entry.prediction.isDouble && (
@@ -96,13 +96,19 @@ export function PredictionHistoryCard({ entry, defaultOpen = false }: { entry: M
           )}
           {isFinished && (
             <p className="text-sm text-muted">
-              {t.profile.actual}: {m.homeScore}-{m.awayScore}
+              {t.profile.actual}:{" "}
+              <span dir="ltr" className="inline-block tabular-nums">
+                {m.homeScore}-{m.awayScore}
+              </span>
             </p>
           )}
           {isLive && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-danger/15 px-2 py-1 text-xs font-bold text-danger">
-                {t.status.LIVE} {m.homeScore}-{m.awayScore}
+                {t.status.LIVE}{" "}
+                <span dir="ltr" className="inline-block tabular-nums">
+                  {m.homeScore}-{m.awayScore}
+                </span>
               </span>
               <span className="rounded-full bg-primary/15 px-2 py-1 text-xs font-bold text-primary">
                 {t.matches.pointsEarned}: {livePoints ?? 0}

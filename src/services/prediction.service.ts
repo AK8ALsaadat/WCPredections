@@ -9,6 +9,7 @@ import {
 } from "@/lib/scorer-prediction";
 import type { LeagueMatchPredictionRow } from "@/types";
 import { calculateBoldScorerBetPointsForMatch } from "@/services/bold-scorer-bet.service";
+import { getUsageRoundScope } from "@/services/usage-round.service";
 import {
   calculateDoubleBonus,
   calculateFinishTypePoints,
@@ -38,15 +39,16 @@ export function shouldIgnorePositionMultiplierForScorerPrediction(
 
 export async function countDoublesUsedInRound(
   userId: string,
-  roundId: string,
+  matchId: string,
   excludePredictionId?: string
 ): Promise<number> {
+  const scope = await getUsageRoundScope(matchId);
   const predictions = await prisma.prediction.findMany({
     where: {
       userId,
       isDouble: true,
       id: excludePredictionId ? { not: excludePredictionId } : undefined,
-      match: { roundId },
+      matchId: { in: scope.matchIds },
     },
   });
   return predictions.length;
@@ -60,14 +62,9 @@ export async function validateDoubleUsage(
 ): Promise<void> {
   if (!isDouble) return;
 
-  const match = await prisma.match.findUniqueOrThrow({
-    where: { id: matchId },
-    select: { roundId: true },
-  });
-
   const doublesUsed = await countDoublesUsedInRound(
     userId,
-    match.roundId,
+    matchId,
     excludePredictionId
   );
 
@@ -422,13 +419,15 @@ export async function submitMatchPredictionBundle(
   }
 
   // Sequential writes — interactive $transaction breaks on Supabase PgBouncer (pooler).
+  const usageScope = await getUsageRoundScope(data.matchId);
+
   if (isDouble) {
     const doublesUsed = await prisma.prediction.count({
       where: {
         userId,
         isDouble: true,
         id: existing?.id ? { not: existing.id } : undefined,
-        match: { roundId: match.roundId },
+        matchId: { in: usageScope.matchIds },
       },
     });
     if (doublesUsed >= MAX_DOUBLES_PER_ROUND) {
@@ -439,7 +438,12 @@ export async function submitMatchPredictionBundle(
   }
 
   const storedBold = await prisma.boldScorerBet.findUnique({
-    where: { userId_roundId: { userId, roundId: match.roundId } },
+    where: {
+      userId_usageRoundKey: {
+        userId,
+        usageRoundKey: usageScope.key,
+      },
+    },
   });
 
   // ✅ منع استخدام الـ Double والـ Bold معاً على نفس المباراة
@@ -505,11 +509,15 @@ export async function submitMatchPredictionBundle(
   if (data.boldPlayerId) {
     boldBet = await prisma.boldScorerBet.upsert({
       where: {
-        userId_roundId: { userId, roundId: match.roundId },
+        userId_usageRoundKey: {
+          userId,
+          usageRoundKey: usageScope.key,
+        },
       },
       create: {
         userId,
         roundId: match.roundId,
+        usageRoundKey: usageScope.key,
         matchId: data.matchId,
         playerId: data.boldPlayerId,
       },

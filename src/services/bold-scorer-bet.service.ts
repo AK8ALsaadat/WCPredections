@@ -5,15 +5,16 @@ import {
   BOLD_SCORER_POINTS,
   calculateBoldScorerBetPoints,
 } from "@/services/scoring.service";
+import { getUsageRoundScope } from "@/services/usage-round.service";
 
 export { BOLD_SCORER_POINTS };
 
 export async function getBoldScorerBetForUserRound(
   userId: string,
-  roundId: string
+  usageRoundKey: string
 ) {
   return prisma.boldScorerBet.findUnique({
-    where: { userId_roundId: { userId, roundId } },
+    where: { userId_usageRoundKey: { userId, usageRoundKey } },
     include: {
       player: { select: { id: true, name: true, teamId: true } },
       match: { select: { id: true, homeTeamId: true, awayTeamId: true } },
@@ -22,37 +23,25 @@ export async function getBoldScorerBetForUserRound(
 }
 
 export async function getBoldScorerBetForMatch(userId: string, matchId: string) {
-  const match = await prisma.match.findUnique({
-    where: { id: matchId },
-    select: { roundId: true },
-  });
-  if (!match) return null;
-  const bet = await getBoldScorerBetForUserRound(userId, match.roundId);
+  const scope = await getUsageRoundScope(matchId);
+  const bet = await getBoldScorerBetForUserRound(userId, scope.key);
   if (bet?.matchId === matchId) return bet;
   return null;
 }
 
 export async function getBoldScorerBetStatus(
   userId: string,
-  matchId: string,
-  roundId?: string
+  matchId: string
 ) {
-  const resolvedRoundId =
-    roundId ??
-    (
-      await prisma.match.findUniqueOrThrow({
-        where: { id: matchId },
-        select: { roundId: true },
-      })
-    ).roundId;
+  const scope = await getUsageRoundScope(matchId);
 
   const existing = await getBoldScorerBetForUserRound(
     userId,
-    resolvedRoundId
+    scope.key
   );
 
   return {
-    roundId: resolvedRoundId,
+    roundId: scope.key,
     used: !!existing,
     onThisMatch: existing?.matchId === matchId,
     onOtherMatch: !!existing && existing.matchId !== matchId,
@@ -90,8 +79,11 @@ export async function submitBoldScorerBet(
     throw new Error(lockReason);
   }
 
+  const scope = await getUsageRoundScope(matchId);
   const existing = await prisma.boldScorerBet.findUnique({
-    where: { userId_roundId: { userId, roundId: match.roundId } },
+    where: {
+      userId_usageRoundKey: { userId, usageRoundKey: scope.key },
+    },
   });
 
   if (!playerId) {
@@ -124,11 +116,12 @@ export async function submitBoldScorerBet(
 
   return prisma.boldScorerBet.upsert({
     where: {
-      userId_roundId: { userId, roundId: match.roundId },
+      userId_usageRoundKey: { userId, usageRoundKey: scope.key },
     },
     create: {
       userId,
       roundId: match.roundId,
+      usageRoundKey: scope.key,
       matchId,
       playerId,
     },

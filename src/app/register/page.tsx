@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { WorldCupFlagGarland } from "@/components/auth/WorldCupFlagGarland";
+import { BoldFiveNotice } from "@/components/auth/BoldFiveNotice";
 import { GoldenSponsorBanner } from "@/components/layout/GoldenSponsorBanner";
 import { LocaleBar } from "@/components/layout/LocaleBar";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -21,6 +22,13 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showBoldFiveNotice, setShowBoldFiveNotice] = useState(false);
+
+  function continueToTutorial() {
+    setShowBoldFiveNotice(false);
+    router.push("/tutorial");
+    router.refresh();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,8 +55,11 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/tutorial");
-      router.refresh();
+      if (data.data.showBoldFiveNotice) {
+        setShowBoldFiveNotice(true);
+      } else {
+        continueToTutorial();
+      }
     } catch {
       setError(t.errors.generic);
     } finally {
@@ -58,6 +69,10 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-8">
+      <BoldFiveNotice
+        open={showBoldFiveNotice}
+        onContinue={continueToTutorial}
+      />
       <LocaleBar />
       <div className="w-full max-w-md">
         <WorldCupFlagGarland />

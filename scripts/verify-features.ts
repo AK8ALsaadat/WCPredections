@@ -36,6 +36,7 @@ import { ar } from "../src/lib/i18n/ar";
 import { asFinishType } from "../src/lib/finish-type";
 import { parseOptionalScore } from "../src/lib/utils";
 import { statsFromLeaderboard } from "../src/services/leaderboard.service";
+import { buildUsageRoundKey } from "../src/services/usage-round.service";
 import type { LeaderboardEntry } from "../src/types";
 
 let passed = 0;
@@ -280,6 +281,29 @@ ok(
 console.log("\n=== حدود الجولة ===");
 ok("مضاعفة: حد أقصى 2 لكل جولة", MAX_DOUBLES_PER_ROUND === 2);
 ok("البطاقة الجريئة: مرة واحدة لكل جولة", MAX_BOLD_SCORER_BETS_PER_ROUND === 1);
+const usageRoundMatches = [
+  {
+    id: "a1",
+    roundId: "tournament",
+    homeTeamId: "a",
+    awayTeamId: "b",
+    matchTime: new Date("2026-06-11T19:00:00Z"),
+    stageName: "Group Stage",
+  },
+  {
+    id: "a2",
+    roundId: "tournament",
+    homeTeamId: "a",
+    awayTeamId: "c",
+    matchTime: new Date("2026-06-18T19:00:00Z"),
+    stageName: "Group Stage",
+  },
+];
+ok(
+  "عداد الدبل والرهان ينتقل إلى نطاق جديد في الجولة التالية",
+  buildUsageRoundKey(usageRoundMatches[0], usageRoundMatches) !==
+    buildUsageRoundKey(usageRoundMatches[1], usageRoundMatches)
+);
 ok(
   "مضاعفة مجموع 8 نقاط = إضافة 8 نقاط",
   calculateDoubleBonus(true, 8) === 8
@@ -290,15 +314,15 @@ ok(
 );
 
 console.log("\n=== البطاقة الجريئة ===");
-ok("BOLD_SCORER_POINTS = 4", BOLD_SCORER_POINTS === 4);
+ok("BOLD_SCORER_POINTS = 5", BOLD_SCORER_POINTS === 5);
 ok(
-  "سجل في الملعب = +4",
-  calculateBoldScorerBetPoints(1) === 4 &&
-    calculateBoldScorerBetPoints(2) === 4
+  "سجل في الملعب = +5",
+  calculateBoldScorerBetPoints(1) === 5 &&
+    calculateBoldScorerBetPoints(2) === 5
 );
 ok(
-  "ما سجل = -4",
-  calculateBoldScorerBetPoints(0) === -4
+  "ما سجل = -5",
+  calculateBoldScorerBetPoints(0) === -5
 );
 const boldBreakdown = buildMatchPointsBreakdown({
   homeScore: 1,
@@ -306,28 +330,28 @@ const boldBreakdown = buildMatchPointsBreakdown({
   isKnockout: false,
   homeTeamName: "A",
   awayTeamName: "B",
-  userBoldScorerBet: { points: 4, player: { name: "سالم" } },
+  userBoldScorerBet: { points: 5, player: { name: "سالم" } },
 }, ar);
-ok("تفصيل البطاقة الجريئة +4", boldBreakdown.total === 4);
+ok("تفصيل البطاقة الجريئة +5", boldBreakdown.total === 5);
 const boldMiss = buildMatchPointsBreakdown({
   homeScore: 0,
   awayScore: 0,
   isKnockout: false,
   homeTeamName: "A",
   awayTeamName: "B",
-  userBoldScorerBet: { points: -4, player: { name: "فهد" } },
+  userBoldScorerBet: { points: -5, player: { name: "فهد" } },
 }, ar);
-ok("تفصيل البطاقة الجريئة -4", boldMiss.total === -4);
+ok("تفصيل البطاقة الجريئة -5", boldMiss.total === -5);
 ok(
-  "بطاقة جريئة خاطئة فقط = -4 (حتى لو المجموع كان 0)",
+  "بطاقة جريئة خاطئة فقط = -5 (حتى لو المجموع كان 0)",
   getMatchTotalUserPoints({
     homeScore: 0,
     awayScore: 0,
     isKnockout: false,
     homeTeamName: "A",
     awayTeamName: "B",
-    userBoldScorerBet: { points: -4, player: { name: "سالم" } },
-  }) === -4
+    userBoldScorerBet: { points: -5, player: { name: "سالم" } },
+  }) === -5
 );
 
 console.log("\n=== توقع الهدافين ===");

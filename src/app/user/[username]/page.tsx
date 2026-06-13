@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { PredictionHistoryCard } from "@/components/predictions/PredictionHistoryCard";
@@ -14,6 +15,7 @@ export default function PublicUserPage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = use(params);
+  const router = useRouter();
   const { messages: t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -51,8 +53,21 @@ export default function PublicUserPage({
 
   return (
     <div className="space-y-6">
-      <header>
+      <header className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{username}</h1>
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/leaderboard/overall");
+            }
+          }}
+          className="rounded-lg border border-card-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:border-primary/40 hover:text-foreground"
+        >
+          {t.tutorial.back} ←
+        </button>
       </header>
 
       <section>
