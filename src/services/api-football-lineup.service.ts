@@ -13,6 +13,7 @@ export type ExternalLineupPlayer = {
   name: string;
   position?: string | null;
   shirtNumber?: number | null;
+  photoUrl?: string | null;
   grid?: string | null;
 };
 
@@ -114,6 +115,7 @@ function mapLineupPlayers(
     id: row.player.id,
     name: row.player.name,
     shirtNumber: row.player.number ?? null,
+    photoUrl: `https://media.api-sports.io/football/players/${row.player.id}.png`,
     position: row.player.pos ?? null,
     grid: row.player.grid ?? null,
   }));

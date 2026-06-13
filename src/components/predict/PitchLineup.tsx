@@ -3,6 +3,7 @@
 import { layoutFormation, getPlayerLabel } from "@/lib/formation-layout";
 import type { ScorerPicks } from "@/lib/scorer-prediction";
 import type { LineupSource, MatchPlayerView } from "@/services/match-players.service";
+import { OptimizedImage } from "@/components/ui/OptimizedImage";
 
 type PitchLineupProps = {
   home: {
@@ -117,6 +118,15 @@ function isGoalkeeper(player: MatchPlayerView) {
   return (player.position ?? "").toLowerCase().includes("goal");
 }
 
+function positionFallback(position?: string | null) {
+  const value = (position ?? "").toLowerCase();
+  if (value.includes("goal")) return "GK";
+  if (value.includes("def")) return "DF";
+  if (value.includes("mid")) return "MF";
+  if (value.includes("attack") || value.includes("forward")) return "FW";
+  return "?";
+}
+
 function PlayerDot({
   player,
   goals,
@@ -140,7 +150,7 @@ function PlayerDot({
       onClick={onToggle}
       disabled={!selected && !selectable}
       style={style}
-      className={`absolute z-10 flex w-[72px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 transition-transform ${
+      className={`absolute z-10 flex w-[88px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 transition-transform sm:w-[104px] ${
         !selected && !selectable
           ? "cursor-not-allowed opacity-45"
           : "hover:scale-105"
@@ -148,7 +158,7 @@ function PlayerDot({
     >
       <span className="relative">
         <span
-          className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold shadow-md ${
+          className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full text-xs font-bold shadow-lg ${
             selected
               ? "bg-primary text-white ring-2 ring-white"
               : gk
@@ -156,8 +166,23 @@ function PlayerDot({
                 : "bg-white/95 text-emerald-900"
           }`}
         >
-          {player.shirtNumber ?? "·"}
+          {player.photoUrl ? (
+            <OptimizedImage
+              src={player.photoUrl}
+              alt={player.name}
+              width={44}
+              height={44}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            player.shirtNumber ?? positionFallback(player.position)
+          )}
         </span>
+        {player.photoUrl && (
+          <span className="absolute -bottom-1 -left-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-white/70 bg-emerald-950 px-1 text-[9px] font-black text-white">
+            {player.shirtNumber ?? positionFallback(player.position)}
+          </span>
+        )}
         {selected && goals > 0 && (
           <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-0.5 text-[9px] font-bold text-black">
             {goals}
@@ -165,7 +190,8 @@ function PlayerDot({
         )}
       </span>
       <span
-        className={`max-w-[72px] truncate rounded px-1 text-center text-[10px] font-medium leading-tight ${
+        title={player.name}
+        className={`line-clamp-2 min-h-7 max-w-[88px] rounded-md px-1.5 py-0.5 text-center text-[10px] font-semibold leading-3 shadow-sm sm:max-w-[104px] sm:text-[11px] ${
           selected ? "bg-primary/90 text-white" : "bg-black/50 text-white"
         }`}
       >
@@ -325,8 +351,9 @@ export function PitchLineup({
         </p>
       </div>
 
-      <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-emerald-600/40 shadow-inner">
-        <div className="relative aspect-[2/3] w-full bg-gradient-to-b from-emerald-700 via-emerald-600 to-emerald-700">
+      <div className="overflow-x-auto pb-2">
+      <div className="relative mx-auto min-w-[520px] max-w-3xl overflow-hidden rounded-2xl border border-emerald-600/40 shadow-inner">
+        <div className="relative aspect-[4/5] w-full bg-gradient-to-b from-emerald-700 via-emerald-600 to-emerald-700">
           <div className="absolute inset-3 rounded-xl border-2 border-white/25" />
           <div className="absolute left-3 right-3 top-1/2 border-t-2 border-white/25" />
           <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/25" />
@@ -395,6 +422,7 @@ export function PitchLineup({
             />
           ))}
         </div>
+      </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

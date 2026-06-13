@@ -61,21 +61,34 @@ export function layoutFromGrid(
   const withGrid = starters.filter((p) => p.grid);
   if (withGrid.length < 11) return null;
 
-  const slots: PitchSlot[] = [];
-  for (const player of starters) {
-    if (!player.grid) return null;
-    const [rowRaw, colRaw] = player.grid.split(":");
-    const row = parseInt(rowRaw, 10);
-    const col = parseInt(colRaw, 10);
-    if (Number.isNaN(row) || Number.isNaN(col)) return null;
+  const parsed = starters.map((player) => {
+    const [rowRaw, colRaw] = player.grid!.split(":");
+    return {
+      player,
+      row: parseInt(rowRaw, 10),
+      col: parseInt(colRaw, 10),
+    };
+  });
+  if (parsed.some(({ row, col }) => Number.isNaN(row) || Number.isNaN(col))) {
+    return null;
+  }
 
-    const x = 10 + ((col - 1) / 4) * 80;
-    const rowNorm = (row - 1) / 4;
+  const maxRow = Math.max(...parsed.map(({ row }) => row), 1);
+  const columnsByRow = new Map<number, number>();
+  for (const { row, col } of parsed) {
+    columnsByRow.set(row, Math.max(columnsByRow.get(row) ?? 0, col));
+  }
+
+  const slots: PitchSlot[] = [];
+  for (const { player, row, col } of parsed) {
+    const columns = columnsByRow.get(row) ?? 1;
+    const x = columns === 1 ? 50 : 8 + ((col - 1) / (columns - 1)) * 84;
+    const rowNorm = maxRow === 1 ? 0 : (row - 1) / (maxRow - 1);
 
     const y =
       side === "home"
-        ? 10 + rowNorm * 28
-        : 90 - rowNorm * 28;
+        ? 8 + rowNorm * 36
+        : 92 - rowNorm * 36;
 
     slots.push({ player, x, y });
   }
@@ -113,18 +126,18 @@ export function layoutFormation(
   const slots: PitchSlot[] = [];
 
   if (side === "home") {
-    slots.push(...spreadRow(gk, 10));
+    slots.push(...spreadRow(gk, 7));
     lines.forEach((players, lineIndex) => {
-      const y = 18 + ((lineIndex + 1) / (lineCount + 1)) * 24;
-      slots.push(...spreadRow(players, y));
+      const y = 16 + ((lineIndex + 1) / (lineCount + 1)) * 36;
+      slots.push(...spreadRow(players, y, 8, 92));
     });
     return slots;
   }
 
-  slots.push(...spreadRow(gk, 90));
+  slots.push(...spreadRow(gk, 93));
   lines.forEach((players, lineIndex) => {
-    const y = 82 - ((lineIndex + 1) / (lineCount + 1)) * 24;
-    slots.push(...spreadRow(players, y));
+    const y = 84 - ((lineIndex + 1) / (lineCount + 1)) * 36;
+    slots.push(...spreadRow(players, y, 8, 92));
   });
   return slots;
 }

@@ -33,6 +33,7 @@ type ApiLineupPlayer = {
   name: string;
   position?: string | null;
   shirtNumber?: number | null;
+  photoUrl?: string | null;
   grid?: string | null;
 };
 
@@ -51,6 +52,7 @@ export type MatchPlayerView = {
   name: string;
   position?: string | null;
   shirtNumber?: number | null;
+  photoUrl?: string | null;
   section: "lineup" | "bench";
   grid?: string | null;
 };
@@ -246,6 +248,7 @@ async function mapPlayersFromDatabase(
       name: row.name,
       position: player.position ?? row.position,
       shirtNumber: player.shirtNumber ?? row.shirtNumber,
+      photoUrl: player.photoUrl ?? null,
       section: player.section,
       grid: player.grid ?? null,
     }];
@@ -292,6 +295,7 @@ async function mapProbableLineupByName(
         name: row.name,
         position: external.position ?? row.position,
         shirtNumber: external.shirtNumber ?? row.shirtNumber,
+        photoUrl: external.photoUrl ?? null,
         section,
         grid: external.grid ?? null,
       });
@@ -466,6 +470,7 @@ async function buildTeamView(
         name: p.name,
         position: p.position,
         shirtNumber: p.shirtNumber,
+        photoUrl: p.photoUrl ?? null,
         section: p.section,
         grid: p.grid ?? null,
       }));
