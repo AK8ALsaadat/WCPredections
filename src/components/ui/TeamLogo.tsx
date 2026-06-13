@@ -27,7 +27,6 @@ export function TeamLogo({ name, shortName, logoUrl, size = "md" }: TeamLogoProp
         height={px}
         className={cn("rounded-full object-contain", flagUrl ? "border border-card-border/30" : "")}
         fallback={flagUrl || undefined}
-        blur={!!flagUrl}
         unoptimized={!flagUrl}
       />
     );
