@@ -264,7 +264,10 @@ type ApiFootballFixtureRow = {
   fixture: { id: number; date: string; status: { short: string } };
 };
 
-async function listRecentFixtures(teamId: number): Promise<ApiFootballFixtureRow[]> {
+async function listRecentFixtures(
+  teamId: number,
+  before: Date
+): Promise<ApiFootballFixtureRow[]> {
   const seasons = ["2024", "2023", "2022"];
 
   for (const season of seasons) {
@@ -274,7 +277,11 @@ async function listRecentFixtures(teamId: number): Promise<ApiFootballFixtureRow
     });
 
     const finished = rows
-      .filter((row) => row.fixture.status.short === "FT")
+      .filter(
+        (row) =>
+          row.fixture.status.short === "FT" &&
+          new Date(row.fixture.date).getTime() < before.getTime()
+      )
       .sort(
         (a, b) =>
           new Date(b.fixture.date).getTime() - new Date(a.fixture.date).getTime()
@@ -291,7 +298,8 @@ async function listRecentFixtures(teamId: number): Promise<ApiFootballFixtureRow
 
 /** آخر تشكيلة حقيقية من مباريات المنتخب */
 export async function fetchProbableLineupFromApiFootball(
-  teamName: string
+  teamName: string,
+  before = new Date()
 ): Promise<ExternalProbableLineup | null> {
   if (!isEnabled()) return null;
 
@@ -299,7 +307,7 @@ export async function fetchProbableLineupFromApiFootball(
     const teamId = await resolveTeamId(teamName);
     if (!teamId) return null;
 
-    const fixtures = await listRecentFixtures(teamId);
+    const fixtures = await listRecentFixtures(teamId, before);
 
     for (const row of fixtures.slice(0, 5)) {
       const lineups = await apiFetch<ApiFootballLineupEntry>(

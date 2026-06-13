@@ -7,6 +7,7 @@ import {
   fetchProbableLineupFromApiFootball,
   type ExternalLineupPlayer,
 } from "@/services/api-football-lineup.service";
+import { fetchLastEspnLineup } from "@/services/espn-roster.service";
 
 const EXPECTED_LINEUP_CACHE_MS = 60 * 60 * 1000;
 const TEAM_PLAYERS_CACHE_MS = 30 * 60 * 1000;
@@ -37,6 +38,12 @@ const apiFootballSquadCache = new Map<
   string,
   { players: Awaited<ReturnType<typeof fetchApiFootballSquad>>; expiresAt: number }
 >();
+
+export function clearExpectedLineupCaches() {
+  expectedLineupCache.clear();
+  teamSquadCache.clear();
+  apiFootballSquadCache.clear();
+}
 
 type ApiLineupPlayer = {
   id: number;
@@ -363,13 +370,30 @@ async function mapProbableLineupByName(
     byLast.set(key, list);
   }
 
+  const usedIds = new Set<string>();
   const resolve = (external: ExternalLineupPlayer): (typeof squad)[0] | null => {
     const full = byFull.get(normalizePlayerName(external.name));
-    if (full) return full;
+    if (full && !usedIds.has(full.id)) return full;
 
-    const lastMatches = byLast.get(lastNameKey(external.name));
-    if (lastMatches?.length === 1) return lastMatches[0];
-    return null;
+    const lastMatches = (byLast.get(lastNameKey(external.name)) ?? []).filter(
+      (player) => !usedIds.has(player.id)
+    );
+    if (lastMatches.length === 1) return lastMatches[0];
+
+    const ranked = squad
+      .filter((player) => !usedIds.has(player.id))
+      .map((player) => ({
+        player,
+        score: playerNameSimilarity(external.name, player.name),
+      }))
+      .sort((left, right) => right.score - left.score);
+    const best = ranked[0];
+    const runnerUp = ranked[1];
+    return best &&
+      best.score >= 0.62 &&
+      best.score - (runnerUp?.score ?? 0) >= 0.05
+      ? best.player
+      : null;
   };
 
   const mapSection = (
@@ -380,6 +404,7 @@ async function mapProbableLineupByName(
     for (const external of players) {
       const row = resolve(external);
       if (!row) continue;
+      usedIds.add(row.id);
       mapped.push({
         id: row.id,
         name: row.name,
@@ -512,7 +537,10 @@ function isFootballDataLineupEnabled() {
   );
 }
 
-async function listFinishedFootballDataMatches(apiTeamId: string) {
+async function listFinishedFootballDataMatches(
+  apiTeamId: string,
+  before: Date
+) {
   try {
     const list = await fetchFootballData<{
       matches?: { id: number; status: string; utcDate?: string }[];
@@ -520,6 +548,10 @@ async function listFinishedFootballDataMatches(apiTeamId: string) {
 
     return (list.matches ?? [])
       .filter((match) => match.status === "FINISHED")
+      .filter(
+        (match) =>
+          new Date(match.utcDate ?? 0).getTime() < before.getTime()
+      )
       .sort(
         (left, right) =>
           new Date(right.utcDate ?? 0).getTime() -
@@ -531,7 +563,8 @@ async function listFinishedFootballDataMatches(apiTeamId: string) {
 }
 
 async function fetchLastFootballDataLineup(
-  apiTeamId: string
+  apiTeamId: string,
+  before: Date
 ): Promise<{
   formation: string | null;
   lineup: ApiLineupPlayer[];
@@ -540,7 +573,7 @@ async function fetchLastFootballDataLineup(
   if (!isFootballDataLineupEnabled()) return null;
 
   try {
-    const matches = await listFinishedFootballDataMatches(apiTeamId);
+    const matches = await listFinishedFootballDataMatches(apiTeamId, before);
     const details = await Promise.all(
       matches.slice(0, 3).map(async (match) => {
         try {
@@ -645,15 +678,20 @@ async function syncOfficialLineup(
 async function syncProbableLineup(
   teamId: string,
   apiTeamId: string,
-  teamName: string
+  teamName: string,
+  targetMatchId: string,
+  targetMatchTime: Date
 ): Promise<TeamPlayersView | null> {
-  const cacheKey = `${teamId}:${apiTeamId}:probable`;
+  const cacheKey = `${teamId}:${apiTeamId}:probable:${targetMatchId}`;
   const cached = expectedLineupCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data;
   }
 
-  const fromHistory = await fetchLastFootballDataLineup(apiTeamId);
+  const fromHistory = await fetchLastFootballDataLineup(
+    apiTeamId,
+    targetMatchTime
+  );
   if (fromHistory) {
     const view = await buildTeamView(
       teamId,
@@ -670,8 +708,28 @@ async function syncProbableLineup(
     return view;
   }
 
-  // Prefer last actual lineup from API-Football as a second-choice source
-  const fromApiFootball = await fetchProbableLineupFromApiFootball(teamName);
+  const fromEspn = await fetchLastEspnLineup(teamName, targetMatchTime);
+  if (fromEspn) {
+    const mapped = await mapProbableLineupByName(
+      teamId,
+      fromEspn.formation,
+      fromEspn.lineup,
+      fromEspn.bench
+    );
+    if (mapped) {
+      expectedLineupCache.set(cacheKey, {
+        data: mapped,
+        expiresAt: Date.now() + EXPECTED_LINEUP_CACHE_MS,
+      });
+      return mapped;
+    }
+  }
+
+  // API-Football remains a fallback if the other providers have no history.
+  const fromApiFootball = await fetchProbableLineupFromApiFootball(
+    teamName,
+    targetMatchTime
+  );
   if (fromApiFootball) {
     const mapped = await mapProbableLineupByName(
       teamId,
@@ -772,9 +830,17 @@ async function syncEstimatedLineup(
 async function syncExpectedLineup(
   teamId: string,
   apiTeamId: string,
-  teamName: string
+  teamName: string,
+  targetMatchId: string,
+  targetMatchTime: Date
 ): Promise<TeamPlayersView> {
-  const probable = await syncProbableLineup(teamId, apiTeamId, teamName);
+  const probable = await syncProbableLineup(
+    teamId,
+    apiTeamId,
+    teamName,
+    targetMatchId,
+    targetMatchTime
+  );
   if (probable) return probable;
 
   return syncEstimatedLineup(teamId, apiTeamId);
@@ -784,7 +850,9 @@ async function getTeamPlayersForMatch(
   teamId: string,
   apiTeamId: string | null,
   teamName: string,
-  apiTeamData?: ApiTeamPlayers
+  apiTeamData?: ApiTeamPlayers,
+  targetMatchId = "unknown",
+  targetMatchTime = new Date()
 ): Promise<TeamPlayersView> {
   if (!apiTeamId) {
     const cacheKey = `team:${teamId}:players`;
@@ -845,7 +913,13 @@ async function getTeamPlayersForMatch(
 
   return enrichWithApiFootballPhotos(
     teamName,
-    await syncExpectedLineup(teamId, apiTeamId, teamName)
+    await syncExpectedLineup(
+      teamId,
+      apiTeamId,
+      teamName,
+      targetMatchId,
+      targetMatchTime
+    )
   );
 }
 
@@ -863,6 +937,8 @@ function resolveLineupStatus(
 }
 
 async function loadProbableBothTeams(match: {
+  id: string;
+  matchTime?: Date | null;
   homeTeamId: string;
   awayTeamId: string;
   homeTeam: { apiTeamId: string | null; name: string };
@@ -873,20 +949,25 @@ async function loadProbableBothTeams(match: {
     source: "estimated",
     formation: null,
   };
+  const targetMatchTime = match.matchTime ?? new Date();
 
   const [rawHome, rawAway] = await Promise.all([
     match.homeTeam.apiTeamId
       ? syncExpectedLineup(
           match.homeTeamId,
           match.homeTeam.apiTeamId,
-          match.homeTeam.name
+          match.homeTeam.name,
+          match.id,
+          targetMatchTime
         )
       : getTeamPlayersForMatch(match.homeTeamId, null, match.homeTeam.name),
     match.awayTeam.apiTeamId
       ? syncExpectedLineup(
           match.awayTeamId,
           match.awayTeam.apiTeamId,
-          match.awayTeam.name
+          match.awayTeam.name,
+          match.id,
+          targetMatchTime
         )
       : getTeamPlayersForMatch(match.awayTeamId, null, match.awayTeam.name),
   ]);
@@ -935,13 +1016,17 @@ export async function getMatchPlayersFromApi(match: {
         match.homeTeamId,
         match.homeTeam.apiTeamId,
         match.homeTeam.name,
-        apiMatch.homeTeam
+        apiMatch.homeTeam,
+        match.id,
+        match.matchTime ?? new Date()
       ),
       getTeamPlayersForMatch(
         match.awayTeamId,
         match.awayTeam.apiTeamId,
         match.awayTeam.name,
-        apiMatch.awayTeam
+        apiMatch.awayTeam,
+        match.id,
+        match.matchTime ?? new Date()
       ),
     ]);
 

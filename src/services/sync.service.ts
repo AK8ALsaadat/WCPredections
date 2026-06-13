@@ -125,6 +125,14 @@ export async function syncActiveRoundFromApi() {
 
   const result = await syncMatchesFromApi(round.id, options);
   await reconcileDuplicateMatchesInRound(round.id);
+  const [{ clearExpectedLineupCaches }, { invalidateCache }] =
+    await Promise.all([
+      import("@/services/match-players.service"),
+      import("@/lib/api-cache"),
+    ]);
+  clearExpectedLineupCaches();
+  invalidateCache("fd:/teams/");
+  invalidateCache("fd:/matches/");
 
   const scorableMatches = await prisma.match.findMany({
     where: {

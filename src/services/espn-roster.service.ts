@@ -17,6 +17,22 @@ export type EspnRosterPlayer = {
   photoUrl?: string | null;
 };
 
+export type EspnLineupPlayer = {
+  id: number;
+  name: string;
+  position?: string | null;
+  shirtNumber?: number | null;
+  photoUrl?: string | null;
+  grid?: string | null;
+};
+
+export type EspnPreviousLineup = {
+  formation: string | null;
+  lineup: EspnLineupPlayer[];
+  bench: EspnLineupPlayer[];
+  fixtureDate: string;
+};
+
 const ESPN_TEAM_ALIASES: Record<string, string> = {
   turkey: "Türkiye",
   curacao: "Curaçao",
@@ -132,4 +148,141 @@ export async function fetchEspnRoster(
 
   rosterInflight.set(cacheKey, request);
   return request;
+}
+
+export async function fetchLastEspnLineup(
+  teamName: string,
+  before: Date
+): Promise<EspnPreviousLineup | null> {
+  const teamId = await resolveEspnTeamId(teamName);
+  if (!teamId) return null;
+
+  try {
+    const scheduleResponse = await fetch(
+      `https://site.api.espn.com/apis/site/v2/sports/soccer/all/teams/${teamId}/schedule`,
+      {
+        next: { revalidate: 60 * 60 },
+        signal: AbortSignal.timeout(6_000),
+      }
+    );
+    if (!scheduleResponse.ok) return null;
+
+    const schedule = (await scheduleResponse.json()) as {
+      events?: {
+        id: string;
+        date: string;
+        league?: { slug?: string };
+        competitions?: {
+          boxscoreAvailable?: boolean;
+          competitors?: { id?: string }[];
+        }[];
+      }[];
+    };
+
+    const candidates = (schedule.events ?? [])
+      .filter((event) => {
+        const eventTime = new Date(event.date).getTime();
+        const hasTeam = event.competitions?.some((competition) =>
+          competition.competitors?.some(
+            (competitor) => competitor.id === teamId
+          )
+        );
+        return (
+          Number.isFinite(eventTime) &&
+          eventTime < before.getTime() &&
+          hasTeam &&
+          event.competitions?.some(
+            (competition) => competition.boxscoreAvailable
+          )
+        );
+      })
+      .sort(
+        (left, right) =>
+          new Date(right.date).getTime() - new Date(left.date).getTime()
+      )
+      .slice(0, 3);
+
+    for (const event of candidates) {
+      const league = event.league?.slug;
+      if (!league) continue;
+      try {
+        const summaryResponse = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/summary?event=${event.id}`,
+          {
+            next: { revalidate: 24 * 60 * 60 },
+            signal: AbortSignal.timeout(6_000),
+          }
+        );
+        if (!summaryResponse.ok) continue;
+
+        const summary = (await summaryResponse.json()) as {
+          rosters?: {
+            team?: { id?: string; displayName?: string };
+            roster?: {
+              starter?: boolean;
+              jersey?: string;
+              formationPlace?: string;
+              athlete?: {
+                id?: string;
+                fullName?: string;
+                displayName?: string;
+                headshot?: { href?: string };
+              };
+              position?: { name?: string };
+            }[];
+          }[];
+        };
+        const teamRoster = summary.rosters?.find(
+          (roster) => roster.team?.id === teamId
+        );
+        if (!teamRoster) continue;
+
+        const mapPlayer = (
+          row: NonNullable<typeof teamRoster.roster>[number]
+        ): EspnLineupPlayer | null => {
+          const name = (
+            row.athlete?.fullName ??
+            row.athlete?.displayName ??
+            ""
+          )
+            .replace(/\s+null$/i, "")
+            .trim();
+          const id = Number.parseInt(row.athlete?.id ?? "", 10);
+          if (!name || !Number.isInteger(id)) return null;
+          const shirtNumber = Number.parseInt(row.jersey ?? "", 10);
+          return {
+            id,
+            name,
+            position: row.position?.name ?? null,
+            shirtNumber: Number.isInteger(shirtNumber) ? shirtNumber : null,
+            photoUrl: row.athlete?.headshot?.href ?? null,
+            grid: row.formationPlace ?? null,
+          };
+        };
+
+        const lineup = (teamRoster.roster ?? [])
+          .filter((row) => row.starter)
+          .map(mapPlayer)
+          .filter((player): player is EspnLineupPlayer => player != null);
+        if (lineup.length < 11) continue;
+        const bench = (teamRoster.roster ?? [])
+          .filter((row) => !row.starter)
+          .map(mapPlayer)
+          .filter((player): player is EspnLineupPlayer => player != null);
+
+        return {
+          formation: null,
+          lineup,
+          bench,
+          fixtureDate: event.date,
+        };
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
