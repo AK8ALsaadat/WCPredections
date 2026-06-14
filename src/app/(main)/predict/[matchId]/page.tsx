@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { PredictPageSkeleton } from "@/components/predict/PredictPageSkeleton";
@@ -55,6 +54,52 @@ import type {
 } from "@/services/match-players.service";
 
 const LINEUP_FAST_POLL_MS = 45_000;
+const SCORE_OPTIONS = Array.from({ length: 10 }, (_, score) => score);
+
+function normalizeScore(score: number) {
+  if (!Number.isFinite(score)) return 0;
+  return Math.min(9, Math.max(0, Math.trunc(score)));
+}
+
+function ScorePicker({
+  teamName,
+  value,
+  onChange,
+}: {
+  teamName: string;
+  value: number;
+  onChange: (score: number) => void;
+}) {
+  return (
+    <fieldset className="min-w-0 rounded-xl border border-card-border bg-background/35 p-3">
+      <legend className="mx-auto px-2 text-center text-sm font-semibold">
+        {teamName}
+      </legend>
+      <div className="mt-1 grid grid-cols-5 gap-1.5" dir="ltr">
+        {SCORE_OPTIONS.map((score) => {
+          const selected = value === score;
+          return (
+            <button
+              key={score}
+              type="button"
+              aria-pressed={selected}
+              aria-label={`${teamName}: ${score}`}
+              onClick={() => onChange(score)}
+              className={cn(
+                "min-w-0 rounded-lg border py-2 text-base font-bold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                selected
+                  ? "border-primary bg-primary text-white shadow-md shadow-primary/20"
+                  : "border-card-border bg-card text-foreground hover:border-primary/50 hover:bg-primary/10"
+              )}
+            >
+              {score}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
 
 async function fetchLineupForMatch(
   matchId: string,
@@ -164,8 +209,8 @@ function formStateFromMatch(m: MatchData | null): FormState {
 
   const state: FormState = { ...EMPTY_FORM, scorerPicks: {} };
   if (m.userPrediction) {
-    state.predHome = m.userPrediction.predHome;
-    state.predAway = m.userPrediction.predAway;
+    state.predHome = normalizeScore(m.userPrediction.predHome);
+    state.predAway = normalizeScore(m.userPrediction.predAway);
     state.isDouble = m.userPrediction.isDouble;
     state.finishType = m.userPrediction.predictedFinishType ?? "";
     state.penaltyWinner = m.userPrediction.predictedPenaltyWinnerTeamId ?? "";
@@ -192,8 +237,8 @@ function applyFormState(state: FormState, setters: {
   setBoldPlayerId: (v: string) => void;
   setBoldEnabled: (v: boolean) => void;
 }) {
-  setters.setPredHome(state.predHome);
-  setters.setPredAway(state.predAway);
+  setters.setPredHome(normalizeScore(state.predHome));
+  setters.setPredAway(normalizeScore(state.predAway));
   setters.setIsDouble(state.isDouble);
   setters.setFinishType(state.finishType);
   setters.setPenaltyWinner(state.penaltyWinner);
@@ -837,25 +882,20 @@ export default function PredictPage() {
           <CardHeader>
             <CardTitle>{t.predict.scorePrediction}</CardTitle>
           </CardHeader>
-          <div className="flex items-end justify-center gap-4">
-            <Input
-              label={match.homeTeam.shortName}
-              type="number"
-              min={0}
-              max={20}
+          <div
+            className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-4"
+            dir="ltr"
+          >
+            <ScorePicker
+              teamName={match.homeTeam.shortName}
               value={predHome}
-              onChange={(e) => setPredHome(parseInt(e.target.value) || 0)}
-              className="w-20 text-center text-2xl font-bold"
+              onChange={setPredHome}
             />
-            <span className="pb-3 text-2xl text-muted">-</span>
-            <Input
-              label={match.awayTeam.shortName}
-              type="number"
-              min={0}
-              max={20}
+            <span className="text-center text-2xl font-bold text-muted">-</span>
+            <ScorePicker
+              teamName={match.awayTeam.shortName}
               value={predAway}
-              onChange={(e) => setPredAway(parseInt(e.target.value) || 0)}
-              className="w-20 text-center text-2xl font-bold"
+              onChange={setPredAway}
             />
           </div>
           <p className="mt-3 text-center text-sm text-muted">

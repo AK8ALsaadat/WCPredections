@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import type { MouseEvent } from "react";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import { LeaguePredictionsNavLink } from "@/components/matches/LeaguePredictionsNavLink";
 
 type ViewLeaguePredictionsButtonProps = {
   matchId: string;
@@ -18,8 +18,8 @@ export function ViewLeaguePredictionsButton({
   const { messages: t } = useI18n();
 
   return (
-    <Link
-      href={`/matches/${matchId}/predictions`}
+    <LeaguePredictionsNavLink
+      matchId={matchId}
       onClick={onClick}
       className={`group relative overflow-hidden rounded-xl border border-primary/35 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent px-4 py-3 transition-all hover:border-primary/60 hover:from-primary/30 hover:shadow-[0_0_24px_rgba(34,197,94,0.15)] ${
         fullWidth ? "flex w-full items-center gap-3" : "inline-flex items-center gap-2.5"
@@ -47,6 +47,6 @@ export function ViewLeaguePredictionsButton({
       >
         →
       </span>
-    </Link>
+    </LeaguePredictionsNavLink>
   );
 }

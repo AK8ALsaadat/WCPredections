@@ -16,6 +16,7 @@ import { asFinishType } from "@/lib/finish-type";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
+import { LeaguePredictionsNavLink } from "@/components/matches/LeaguePredictionsNavLink";
 import { seedPredictMatchFromList } from "@/lib/predict-prefetch";
 
 type ScorerPick = {
@@ -296,13 +297,13 @@ export function MatchCard({
 
       {finalPrediction && !canPredict && hasPrediction && !isFinished && (
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-          <Link
-            href={`/matches/${match.id}/predictions`}
+          <LeaguePredictionsNavLink
+            matchId={match.id}
             onClick={(e) => e.stopPropagation()}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
           >
             {t.matches.viewLeaguePredictionsShort}
-          </Link>
+          </LeaguePredictionsNavLink>
           <Link
             href={`/matches/${match.id}`}
             onClick={(e) => e.stopPropagation()}
@@ -315,13 +316,13 @@ export function MatchCard({
 
       {finalPrediction && isFinished && hasPrediction && (
         <div className="mt-4 flex justify-end">
-          <Link
-            href={`/matches/${match.id}/predictions`}
+          <LeaguePredictionsNavLink
+            matchId={match.id}
             onClick={(e) => e.stopPropagation()}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
           >
             {t.matches.viewLeaguePredictionsShort}
-          </Link>
+          </LeaguePredictionsNavLink>
         </div>
       )}
 

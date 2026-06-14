@@ -4,6 +4,7 @@ type PaginationProps = {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onPagePrefetch?: (page: number) => void;
   className?: string;
   labels: {
     previous: string;
@@ -30,6 +31,7 @@ export function Pagination({
   page,
   totalPages,
   onPageChange,
+  onPagePrefetch,
   className,
   labels,
 }: PaginationProps) {
@@ -51,6 +53,9 @@ export function Pagination({
         type="button"
         disabled={page <= 1}
         onClick={() => goTo(page - 1)}
+        onMouseEnter={() => onPagePrefetch?.(page - 1)}
+        onFocus={() => onPagePrefetch?.(page - 1)}
+        onTouchStart={() => onPagePrefetch?.(page - 1)}
         className="rounded-lg border border-card-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
       >
         {labels.previous}
@@ -69,6 +74,9 @@ export function Pagination({
                 type="button"
                 aria-current={p === page ? "page" : undefined}
                 onClick={() => goTo(p)}
+                onMouseEnter={() => onPagePrefetch?.(p)}
+                onFocus={() => onPagePrefetch?.(p)}
+                onTouchStart={() => onPagePrefetch?.(p)}
                 className={cn(
                   "min-w-9 rounded-lg border px-2 py-2 text-sm tabular-nums transition-colors",
                   p === page
@@ -87,6 +95,9 @@ export function Pagination({
         type="button"
         disabled={page >= totalPages}
         onClick={() => goTo(page + 1)}
+        onMouseEnter={() => onPagePrefetch?.(page + 1)}
+        onFocus={() => onPagePrefetch?.(page + 1)}
+        onTouchStart={() => onPagePrefetch?.(page + 1)}
         className="rounded-lg border border-card-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
       >
         {labels.next}

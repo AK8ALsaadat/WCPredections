@@ -11,6 +11,11 @@ import { asFinishType } from "@/lib/finish-type";
 import { formatDate, isMatchStarted } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { clientFetch } from "@/lib/client-fetch";
+import {
+  isLeaguePredictionsCacheFresh,
+  readLeaguePredictionsCache,
+  writeLeaguePredictionsCache,
+} from "@/lib/league-predictions-prefetch";
 import type { LeagueMatchPredictionRow } from "@/types";
 
 type LeaguePredictionsPayload = {
@@ -38,33 +43,41 @@ type LeaguePredictionsPayload = {
     };
   };
   predictions: LeagueMatchPredictionRow[];
+  currentUserId?: string;
 };
 
 export default function LeagueMatchPredictionsPage() {
   const { messages: t, locale } = useI18n();
   const params = useParams();
   const matchId = params.id as string;
-  const [data, setData] = useState<LeaguePredictionsPayload | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string>();
-  const [loading, setLoading] = useState(true);
+  const initialCache =
+    readLeaguePredictionsCache<LeaguePredictionsPayload>(matchId);
+  const [data, setData] = useState<LeaguePredictionsPayload | null>(
+    initialCache
+  );
+  const [loading, setLoading] = useState(!initialCache);
   const [error, setError] = useState("");
 
-  const loadPredictions = useCallback(async () => {
-    const [predRes, meRes] = await Promise.all([
-      clientFetch(`/api/matches/${matchId}/predictions`, { cache: "no-store" }),
-      clientFetch("/api/auth/me", { cache: "no-store" }),
-    ]);
+  const loadPredictions = useCallback(async (force = false) => {
+    const cached =
+      readLeaguePredictionsCache<LeaguePredictionsPayload>(matchId);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      if (!force && isLeaguePredictionsCacheFresh(matchId)) return;
+    }
+
+    const predRes = await clientFetch(`/api/matches/${matchId}/predictions`, {
+      cache: "no-store",
+    });
     const predData = predRes ? await predRes.json() : null;
-    const meData = meRes ? await meRes.json() : null;
 
     if (predData?.success) {
+      writeLeaguePredictionsCache(matchId, predData.data);
       setData(predData.data);
       setError("");
-    } else {
+    } else if (!cached) {
       setError(predData?.error ?? t.errors.loadFailed);
-    }
-    if (meData?.success) {
-      setCurrentUserId(meData.data.user?.userId);
     }
   }, [matchId, t.errors.loadFailed]);
 
@@ -85,7 +98,7 @@ export default function LeagueMatchPredictionsPage() {
       try {
         const payload = JSON.parse((event as MessageEvent).data);
         if (payload?.matchId === matchId) {
-          void loadPredictions().catch(() => {});
+          void loadPredictions(true).catch(() => {});
         }
       } catch {
         // The fallback timer handles malformed or missed events.
@@ -95,7 +108,7 @@ export default function LeagueMatchPredictionsPage() {
 
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") {
-        void loadPredictions().catch(() => {});
+        void loadPredictions(true).catch(() => {});
       }
     }, 15_000);
 
@@ -269,7 +282,7 @@ export default function LeagueMatchPredictionsPage() {
         isFinished={isFinished}
         matchStatus={match.status}
         matchResult={matchResult}
-        currentUserId={currentUserId}
+        currentUserId={data.currentUserId}
       />
     </div>
   );

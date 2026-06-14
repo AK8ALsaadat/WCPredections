@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAuth();
+    const user = await requireAuth();
     const { id } = await params;
     const data = await getLeagueMatchPredictions(id);
 
@@ -17,7 +17,7 @@ export async function GET(
       return apiError("Match not found", 404);
     }
 
-    return apiSuccess(data, 200, {
+    return apiSuccess({ ...data, currentUserId: user.userId }, 200, {
       headers: {
         "Cache-Control": "private, no-cache",
       },

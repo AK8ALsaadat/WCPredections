@@ -21,6 +21,7 @@ import {
 } from "@/lib/client-page-cache";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { clientFetch } from "@/lib/client-fetch";
+import { enqueueBackgroundPrefetch } from "@/lib/prefetch-queue";
 
 type Round = { id: string; name: string };
 type Match = {
@@ -71,6 +72,86 @@ const ROUNDS_CACHE_FRESH_MS = 5 * 60_000;
 
 function matchesCacheKey(roundId: string, page: number, matchType: string) {
   return `matches:v4:${matchType}:${roundId || "all"}:${page}`;
+}
+
+function matchesApiUrl(
+  targetPage: number,
+  targetRound: string,
+  targetType: "upcoming" | "past"
+) {
+  const params = new URLSearchParams({
+    paginated: "true",
+    page: String(targetPage),
+    light: targetType === "upcoming" ? "1" : "0",
+  });
+  params.set(targetType === "past" ? "completed" : "upcoming", "true");
+  if (targetRound) params.set("roundId", targetRound);
+  return `/api/matches?${params}`;
+}
+
+const matchesPrefetchInFlight = new Set<string>();
+
+async function prefetchMatchesPage(
+  targetPage: number,
+  targetRound: string,
+  targetType: "upcoming" | "past"
+) {
+  const requestKey = matchesCacheKey(targetRound, targetPage, targetType);
+  if (
+    matchesPrefetchInFlight.has(requestKey) ||
+    isClientCacheFresh(requestKey, MATCHES_CACHE_FRESH_MS)
+  ) {
+    return;
+  }
+
+  matchesPrefetchInFlight.add(requestKey);
+  try {
+    const response = await clientFetch(
+      matchesApiUrl(targetPage, targetRound, targetType)
+    );
+    const data = response ? await response.json() : null;
+    if (!data?.success) return;
+
+    const resolvedPage = data.data.page as number;
+    writeClientCache(
+      matchesCacheKey(targetRound, resolvedPage, targetType),
+      {
+        matches: data.data.matches,
+        pinnedMatches: data.data.pinnedMatches ?? [],
+        meta: {
+          page: resolvedPage,
+          totalPages: data.data.totalPages,
+          totalItems: data.data.totalItems,
+          pageKind: data.data.pageKind,
+          openCount: data.data.openCount,
+        },
+      } satisfies MatchesPageCache
+    );
+  } catch {
+    // Prefetch is opportunistic; the normal page request remains the fallback.
+  } finally {
+    matchesPrefetchInFlight.delete(requestKey);
+  }
+}
+
+function queueAdjacentMatchesPrefetch(
+  currentPage: number,
+  totalPages: number,
+  targetRound: string,
+  targetType: "upcoming" | "past"
+) {
+  if (currentPage < totalPages) {
+    enqueueBackgroundPrefetch(
+      () => prefetchMatchesPage(currentPage + 1, targetRound, targetType),
+      3
+    );
+  }
+  if (currentPage === 1 && targetType === "upcoming") {
+    enqueueBackgroundPrefetch(
+      () => prefetchMatchesPage(1, targetRound, "past"),
+      3
+    );
+  }
 }
 
 export default function MatchesPage() {
@@ -131,6 +212,12 @@ export default function MatchesPage() {
         !hasLiveInCache &&
         isClientCacheFresh(requestKey, MATCHES_CACHE_FRESH_MS)
       ) {
+        queueAdjacentMatchesPrefetch(
+          cached.meta.page,
+          cached.meta.totalPages,
+          targetRound,
+          matchType
+        );
         return;
       }
 
@@ -140,22 +227,13 @@ export default function MatchesPage() {
         setRefreshing(true);
       }
 
-      const params = new URLSearchParams({
-        paginated: "true",
-        page: String(targetPage),
-        light: matchType === "upcoming" ? "1" : "0",
-      });
-      if (matchType === "past") {
-        params.set("completed", "true");
-      } else {
-        params.set("upcoming", "true");
-      }
-      if (targetRound) params.set("roundId", targetRound);
-
       try {
-        const res = await clientFetch(`/api/matches?${params}`, {
-          signal: opts?.signal,
-        });
+        const res = await clientFetch(
+          matchesApiUrl(targetPage, targetRound, matchType),
+          {
+            signal: opts?.signal,
+          }
+        );
         if (!res) throw new Error("NetworkError");
         if (seq !== loadSeq.current) return;
 
@@ -182,6 +260,13 @@ export default function MatchesPage() {
           setPage(resolvedPage);
           setLastUpdate(new Date());
           setError("");
+
+          queueAdjacentMatchesPrefetch(
+            resolvedPage,
+            payload.meta.totalPages,
+            targetRound,
+            matchType
+          );
         } else {
           setError(data.error);
         }
@@ -196,7 +281,7 @@ export default function MatchesPage() {
         }
       }
     },
-    [applyCache, matchType]
+    [applyCache, matchType, t.errors.loadFailed]
   );
 
   const handlePageChange = useCallback(
@@ -229,8 +314,8 @@ export default function MatchesPage() {
 
   useEffect(() => {
     for (const key of [
-      `matches:upcoming:${selectedRound || "all"}:1`,
-      `matches:past:${selectedRound || "all"}:${page}`,
+      matchesCacheKey(selectedRound, 1, "upcoming"),
+      matchesCacheKey(selectedRound, page, "past"),
     ]) {
       const cached = readClientCache<MatchesPageCache>(key);
       const hasStaleScheduled = [...(cached?.matches ?? []), ...(cached?.pinnedMatches ?? [])].some(
@@ -242,10 +327,6 @@ export default function MatchesPage() {
       }
     }
   }, [page, selectedRound]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [matchType]);
 
   useEffect(() => {
     setMatches([]);
@@ -344,7 +425,19 @@ export default function MatchesPage() {
 
         <div className="flex gap-2 border-b border-card-border pb-3">
           <button
-            onClick={() => setMatchType("upcoming")}
+            onClick={() => {
+              setPage(1);
+              setMatchType("upcoming");
+            }}
+            onMouseEnter={() =>
+              void prefetchMatchesPage(1, selectedRound, "upcoming")
+            }
+            onFocus={() =>
+              void prefetchMatchesPage(1, selectedRound, "upcoming")
+            }
+            onTouchStart={() =>
+              void prefetchMatchesPage(1, selectedRound, "upcoming")
+            }
             className={`px-4 py-2 font-medium rounded-t transition ${
               matchType === "upcoming"
                 ? "bg-primary text-white"
@@ -354,7 +447,19 @@ export default function MatchesPage() {
             المباريات القادمة
           </button>
           <button
-            onClick={() => setMatchType("past")}
+            onClick={() => {
+              setPage(1);
+              setMatchType("past");
+            }}
+            onMouseEnter={() =>
+              void prefetchMatchesPage(1, selectedRound, "past")
+            }
+            onFocus={() =>
+              void prefetchMatchesPage(1, selectedRound, "past")
+            }
+            onTouchStart={() =>
+              void prefetchMatchesPage(1, selectedRound, "past")
+            }
             className={`px-4 py-2 font-medium rounded-t transition ${
               matchType === "past"
                 ? "bg-primary text-white"
@@ -472,6 +577,13 @@ export default function MatchesPage() {
             page={page}
             totalPages={meta.totalPages}
             onPageChange={handlePageChange}
+            onPagePrefetch={(targetPage) =>
+              void prefetchMatchesPage(
+                targetPage,
+                selectedRound,
+                matchType
+              )
+            }
             labels={{
               previous: t.matches.paginationPrevious,
               next: t.matches.paginationNext,

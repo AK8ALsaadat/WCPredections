@@ -113,49 +113,81 @@ export async function getUserPinnedTodayMatches(
   userId: string,
   roundId?: string
 ) {
-  const rows = await prisma.match.findMany({
-    where: {
-      roundId: roundId ?? undefined,
-      status: { notIn: ["CANCELLED"] },
-      predictions: { some: { userId } },
-    },
-    include: {
-      homeTeam: { select: teamSelect },
-      awayTeam: { select: teamSelect },
-      round: { select: { id: true, name: true } },
-      predictions: {
-        where: { userId },
-        select: {
-          predHome: true,
-          predAway: true,
-          isDouble: true,
-          points: true,
-          doubleBonus: true,
-          finishTypePoints: true,
-          penaltyWinnerPoints: true,
-          predictedFinishType: true,
-          predictedPenaltyWinnerTeamId: true,
-        },
-      },
-      scorerPredictions: {
-        where: { userId },
-        select: {
-          predictedGoals: true,
-          points: true,
-          player: { select: { id: true, name: true, teamId: true } },
-        },
-      },
-      boldScorerBets: {
-        where: { userId },
-        select: {
-          points: true,
-          player: { select: { name: true } },
-        },
+  const select = {
+    id: true,
+    apiMatchId: true,
+    roundId: true,
+    homeTeamId: true,
+    awayTeamId: true,
+    matchTime: true,
+    groupCode: true,
+    stageName: true,
+    status: true,
+    isKnockout: true,
+    homeScore: true,
+    awayScore: true,
+    actualFinishType: true,
+    penaltyWinnerTeamId: true,
+    homeTeam: { select: teamSelect },
+    awayTeam: { select: teamSelect },
+    round: { select: { id: true, name: true } },
+    predictions: {
+      where: { userId },
+      select: {
+        predHome: true,
+        predAway: true,
+        isDouble: true,
+        points: true,
+        doubleBonus: true,
+        finishTypePoints: true,
+        penaltyWinnerPoints: true,
+        predictedFinishType: true,
+        predictedPenaltyWinnerTeamId: true,
       },
     },
-    orderBy: { matchTime: "asc" },
-  });
+    scorerPredictions: {
+      where: { userId },
+      select: {
+        predictedGoals: true,
+        points: true,
+        player: { select: { id: true, name: true, teamId: true } },
+      },
+    },
+    boldScorerBets: {
+      where: { userId },
+      select: {
+        points: true,
+        player: { select: { name: true } },
+      },
+    },
+  } as const;
+  const baseWhere = {
+    roundId: roundId ?? undefined,
+    predictions: { some: { userId } },
+  } as const;
 
+  const [activeRows, previousRows] = await Promise.all([
+    prisma.match.findMany({
+      where: {
+        ...baseWhere,
+        status: { in: ["LIVE", "SCHEDULED"] },
+      },
+      select,
+      orderBy: { matchTime: "asc" },
+      take: 8,
+    }),
+    prisma.match.findMany({
+      where: {
+        ...baseWhere,
+        status: { notIn: ["CANCELLED", "LIVE", "SCHEDULED"] },
+      },
+      select,
+      orderBy: { matchTime: "desc" },
+      take: 8,
+    }),
+  ]);
+
+  const rows = [...activeRows, ...previousRows];
   const statusPriority: Record<string, number> = {
     LIVE: 0,
     SCHEDULED: 1,

@@ -1,5 +1,5 @@
 import type { FinishType } from "@prisma/client";
-import { revalidateTag } from "next/cache";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { resolveScorerGoalsForPlayer } from "@/lib/player-matching";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason, isPredictionAllowed } from "@/lib/utils";
@@ -840,7 +840,7 @@ export async function getUserPredictionHistory(userId: string) {
   return { predictions, scorerPredictions, boldScorerBets };
 }
 
-export async function getLeagueMatchPredictions(matchId: string) {
+async function fetchLeagueMatchPredictions(matchId: string) {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     select: {
@@ -870,19 +870,36 @@ export async function getLeagueMatchPredictions(matchId: string) {
   const [predictions, scorerPredictions, boldBets] = await Promise.all([
     prisma.prediction.findMany({
       where: { matchId },
-      include: { user: { select: { id: true, username: true } } },
+      select: {
+        userId: true,
+        predHome: true,
+        predAway: true,
+        isDouble: true,
+        predictedFinishType: true,
+        predictedPenaltyWinnerTeamId: true,
+        points: true,
+        doubleBonus: true,
+        finishTypePoints: true,
+        penaltyWinnerPoints: true,
+        user: { select: { username: true } },
+      },
     }),
     prisma.scorerPrediction.findMany({
       where: { matchId },
-      include: {
-        user: { select: { id: true, username: true } },
+      select: {
+        userId: true,
+        predictedGoals: true,
+        points: true,
+        user: { select: { username: true } },
         player: { select: { id: true, name: true, teamId: true, position: true } },
       },
     }),
     prisma.boldScorerBet.findMany({
       where: { matchId },
-      include: {
-        user: { select: { id: true, username: true } },
+      select: {
+        userId: true,
+        points: true,
+        user: { select: { username: true } },
         player: { select: { id: true, name: true } },
       },
     }),
@@ -978,4 +995,15 @@ export async function getLeagueMatchPredictions(matchId: string) {
     },
     predictions: entries,
   };
+}
+
+export async function getLeagueMatchPredictions(matchId: string) {
+  return unstable_cache(
+    () => fetchLeagueMatchPredictions(matchId),
+    ["league-match-predictions-v1", matchId],
+    {
+      revalidate: 30,
+      tags: [`match-${matchId}`],
+    }
+  )();
 }

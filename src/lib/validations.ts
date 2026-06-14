@@ -35,8 +35,8 @@ export const finishTypeSchema = z.enum([
 export const predictionSchema = z
   .object({
     matchId: z.string().min(1),
-    predHome: z.number().int().min(0).max(20),
-    predAway: z.number().int().min(0).max(20),
+    predHome: z.number().int().min(0).max(9),
+    predAway: z.number().int().min(0).max(9),
     isDouble: z.boolean().optional().default(false),
     predictedFinishType: finishTypeSchema.optional().nullable(),
     predictedPenaltyWinnerTeamId: z.string().optional().nullable(),
