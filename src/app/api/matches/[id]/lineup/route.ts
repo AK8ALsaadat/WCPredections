@@ -14,10 +14,11 @@ export async function GET(
       return apiError("Match not found", 404);
     }
 
-    const cacheControl =
-      lineup.lineupStatus === "official"
-        ? "private, max-age=180, stale-while-revalidate=300"
-        : "private, max-age=30, stale-while-revalidate=60";
+    const cacheControl = fresh
+      ? "private, no-store"
+      : lineup.lineupStatus === "official"
+        ? "public, max-age=60, s-maxage=180, stale-while-revalidate=300"
+        : "public, max-age=60, s-maxage=300, stale-while-revalidate=900";
 
     return apiSuccess(lineup, 200, {
       headers: {

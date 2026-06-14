@@ -51,6 +51,18 @@ function spreadFormationRow(players: MatchPlayerView[], y: number) {
     : spreadRow(players, y, 10, 90);
 }
 
+function spreadLine(
+  players: MatchPlayerView[],
+  y: number,
+  lineIndex: number,
+  lineCount: number
+) {
+  const isTwoPlayerAttack = players.length === 2 && lineIndex === lineCount - 1;
+  return isTwoPlayerAttack
+    ? spreadRow(players, y, 36, 64)
+    : spreadFormationRow(players, y);
+}
+
 function isGoalkeeper(player: MatchPlayerView) {
   const p = (player.position ?? "").toLowerCase();
   return p.includes("goal");
@@ -124,7 +136,11 @@ export function layoutFromGrid(
   const slots: PitchSlot[] = [];
   for (const { player, row, col } of parsed) {
     const columns = columnsByRow.get(row) ?? 1;
-    const x = columns === 1 ? 50 : 10 + ((col - 1) / (columns - 1)) * 80;
+    const isTwoPlayerAttack = columns === 2 && row === maxRow;
+    const xMin = isTwoPlayerAttack ? 36 : 10;
+    const xMax = isTwoPlayerAttack ? 64 : 90;
+    const x =
+      columns === 1 ? 50 : xMin + ((col - 1) / (columns - 1)) * (xMax - xMin);
     const rowNorm = maxRow === 1 ? 0 : (row - 1) / (maxRow - 1);
 
     const y =
@@ -174,7 +190,7 @@ export function layoutFormation(
       const y =
         homeLineYs?.[lineIndex] ??
         12 + ((lineIndex + 1) / (lines.length + 1)) * 36;
-      slots.push(...spreadFormationRow(players, y));
+      slots.push(...spreadLine(players, y, lineIndex, lines.length));
     });
     return slots;
   }
@@ -184,7 +200,7 @@ export function layoutFormation(
       const y =
         awayLineYs?.[lineIndex] ??
         88 - ((lineIndex + 1) / (lines.length + 1)) * 36;
-    slots.push(...spreadFormationRow(players, y));
+    slots.push(...spreadLine(players, y, lineIndex, lines.length));
   });
   return slots;
 }

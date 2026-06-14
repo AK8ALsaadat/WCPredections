@@ -39,9 +39,9 @@ export function PredictNavLink({
       href={`/predict/${matchId}`}
       prefetch
       className={className}
-      onMouseEnter={() => prefetchPredictData(matchId)}
-      onFocus={() => prefetchPredictData(matchId)}
-      onTouchStart={() => prefetchPredictData(matchId)}
+      onMouseEnter={() => prefetchPredictData(matchId, { urgent: true })}
+      onFocus={() => prefetchPredictData(matchId, { urgent: true })}
+      onTouchStart={() => prefetchPredictData(matchId, { urgent: true })}
     >
       {children}
     </Link>

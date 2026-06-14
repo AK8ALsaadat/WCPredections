@@ -329,7 +329,7 @@ export default function PredictPage() {
       if (
         !silent &&
         isPredictLineupCacheFresh(matchId) &&
-        cachedLineup?.lineupStatus === "official"
+        cachedLineup != null
       ) {
         setLineupLoading(false);
         return;

@@ -246,6 +246,7 @@ const matchLineupCache = new Map<
   { data: Awaited<ReturnType<typeof buildMatchLineup>>; expiresAt: number }
 >();
 const MATCH_LINEUP_CACHE_MS = 5 * 60 * 1000;
+const MATCH_LINEUP_SHARED_CACHE_SECONDS = 5 * 60;
 const MATCH_SHELL_REVALIDATE_SECONDS = 60;
 
 async function fetchMatchShell(matchId: string) {
@@ -306,6 +307,17 @@ async function buildMatchLineup(matchId: string) {
   };
 }
 
+function getSharedMatchLineup(matchId: string) {
+  return unstable_cache(
+    () => buildMatchLineup(matchId),
+    ["match-lineup-v8", matchId],
+    {
+      revalidate: MATCH_LINEUP_SHARED_CACHE_SECONDS,
+      tags: [`lineup-${matchId}`],
+    }
+  )();
+}
+
 export function clearMatchLineupMemoryCache(matchId: string) {
   matchLineupCache.delete(matchId);
 }
@@ -332,7 +344,7 @@ export async function getMatchLineup(
     return hit.data;
   }
 
-  const data = await buildMatchLineup(matchId);
+  const data = await getSharedMatchLineup(matchId);
 
   if (data) {
     matchLineupCache.set(matchId, {

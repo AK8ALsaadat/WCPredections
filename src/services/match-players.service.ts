@@ -1,6 +1,9 @@
 import { cachedFetch } from "@/lib/api-cache";
 import { buildExpectedLineup } from "@/lib/expected-lineup";
-import { isWithinLineupFastRefreshWindow } from "@/lib/utils";
+import {
+  isWithinLineupFastRefreshWindow,
+  LINEUP_FAST_REFRESH_BEFORE_MS,
+} from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import {
   fetchApiFootballSquad,
@@ -155,6 +158,39 @@ async function within<T>(promise: Promise<T>, ms: number, fallback: T) {
   }
 }
 
+async function firstAvailable<T>(
+  promises: Promise<T | null>[]
+): Promise<T | null> {
+  return new Promise((resolve) => {
+    let pending = promises.length;
+    let settled = false;
+
+    if (pending === 0) {
+      resolve(null);
+      return;
+    }
+
+    for (const promise of promises) {
+      promise
+        .then((value) => {
+          if (settled) return;
+          if (value != null) {
+            settled = true;
+            resolve(value);
+            return;
+          }
+          pending--;
+          if (pending === 0) resolve(null);
+        })
+        .catch(() => {
+          if (settled) return;
+          pending--;
+          if (pending === 0) resolve(null);
+        });
+    }
+  });
+}
+
 function formationFromGrid(players: { grid?: string | null }[]) {
   const rows = new Map<number, number>();
   for (const player of players) {
@@ -221,7 +257,7 @@ async function enrichWithApiFootballPhotos(
 
   let squad = apiFootballSquadCache.get(teamName);
   if (!squad || squad.expiresAt <= Date.now()) {
-    const players = await within(fetchApiFootballSquad(teamName), 1_200, []);
+    const players = await within(fetchApiFootballSquad(teamName), 800, []);
     squad = { players, expiresAt: Date.now() + TEAM_SQUAD_CACHE_MS };
     if (players.length > 0) {
       apiFootballSquadCache.set(teamName, squad);
@@ -258,6 +294,11 @@ async function enrichWithApiFootballPhotos(
     squad.players.map((player) => [normalizePlayerName(player.name), player])
   );
 
+  const playersToPersist: {
+    id: string;
+    photoUrl?: string;
+    shirtNumber?: number;
+  }[] = [];
   const enriched = {
     ...view,
     players: view.players.map((player) => {
@@ -267,22 +308,37 @@ async function enrichWithApiFootballPhotos(
       if (!external) {
         return player;
       }
+      const photoUrl =
+        external.photo ??
+        `https://media.api-sports.io/football/players/${external.id}.png`;
+      const shirtNumber = player.shirtNumber ?? external.number ?? null;
+      if (
+        !player.id.startsWith("temp-") &&
+        ((!isOfficialPlayerPhoto(player.photoUrl) &&
+          isOfficialPlayerPhoto(photoUrl)) ||
+          (player.shirtNumber == null && shirtNumber != null))
+      ) {
+        playersToPersist.push({
+          id: player.id,
+          photoUrl:
+            !isOfficialPlayerPhoto(player.photoUrl) &&
+            isOfficialPlayerPhoto(photoUrl)
+              ? photoUrl
+              : undefined,
+          shirtNumber:
+            player.shirtNumber == null && shirtNumber != null
+              ? shirtNumber
+              : undefined,
+        });
+      }
       return {
         ...player,
-        shirtNumber: player.shirtNumber ?? external.number ?? null,
-        photoUrl:
-          external.photo ??
-          `https://media.api-sports.io/football/players/${external.id}.png`,
+        shirtNumber,
+        photoUrl,
       };
     }),
   };
 
-  const playersToPersist = enriched.players.filter(
-    (player) =>
-      !player.id.startsWith("temp-") &&
-      (isOfficialPlayerPhoto(player.photoUrl) ||
-        player.shirtNumber != null)
-  );
   if (playersToPersist.length > 0) {
     try {
       await prisma.$transaction(
@@ -290,10 +346,8 @@ async function enrichWithApiFootballPhotos(
           prisma.player.updateMany({
             where: { id: player.id },
             data: {
-              photoUrl: isOfficialPlayerPhoto(player.photoUrl)
-                ? player.photoUrl
-                : undefined,
-              shirtNumber: player.shirtNumber ?? undefined,
+              photoUrl: player.photoUrl,
+              shirtNumber: player.shirtNumber,
             },
           })
         )
@@ -356,7 +410,17 @@ async function fetchFootballData<T>(
 
     const res = await fetch(`${baseUrl}${endpoint}`, {
       headers,
-      next: { revalidate: 0 },
+      signal: AbortSignal.timeout(4_000),
+      ...(options?.skipCache
+        ? { cache: "no-store" as const }
+        : {
+            next: {
+              revalidate: Math.max(
+                1,
+                Math.floor((options?.ttlMs ?? 15 * 60 * 1000) / 1000)
+              ),
+            },
+          }),
     });
 
     if (!res.ok) {
@@ -412,7 +476,7 @@ async function mapProbableLineupByName(
         .filter((player) => !player.photoUrl)
         .map((player) => player.name)
     ),
-    3_000,
+    800,
     new Map<string, string>()
   );
   const withPhoto = (player: ExternalLineupPlayer) => ({
@@ -808,28 +872,39 @@ async function syncProbableLineup(
     return cached.data;
   }
 
-  const [fromHistory, fromEspn, fromApiFootball] = await Promise.all([
+  type ProbableCandidate = {
+    source: "history" | "espn" | "api-football";
+    data: {
+      formation: string | null;
+      lineup: ExternalLineupPlayer[];
+      bench: ExternalLineupPlayer[];
+    };
+  };
+
+  const candidate = await firstAvailable<ProbableCandidate>([
     within(
       fetchLastFootballDataLineup(apiTeamId, targetMatchTime),
-      3_000,
+      2_500,
       null
+    ).then((data) => data ? { source: "history" as const, data } : null),
+    within(fetchLastEspnLineup(teamName, targetMatchTime), 2_500, null).then(
+      (data) => data ? { source: "espn" as const, data } : null
     ),
-    within(fetchLastEspnLineup(teamName, targetMatchTime), 3_500, null),
     within(
       fetchProbableLineupFromApiFootball(teamName, targetMatchTime),
-      3_500,
+      2_500,
       null
-    ),
+    ).then((data) => data ? { source: "api-football" as const, data } : null),
   ]);
 
-  if (fromHistory) {
+  if (candidate?.source === "history") {
     const view = await buildTeamView(
       teamId,
       apiTeamId,
       "probable",
-      fromHistory.formation,
-      fromHistory.lineup,
-      fromHistory.bench
+      candidate.data.formation,
+      candidate.data.lineup,
+      candidate.data.bench
     );
     expectedLineupCache.set(cacheKey, {
       data: view,
@@ -838,12 +913,12 @@ async function syncProbableLineup(
     return view;
   }
 
-  if (fromEspn) {
+  if (candidate?.source === "espn") {
     const mapped = await mapProbableLineupByName(
       teamId,
-      fromEspn.formation,
-      fromEspn.lineup,
-      fromEspn.bench
+      candidate.data.formation,
+      candidate.data.lineup,
+      candidate.data.bench
     );
     if (mapped) {
       expectedLineupCache.set(cacheKey, {
@@ -855,12 +930,12 @@ async function syncProbableLineup(
   }
 
   // API-Football remains a fallback if the other providers have no history.
-  if (fromApiFootball) {
+  if (candidate?.source === "api-football") {
     const mapped = await mapProbableLineupByName(
       teamId,
-      fromApiFootball.formation,
-      fromApiFootball.lineup,
-      fromApiFootball.bench
+      candidate.data.formation,
+      candidate.data.lineup,
+      candidate.data.bench
     );
     if (mapped) {
       expectedLineupCache.set(cacheKey, {
@@ -880,8 +955,8 @@ async function syncProbableLineup(
     // Ensure any player who appeared in the last actual match is included
     // in the probable lineup (promote from bench into lineup where needed).
     const playedNames = new Set<string>();
-    if (fromApiFootball) {
-      for (const p of [...(fromApiFootball.lineup ?? []), ...(fromApiFootball.bench ?? [])]) {
+    if (candidate?.source === "api-football") {
+      for (const p of [...(candidate.data.lineup ?? []), ...(candidate.data.bench ?? [])]) {
         playedNames.add(normalizePlayerName(p.name));
       }
     }
@@ -1168,6 +1243,12 @@ export async function getMatchPlayersFromApi(match: {
   }
 
   if (!match.apiMatchId) {
+    return loadProbableBothTeams(match);
+  }
+
+  const msUntilKickoff =
+    (match.matchTime?.getTime() ?? Date.now()) - Date.now();
+  if (msUntilKickoff > LINEUP_FAST_REFRESH_BEFORE_MS) {
     return loadProbableBothTeams(match);
   }
 

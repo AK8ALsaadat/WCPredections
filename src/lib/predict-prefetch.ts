@@ -28,7 +28,12 @@ function lineupFreshMs(
     : LINEUP_PROBABLE_FRESH_MS;
 }
 
-const inflight = new Map<string, Promise<void>>();
+type InflightPrefetch = {
+  promise: Promise<void>;
+  run: () => Promise<void>;
+};
+
+const inflight = new Map<string, InflightPrefetch>();
 
 // Use prioritized background prefetching to avoid blocking the main thread
 // or launching many simultaneous network requests.
@@ -152,7 +157,10 @@ export function seedPredictMatchFromList(match: ListMatchSeed) {
 }
 
 /** يحمّل بيانات التوقع مسبقاً — فور ظهور الرابط أو لمسه */
-export function prefetchPredictData(matchId: string) {
+export function prefetchPredictData(
+  matchId: string,
+  options?: { urgent?: boolean }
+) {
   if (DISABLE_PREFETCH) return Promise.resolve();
   const matchFresh = isClientCacheFresh(
     predictMatchCacheKey(matchId),
@@ -171,24 +179,37 @@ export function prefetchPredictData(matchId: string) {
   if (matchFresh && lineupFresh) return Promise.resolve();
 
   const existing = inflight.get(matchId);
-  if (existing) return existing;
+  if (existing) {
+    if (options?.urgent) void existing.run();
+    return existing.promise;
+  }
 
   let resolveTask: () => void;
   const task = new Promise<void>((resolve) => {
     resolveTask = resolve;
   });
 
-  inflight.set(matchId, task);
+  let started = false;
+  const run = async () => {
+    if (started) return task;
+    started = true;
+    try {
+      await Promise.all([
+        matchFresh ? Promise.resolve() : fetchPredictMatch(matchId),
+        lineupFresh ? Promise.resolve() : fetchPredictLineup(matchId),
+      ]);
+    } finally {
+      inflight.delete(matchId);
+      resolveTask();
+    }
+  };
 
-  enqueueBackgroundPrefetch(async () => {
-    await Promise.all([
-      matchFresh ? Promise.resolve() : fetchPredictMatch(matchId),
-      lineupFresh ? Promise.resolve() : fetchPredictLineup(matchId),
-    ]);
-    inflight.delete(matchId);
-    resolveTask();
-  }, 3);
-
+  inflight.set(matchId, { promise: task, run });
+  if (options?.urgent) {
+    void run();
+  } else {
+    enqueueBackgroundPrefetch(run, 3);
+  }
   return task;
 }
 

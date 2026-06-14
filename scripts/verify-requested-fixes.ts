@@ -60,6 +60,46 @@ check(
   expected352.formation === "3-5-2" && expected352.lineup.length === 11
 );
 
+function compactAttackDistance(formation: "3-5-2" | "4-4-2") {
+  const [defenders, midfielders] = formation.split("-").map(Number);
+  const lineup = [
+    {
+      id: `${formation}-gk`,
+      name: "GK",
+      position: "Goalkeeper",
+      section: "lineup" as const,
+    },
+    ...Array.from({ length: defenders }, (_, index) => ({
+      id: `${formation}-d${index}`,
+      name: `D${index}`,
+      position: "Defender",
+      section: "lineup" as const,
+    })),
+    ...Array.from({ length: midfielders }, (_, index) => ({
+      id: `${formation}-m${index}`,
+      name: `M${index}`,
+      position: "Midfielder",
+      section: "lineup" as const,
+    })),
+    ...Array.from({ length: 2 }, (_, index) => ({
+      id: `${formation}-a${index}`,
+      name: `A${index}`,
+      position: "Forward",
+      section: "lineup" as const,
+    })),
+  ];
+  const attackers = layoutFormation(lineup, formation, "home")
+    .filter((slot) => slot.player.position === "Forward")
+    .sort((left, right) => left.x - right.x);
+  return attackers[1].x - attackers[0].x;
+}
+
+check(
+  "two strikers stay close in 3-5-2 and 4-4-2",
+  compactAttackDistance("3-5-2") === 28 &&
+    compactAttackDistance("4-4-2") === 28
+);
+
 const fiveHome = new Set(["h1", "h2", "h3", "h4", "h5"]);
 const oneAway = new Set(["a1"]);
 const fiveScorers: ScorerPicks = {
