@@ -89,7 +89,7 @@ export function layoutFromGrid(
   side: "home" | "away"
 ): PitchSlot[] | null {
   const starters = lineup.slice(0, 11);
-  const withGrid = starters.filter((p) => p.grid);
+  const withGrid = starters.filter((p) => /^\d+:\d+$/.test(p.grid ?? ""));
   if (withGrid.length < 11) return null;
 
   const parsed = starters.map((player) => {

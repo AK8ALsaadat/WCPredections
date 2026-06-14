@@ -69,7 +69,7 @@ const LIVE_REFRESH_MS = 15_000;
 const MATCHES_CACHE_FRESH_MS = 30_000;
 
 function matchesCacheKey(roundId: string, page: number, matchType: string) {
-  return `matches:v3:${matchType}:${roundId || "all"}:${page}`;
+  return `matches:v4:${matchType}:${roundId || "all"}:${page}`;
 }
 
 export default function MatchesPage() {
@@ -140,12 +140,15 @@ const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
       }
 
       const params = new URLSearchParams({
-        schedule: "true",
         paginated: "true",
         page: String(targetPage),
         light: matchType === "upcoming" ? "1" : "0",
       });
-      if (matchType === "past") params.set("completed", "true");
+      if (matchType === "past") {
+        params.set("completed", "true");
+      } else {
+        params.set("upcoming", "true");
+      }
       if (targetRound) params.set("roundId", targetRound);
 
       try {

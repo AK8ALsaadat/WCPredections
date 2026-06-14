@@ -199,7 +199,10 @@ export async function getUpcomingMatches(roundId?: string) {
     where: {
       roundId: roundId ?? undefined,
       status: { in: ["SCHEDULED", "LIVE"] },
-      matchTime: { gte: new Date() },
+      OR: [
+        { status: "LIVE" },
+        { status: "SCHEDULED", matchTime: { gte: new Date() } },
+      ],
     },
     include: {
       homeTeam: { select: teamSelect },

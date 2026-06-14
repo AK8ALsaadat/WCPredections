@@ -11,6 +11,7 @@ import {
   fetchEspnRoster,
   fetchLastEspnLineup,
 } from "@/services/espn-roster.service";
+import { fetchWikidataPlayerPhotos } from "@/services/wikidata-player-photos.service";
 import {
   normalizePlayerName,
   resolvePlayerInSquad,
@@ -157,7 +158,8 @@ async function within<T>(promise: Promise<T>, ms: number, fallback: T) {
 function formationFromGrid(players: { grid?: string | null }[]) {
   const rows = new Map<number, number>();
   for (const player of players) {
-    const row = Number.parseInt(player.grid?.split(":")[0] ?? "", 10);
+    if (!/^\d+:\d+$/.test(player.grid ?? "")) continue;
+    const row = Number.parseInt(player.grid!.split(":")[0], 10);
     if (!Number.isInteger(row) || row <= 1) continue;
     rows.set(row, (rows.get(row) ?? 0) + 1);
   }
@@ -371,7 +373,25 @@ async function mapProbableLineupByName(
   source: LineupSource = "probable"
 ): Promise<TeamPlayersView | null> {
   const squad = await prisma.player.findMany({ where: { teamId } });
-  const externalPlayers = [...lineup, ...bench];
+  const requestedPhotos = await within(
+    fetchWikidataPlayerPhotos(
+      [...lineup, ...bench]
+        .filter((player) => !player.photoUrl)
+        .map((player) => player.name)
+    ),
+    3_000,
+    new Map<string, string>()
+  );
+  const withPhoto = (player: ExternalLineupPlayer) => ({
+    ...player,
+    photoUrl:
+      player.photoUrl ??
+      requestedPhotos.get(player.name) ??
+      null,
+  });
+  const mappedInputLineup = lineup.map(withPhoto);
+  const mappedInputBench = bench.map(withPhoto);
+  const externalPlayers = [...mappedInputLineup, ...mappedInputBench];
 
   // New tournament teams may have no locally synced squad yet. Persist the
   // trusted previous-match roster so predictions always use real Player rows.
@@ -473,8 +493,8 @@ async function mapProbableLineupByName(
     return mapped;
   };
 
-  const mappedLineup = mapSection(lineup, "lineup");
-  const mappedBench = mapSection(bench, "bench");
+  const mappedLineup = mapSection(mappedInputLineup, "lineup");
+  const mappedBench = mapSection(mappedInputBench, "bench");
   // If there are fewer than 11 mapped starters, promote bench players
   // from the last match into the lineup until we reach 11 starters.
   if (mappedLineup.length < 11 && mappedBench.length > 0) {
@@ -487,7 +507,7 @@ async function mapProbableLineupByName(
   if (mappedLineup.length < 11) return null;
 
   return {
-    formation: formation ?? formationFromGrid(lineup),
+    formation: formation ?? formationFromGrid(mappedInputLineup),
     players: [...mappedLineup, ...mappedBench],
     source,
   };

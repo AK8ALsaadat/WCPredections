@@ -41,7 +41,7 @@ export async function GET(request: Request) {
           ? await getUpcomingMatches(roundId)
           : await getAllMatches(roundId);
 
-    if ((schedule || completed) && paginated) {
+    if ((schedule || upcoming || completed) && paginated) {
       const { items, meta } = paginateSchedule(raw, page, pageSize);
       
       if (light && !completed) {

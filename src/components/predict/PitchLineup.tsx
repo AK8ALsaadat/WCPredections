@@ -118,7 +118,9 @@ function PlayerPortrait({
   sizeClass: string;
   enabled: boolean;
 }) {
-  const photoUrl = player.photoUrl ?? null;
+  const photoUrl =
+    player.photoUrl ??
+    `/api/player-avatar?name=${encodeURIComponent(player.name)}`;
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -127,7 +129,7 @@ function PlayerPortrait({
     setFailed(false);
   }, [photoUrl]);
 
-  if (!enabled || !photoUrl || failed) return null;
+  if (!enabled || failed) return null;
 
   return (
     <Image

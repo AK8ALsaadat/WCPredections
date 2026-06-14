@@ -5,6 +5,7 @@ import {
 } from "../src/lib/scorer-prediction";
 import { playerNamesMatch } from "../src/lib/player-matching";
 import { matchIdentityKey } from "../src/lib/team-identity";
+import { layoutFormation } from "../src/lib/formation-layout";
 import {
   calculateScorerPredictionPoints,
   getPositionPointsMultiplier,
@@ -90,6 +91,37 @@ check(
     getPositionPointsMultiplier("Defender") === 3 &&
     getPositionPointsMultiplier("Winger") === 1 &&
     calculateScorerPredictionPoints(1, 1, "Defender") === 3
+);
+
+const espnOrdinalGrid = [
+  { id: "gk", name: "GK", position: "Goalkeeper", section: "lineup" as const, grid: "1" },
+  ...Array.from({ length: 4 }, (_, index) => ({
+    id: `d${index}`,
+    name: `D${index}`,
+    position: "Defender",
+    section: "lineup" as const,
+    grid: String(index + 2),
+  })),
+  ...Array.from({ length: 3 }, (_, index) => ({
+    id: `m${index}`,
+    name: `M${index}`,
+    position: "Midfielder",
+    section: "lineup" as const,
+    grid: String(index + 6),
+  })),
+  ...Array.from({ length: 3 }, (_, index) => ({
+    id: `a${index}`,
+    name: `A${index}`,
+    position: "Forward",
+    section: "lineup" as const,
+    grid: String(index + 9),
+  })),
+];
+const ordinalSlots = layoutFormation(espnOrdinalGrid, null, "home");
+check(
+  "ESPN ordinal formationPlace does not collapse players into one line",
+  new Set(ordinalSlots.map((slot) => slot.x)).size > 3 &&
+    new Set(ordinalSlots.map((slot) => slot.y)).size === 4
 );
 
 process.exit(failures === 0 ? 0 : 1);
