@@ -14,7 +14,10 @@ import {
   calculateScorerPredictionPoints,
   getPositionPointsMultiplier,
 } from "../src/services/scoring.service";
-import { mergeProbableBenchWithCurrentRoster } from "../src/services/match-players.service";
+import {
+  mergeProbableBenchWithCurrentRoster,
+  mergeTeamViewWithCurrentRoster,
+} from "../src/services/match-players.service";
 
 let failures = 0;
 
@@ -39,6 +42,11 @@ check(
   "Turkey and Turkiye share one match identity",
   matchIdentityKey("Turkey", "Australia") ===
     matchIdentityKey("Türkiye", "Australia")
+);
+check(
+  "encoded Curacao and Cape Verde aliases share team identities",
+  matchIdentityKey("CuraÃ§ao", "Cape Verde Islands") ===
+    matchIdentityKey("Curacao", "Cape Verde")
 );
 
 const squad = [
@@ -174,6 +182,41 @@ check(
   "current squad completes probable bench with Lamine Yamal",
   probableBench.map((player) => player.name).join("|") ===
     "Pedri|Lamine Yamal"
+);
+
+const completedOfficialView = mergeTeamViewWithCurrentRoster(
+  {
+    formation: "4-3-3",
+    source: "official",
+    players: formation352Players.slice(0, 11).map((player) => ({
+      ...player,
+      section: "lineup" as const,
+    })),
+  },
+  [
+    {
+      id: "current-roster-player",
+      name: "Current Roster Player",
+      position: "Forward",
+      shirtNumber: null,
+      photoUrl: null,
+      section: "lineup",
+      grid: "1:1",
+    },
+  ]
+);
+check(
+  "current squad completes every lineup source without changing starters",
+  completedOfficialView.source === "official" &&
+    completedOfficialView.players.filter(
+      (player) => player.section === "lineup"
+    ).length === 11 &&
+    completedOfficialView.players.some(
+      (player) =>
+        player.id === "current-roster-player" &&
+        player.section === "bench" &&
+        player.grid == null
+    )
 );
 
 const retainedLineup = mergeLineupData(

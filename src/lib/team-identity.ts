@@ -5,6 +5,9 @@ const TEAM_ALIASES: Record<string, string> = {
   usa: "united states",
   "united states of america": "united states",
   "cote d ivoire": "ivory coast",
+  "curaa ao": "curacao",
+  "cape verde islands": "cape verde",
+  "ir iran": "iran",
 };
 
 export function normalizeTeamIdentity(name: string): string {

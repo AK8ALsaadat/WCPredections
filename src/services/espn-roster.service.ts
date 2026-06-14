@@ -1,3 +1,5 @@
+import { normalizeTeamIdentity } from "@/lib/team-identity";
+
 type EspnSearchContent = {
   uid?: string;
   displayName?: string;
@@ -15,7 +17,7 @@ export type EspnRosterPlayer = {
   id: number;
   name: string;
   position?: string | null;
-  shirtNumber: number;
+  shirtNumber?: number | null;
   photoUrl?: string | null;
 };
 
@@ -42,12 +44,43 @@ const ESPN_TEAM_ALIASES: Record<string, string> = {
   usa: "United States",
 };
 
+const ESPN_TEAM_SEARCH_NAMES: Record<string, string> = {
+  turkey: "Turkiye",
+  curacao: "Curacao",
+  "cape verde": "Cape Verde",
+  "united states": "United States",
+  "south korea": "South Korea",
+  "ivory coast": "Ivory Coast",
+};
+
 const ROSTER_CACHE_MS = 24 * 60 * 60 * 1000;
 const rosterCache = new Map<
   string,
   { players: EspnRosterPlayer[]; expiresAt: number }
 >();
 const rosterInflight = new Map<string, Promise<EspnRosterPlayer[]>>();
+
+async function fetchEspnJson<T>(
+  url: string | URL,
+  revalidate: number,
+  timeoutMs: number
+): Promise<T | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(url, {
+        next: { revalidate },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (response.ok) return (await response.json()) as T;
+    } catch {
+      // Retry once because ESPN search intermittently returns gateway timeouts.
+    }
+    if (attempt === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+  return null;
+}
 
 function decodeHtml(value: string): string {
   return value
@@ -64,28 +97,30 @@ function decodeHtml(value: string): string {
 }
 
 async function resolveEspnTeamId(teamName: string): Promise<string | null> {
+  const teamIdentity = normalizeTeamIdentity(teamName);
   const searchName =
-    ESPN_TEAM_ALIASES[teamName.trim().toLowerCase()] ?? teamName;
+    ESPN_TEAM_SEARCH_NAMES[teamIdentity] ??
+    ESPN_TEAM_ALIASES[teamName.trim().toLowerCase()] ??
+    teamName;
   const url = new URL("https://site.web.api.espn.com/apis/search/v2");
   url.searchParams.set("query", searchName);
   url.searchParams.set("limit", "20");
 
-  const response = await fetch(url, {
-    next: { revalidate: 24 * 60 * 60 },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!response.ok) return null;
-
-  const data = (await response.json()) as EspnSearchResponse;
+  const data = await fetchEspnJson<EspnSearchResponse>(
+    url,
+    24 * 60 * 60,
+    10_000
+  );
+  if (!data) return null;
   const candidates = (data.results ?? []).flatMap(
     (result) => result.contents ?? []
   );
-  const exactName = searchName.trim().toLowerCase();
   const team = candidates.find(
     (item) =>
       item.sport === "soccer" &&
-      item.subtitle === "Men's soccer team" &&
-      item.displayName?.trim().toLowerCase() === exactName
+      /~t:\d+$/.test(item.uid ?? "") &&
+      !item.subtitle?.toLowerCase().includes("women") &&
+      normalizeTeamIdentity(item.displayName ?? "") === teamIdentity
   );
 
   return team?.uid?.match(/~t:(\d+)$/)?.[1] ?? null;
@@ -95,16 +130,7 @@ async function loadEspnRoster(teamName: string): Promise<EspnRosterPlayer[]> {
   const teamId = await resolveEspnTeamId(teamName);
   if (!teamId) return [];
 
-  const response = await fetch(
-    `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/teams/${teamId}/roster`,
-    {
-      next: { revalidate: 24 * 60 * 60 },
-      signal: AbortSignal.timeout(6_000),
-    }
-  );
-  if (!response.ok) return [];
-
-  const data = (await response.json()) as {
+  const data = await fetchEspnJson<{
     athletes?: {
       id?: string;
       fullName?: string;
@@ -113,20 +139,25 @@ async function loadEspnRoster(teamName: string): Promise<EspnRosterPlayer[]> {
       headshot?: { href?: string };
       position?: { name?: string };
     }[];
-  };
+  }>(
+    `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/teams/${teamId}/roster`,
+    24 * 60 * 60,
+    6_000
+  );
+  if (!data) return [];
 
   return (data.athletes ?? []).flatMap((athlete) => {
     const name = decodeHtml(athlete.fullName ?? athlete.displayName ?? "");
     const id = Number.parseInt(athlete.id ?? "", 10);
     const shirtNumber = Number.parseInt(athlete.jersey ?? "", 10);
-    if (!name || !Number.isInteger(id) || !Number.isInteger(shirtNumber)) {
+    if (!name || !Number.isInteger(id)) {
       return [];
     }
     return [{
       id,
       name,
       position: athlete.position?.name ?? null,
-      shirtNumber,
+      shirtNumber: Number.isInteger(shirtNumber) ? shirtNumber : null,
       photoUrl: athlete.headshot?.href ?? null,
     }];
   });

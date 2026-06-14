@@ -319,7 +319,7 @@ async function buildMatchLineup(matchId: string) {
 function getSharedMatchLineup(matchId: string) {
   return unstable_cache(
     () => buildMatchLineup(matchId),
-    ["match-lineup-v9", matchId],
+    ["match-lineup-v10", matchId],
     {
       revalidate: MATCH_LINEUP_SHARED_CACHE_SECONDS,
       tags: [`lineup-${matchId}`],
