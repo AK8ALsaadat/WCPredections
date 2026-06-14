@@ -1,14 +1,10 @@
 import { revalidateTag, unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import {
-  isPredictionAllowed,
-  isWithinLineupFastRefreshWindow,
-} from "@/lib/utils";
+import { isPredictionAllowed } from "@/lib/utils";
 import { getTournamentRoundName } from "@/lib/rounds";
 import type { MatchStatus } from "@prisma/client";
 import { recalculateMatchScoring } from "@/services/prediction.service";
 import { getRoundUsageLimits } from "@/services/round-usage.service";
-import { buildExpectedLineup } from "@/lib/expected-lineup";
 
 const teamSelect = {
   id: true,
@@ -250,69 +246,7 @@ const matchLineupCache = new Map<
   { data: Awaited<ReturnType<typeof buildMatchLineup>>; expiresAt: number }
 >();
 const MATCH_LINEUP_CACHE_MS = 5 * 60 * 1000;
-const MATCH_LINEUP_PROBABLE_CACHE_MS = 45 * 1000;
 const MATCH_SHELL_REVALIDATE_SECONDS = 60;
-const MATCH_LINEUP_REVALIDATE_SECONDS = 300;
-const MATCH_LINEUP_PROBABLE_REVALIDATE_SECONDS = 45;
-const FAST_ROSTERS_CACHE_MS = 30 * 60 * 1000;
-
-type FastRosterTeam = {
-  id: string;
-  name: string;
-  shortName: string;
-  players: {
-    id: string;
-    name: string;
-    position: string | null;
-    shirtNumber: number | null;
-    photoUrl: string | null;
-  }[];
-};
-
-let fastRostersCache:
-  | { teams: Map<string, FastRosterTeam>; expiresAt: number }
-  | undefined;
-let fastRostersInflight: Promise<Map<string, FastRosterTeam>> | undefined;
-
-async function getFastRosters() {
-  if (fastRostersCache && fastRostersCache.expiresAt > Date.now()) {
-    return fastRostersCache.teams;
-  }
-  if (fastRostersInflight) return fastRostersInflight;
-
-  fastRostersInflight = prisma.team
-    .findMany({
-      where: { players: { some: {} } },
-      select: {
-        id: true,
-        name: true,
-        shortName: true,
-        players: {
-          orderBy: [{ shirtNumber: "asc" }, { name: "asc" }],
-          select: {
-            id: true,
-            name: true,
-            position: true,
-            shirtNumber: true,
-            photoUrl: true,
-          },
-        },
-      },
-    })
-    .then((teams) => {
-      const mapped = new Map(teams.map((team) => [team.id, team]));
-      fastRostersCache = {
-        teams: mapped,
-        expiresAt: Date.now() + FAST_ROSTERS_CACHE_MS,
-      };
-      return mapped;
-    })
-    .finally(() => {
-      fastRostersInflight = undefined;
-    });
-
-  return fastRostersInflight;
-}
 
 async function fetchMatchShell(matchId: string) {
   return prisma.match.findUnique({
@@ -372,70 +306,6 @@ async function buildMatchLineup(matchId: string) {
   };
 }
 
-async function buildFastMatchLineup(matchId: string) {
-  const [match, rosters] = await Promise.all([
-    prisma.match.findUnique({
-      where: { id: matchId },
-      select: { homeTeamId: true, awayTeamId: true },
-    }),
-    getFastRosters(),
-  ]);
-  if (!match) return null;
-  const homeTeam = rosters.get(match.homeTeamId);
-  const awayTeam = rosters.get(match.awayTeamId);
-  if (!homeTeam || !awayTeam) return null;
-
-  const buildTeam = (players: FastRosterTeam["players"]) => {
-    const expected = buildExpectedLineup(
-      players.map((player, index) => ({
-        id: index,
-        name: player.name,
-        position: player.position,
-        shirtNumber: player.shirtNumber,
-      }))
-    );
-    const starterIds = new Set(expected.lineup.map((player) => player.id));
-    return {
-      formation: expected.formation,
-      players: players.map((player, index) => ({
-        ...player,
-        section: starterIds.has(index) ? ("lineup" as const) : ("bench" as const),
-        grid: null,
-      })),
-    };
-  };
-
-  const home = buildTeam(homeTeam.players);
-  const away = buildTeam(awayTeam.players);
-
-  return {
-    homePlayers: home.players,
-    awayPlayers: away.players,
-    homeFormation: home.formation,
-    awayFormation: away.formation,
-    homeLineupSource: "estimated" as const,
-    awayLineupSource: "estimated" as const,
-    lineupStatus: "estimated" as const,
-    homeTeamName: homeTeam.name,
-    awayTeamName: awayTeam.name,
-    homeShortName: homeTeam.shortName,
-    awayShortName: awayTeam.shortName,
-  };
-}
-
-function getCachedMatchLineup(matchId: string, probable = false) {
-  return unstable_cache(
-    () => buildMatchLineup(matchId),
-    ["match-lineup", matchId, probable ? "probable" : "default"],
-    {
-      revalidate: probable
-        ? MATCH_LINEUP_PROBABLE_REVALIDATE_SECONDS
-        : MATCH_LINEUP_REVALIDATE_SECONDS,
-      tags: [`lineup-${matchId}`],
-    }
-  )();
-}
-
 export function clearMatchLineupMemoryCache(matchId: string) {
   matchLineupCache.delete(matchId);
 }
@@ -462,17 +332,7 @@ export async function getMatchLineup(
     return hit.data;
   }
 
-  let data: Awaited<ReturnType<typeof buildMatchLineup>> =
-    await buildFastMatchLineup(matchId);
-  const hasCompleteFastLineup =
-    (data?.homePlayers.filter((player) => player.section === "lineup").length ??
-      0) >= 11 &&
-    (data?.awayPlayers.filter((player) => player.section === "lineup").length ??
-      0) >= 11;
-
-  if (!hasCompleteFastLineup) {
-    data = await buildMatchLineup(matchId);
-  }
+  const data = await buildMatchLineup(matchId);
 
   if (data) {
     matchLineupCache.set(matchId, {

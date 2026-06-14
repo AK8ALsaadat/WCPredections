@@ -40,7 +40,7 @@ export function predictMatchCacheKey(matchId: string) {
 }
 
 export function predictLineupCacheKey(matchId: string) {
-  return `predict:lineup:v6:${matchId}`;
+  return `predict:lineup:v7:${matchId}`;
 }
 
 type ListMatchSeed = {

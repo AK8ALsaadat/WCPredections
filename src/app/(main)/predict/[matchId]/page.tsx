@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -234,7 +234,6 @@ export default function PredictPage() {
   );
   const [boldEnabled, setBoldEnabled] = useState(initialForm.boldEnabled);
   const [boldPlayerId, setBoldPlayerId] = useState(initialForm.boldPlayerId);
-  const lineupRefreshStartedRef = useRef<string | null>(null);
 
   const teamSets = useMemo(() => {
     if (!lineup) return { home: new Set<string>(), away: new Set<string>() };
@@ -449,28 +448,6 @@ export default function PredictPage() {
       if (interval) clearInterval(interval);
       if (windowTimer) clearTimeout(windowTimer);
     };
-  }, [matchId, match?.matchTime, lineup?.lineupStatus]);
-
-  useEffect(() => {
-    if (
-      !match?.matchTime ||
-      lineup?.lineupStatus == null ||
-      lineup.lineupStatus === "official" ||
-      lineupRefreshStartedRef.current === matchId
-    ) {
-      return;
-    }
-    lineupRefreshStartedRef.current = matchId;
-
-    const timer = setTimeout(() => {
-      void fetchLineupForMatch(matchId, match.matchTime, { fresh: true }).then(
-        (payload) => {
-          if (payload) setLineup(payload);
-        }
-      );
-    }, 800);
-
-    return () => clearTimeout(timer);
   }, [matchId, match?.matchTime, lineup?.lineupStatus]);
 
   function toggleScorer(playerId: string) {
@@ -702,17 +679,6 @@ export default function PredictPage() {
       !doubleLimits.canEnable &&
       !doubleLimits.onThisMatch) ||
     boldEnabled; // منع الـ Double إذا كانت البطاقة الجريئة مفعلة
-  const allLineupPlayers = [
-    ...(lineup?.homePlayers ?? []).map((p) => ({
-      ...p,
-      teamShort: match.homeTeam.shortName,
-    })),
-    ...(lineup?.awayPlayers ?? []).map((p) => ({
-      ...p,
-      teamShort: match.awayTeam.shortName,
-    })),
-  ];
-
   const boldPlayerGroups =
     lineup && hasPlayers
       ? [

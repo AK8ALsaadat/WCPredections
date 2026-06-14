@@ -58,9 +58,20 @@ function isGoalkeeper(player: MatchPlayerView) {
 
 function positionRank(player: MatchPlayerView) {
   const position = (player.position ?? "").toLowerCase();
-  if (position.includes("def")) return 0;
+  if (
+    position.includes("def") ||
+    position.includes("back") ||
+    position.includes("sweeper")
+  ) return 0;
   if (position.includes("mid")) return 1;
-  if (position.includes("attack") || position.includes("forward") || position.includes("offence")) {
+  if (
+    position.includes("attack") ||
+    position.includes("forward") ||
+    position.includes("offence") ||
+    position.includes("offense") ||
+    position.includes("striker") ||
+    position.includes("wing")
+  ) {
     return 2;
   }
   return 3;

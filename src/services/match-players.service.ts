@@ -171,6 +171,39 @@ function formationFromGrid(players: { grid?: string | null }[]) {
     : null;
 }
 
+function formationFromPositions(
+  players: { position?: string | null }[]
+): string | null {
+  let defenders = 0;
+  let midfielders = 0;
+  let attackers = 0;
+
+  for (const player of players.slice(0, 11)) {
+    const position = (player.position ?? "").toLowerCase();
+    if (position.includes("goal")) continue;
+    if (
+      position.includes("defen") ||
+      position.includes("back") ||
+      position.includes("sweeper")
+    ) {
+      defenders++;
+    } else if (position.includes("mid")) {
+      midfielders++;
+    } else if (
+      position.includes("attack") ||
+      position.includes("forward") ||
+      position.includes("striker") ||
+      position.includes("wing")
+    ) {
+      attackers++;
+    }
+  }
+
+  return defenders + midfielders + attackers === 10
+    ? `${defenders}-${midfielders}-${attackers}`
+    : null;
+}
+
 async function enrichWithApiFootballPhotos(
   teamName: string,
   view: TeamPlayersView
@@ -507,7 +540,11 @@ async function mapProbableLineupByName(
   if (mappedLineup.length < 11) return null;
 
   return {
-    formation: formation ?? formationFromGrid(mappedInputLineup),
+    formation:
+      formation ??
+      formationFromGrid(mappedInputLineup) ??
+      formationFromPositions(mappedInputLineup) ??
+      "4-3-3",
     players: [...mappedLineup, ...mappedBench],
     source,
   };
@@ -733,7 +770,11 @@ async function buildTeamView(
       }));
 
   return {
-    formation: formation ?? formationFromGrid(lineup),
+    formation:
+      formation ??
+      formationFromGrid(lineup) ??
+      formationFromPositions(lineup) ??
+      "4-3-3",
     players,
     source,
   };

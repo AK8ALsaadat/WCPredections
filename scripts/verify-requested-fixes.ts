@@ -98,7 +98,12 @@ const espnOrdinalGrid = [
   ...Array.from({ length: 4 }, (_, index) => ({
     id: `d${index}`,
     name: `D${index}`,
-    position: "Defender",
+    position:
+      index === 0
+        ? "Left Back"
+        : index === 3
+          ? "Right Back"
+          : "Center Defender",
     section: "lineup" as const,
     grid: String(index + 2),
   })),
@@ -121,7 +126,9 @@ const ordinalSlots = layoutFormation(espnOrdinalGrid, null, "home");
 check(
   "ESPN ordinal formationPlace does not collapse players into one line",
   new Set(ordinalSlots.map((slot) => slot.x)).size > 3 &&
-    new Set(ordinalSlots.map((slot) => slot.y)).size === 4
+    new Set(ordinalSlots.map((slot) => slot.y)).size === 4 &&
+    ordinalSlots.find((slot) => slot.player.id === "d0")?.y === 18 &&
+    ordinalSlots.find((slot) => slot.player.id === "d3")?.y === 18
 );
 
 process.exit(failures === 0 ? 0 : 1);
