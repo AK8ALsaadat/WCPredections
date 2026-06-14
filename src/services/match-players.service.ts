@@ -94,6 +94,20 @@ export type TeamPlayersView = {
   source: LineupSource;
 };
 
+export function mergeProbableBenchWithCurrentRoster<
+  T extends { name: string }
+>(lineup: T[], bench: T[], currentRoster: T[]): T[] {
+  const knownNames = new Set(
+    [...lineup, ...bench].map((player) => normalizePlayerName(player.name))
+  );
+  return [
+    ...bench,
+    ...currentRoster.filter(
+      (player) => !knownNames.has(normalizePlayerName(player.name))
+    ),
+  ];
+}
+
 function compactPlayerName(name: string): string {
   return normalizePlayerName(name).replace(/\s+/g, "");
 }
@@ -881,6 +895,7 @@ async function syncProbableLineup(
     };
   };
 
+  const currentRosterPromise = within(fetchEspnRoster(teamName), 2_000, []);
   const candidate = await firstAvailable<ProbableCandidate>([
     within(
       fetchLastFootballDataLineup(apiTeamId, targetMatchTime),
@@ -896,46 +911,21 @@ async function syncProbableLineup(
       null
     ).then((data) => data ? { source: "api-football" as const, data } : null),
   ]);
+  const currentRoster = await currentRosterPromise;
+  const candidateBench = candidate
+    ? mergeProbableBenchWithCurrentRoster(
+        candidate.data.lineup,
+        candidate.data.bench,
+        currentRoster
+      )
+    : [];
 
-  if (candidate?.source === "history") {
-    const view = await buildTeamView(
-      teamId,
-      apiTeamId,
-      "probable",
-      candidate.data.formation,
-      candidate.data.lineup,
-      candidate.data.bench
-    );
-    expectedLineupCache.set(cacheKey, {
-      data: view,
-      expiresAt: Date.now() + EXPECTED_LINEUP_CACHE_MS,
-    });
-    return view;
-  }
-
-  if (candidate?.source === "espn") {
+  if (candidate) {
     const mapped = await mapProbableLineupByName(
       teamId,
       candidate.data.formation,
       candidate.data.lineup,
-      candidate.data.bench
-    );
-    if (mapped) {
-      expectedLineupCache.set(cacheKey, {
-        data: mapped,
-        expiresAt: Date.now() + EXPECTED_LINEUP_CACHE_MS,
-      });
-      return mapped;
-    }
-  }
-
-  // API-Football remains a fallback if the other providers have no history.
-  if (candidate?.source === "api-football") {
-    const mapped = await mapProbableLineupByName(
-      teamId,
-      candidate.data.formation,
-      candidate.data.lineup,
-      candidate.data.bench
+      candidateBench
     );
     if (mapped) {
       expectedLineupCache.set(cacheKey, {

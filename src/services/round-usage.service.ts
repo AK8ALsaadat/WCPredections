@@ -15,7 +15,7 @@ export async function getRoundUsageLimits(
   matchId: string,
   roundId?: string
 ) {
-  const scope = await getUsageRoundScope(matchId);
+  const scope = await getUsageRoundScope(matchId, roundId);
   const resolvedRoundId = roundId ?? scope.databaseRoundId;
 
   const [roundPredictions, boldStatus, totalPoints] = await Promise.all([
@@ -26,7 +26,7 @@ export async function getRoundUsageLimits(
       },
       select: { matchId: true, isDouble: true },
     }),
-    getBoldScorerBetStatus(userId, matchId),
+    getBoldScorerBetStatus(userId, matchId, scope),
     getUserTotalPoints(userId),
   ]);
   const hasBoldPoints = totalPoints >= MIN_POINTS_FOR_BOLD_SCORER_BET;

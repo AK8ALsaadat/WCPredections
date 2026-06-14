@@ -9,10 +9,12 @@ import {
 import { playerNamesMatch } from "../src/lib/player-matching";
 import { matchIdentityKey } from "../src/lib/team-identity";
 import { layoutFormation } from "../src/lib/formation-layout";
+import { mergeLineupData } from "../src/lib/lineup-state";
 import {
   calculateScorerPredictionPoints,
   getPositionPointsMultiplier,
 } from "../src/services/scoring.service";
+import { mergeProbableBenchWithCurrentRoster } from "../src/services/match-players.service";
 
 let failures = 0;
 
@@ -144,6 +146,65 @@ check(
   "official 3-5-2 grid keeps the back three compact",
   gridBackThree.length === 3 &&
     gridBackThree[2].x - gridBackThree[0].x === 52
+);
+const formation343Players = formation352Players.map((player, index) => {
+  if (index >= 4 && index <= 7) {
+    return { ...player, id: `343-m${index}`, position: "Midfielder" };
+  }
+  if (index >= 8) {
+    return { ...player, id: `343-a${index}`, position: "Forward" };
+  }
+  return { ...player, id: `343-${player.id}` };
+});
+const backThree343 = layoutFormation(formation343Players, "3-4-3", "home")
+  .filter((slot) => slot.player.position === "Defender")
+  .sort((left, right) => left.x - right.x);
+check(
+  "three defenders stay compact in 3-4-3",
+  backThree343.length === 3 &&
+    backThree343[2].x - backThree343[0].x === 52
+);
+
+const probableBench = mergeProbableBenchWithCurrentRoster(
+  [{ name: "Unai Simon" }],
+  [{ name: "Pedri" }],
+  [{ name: "Pedri" }, { name: "Lamine Yamal" }]
+);
+check(
+  "current squad completes probable bench with Lamine Yamal",
+  probableBench.map((player) => player.name).join("|") ===
+    "Pedri|Lamine Yamal"
+);
+
+const retainedLineup = mergeLineupData(
+  {
+    homePlayers: [
+      {
+        id: "yamal",
+        name: "Lamine Yamal",
+        position: "Forward",
+        section: "lineup" as const,
+      },
+    ],
+    awayPlayers: [],
+  },
+  {
+    homePlayers: [
+      {
+        id: "pedri",
+        name: "Pedri",
+        position: "Midfielder",
+        section: "lineup" as const,
+      },
+    ],
+    awayPlayers: [],
+  }
+);
+check(
+  "lineup refresh keeps previously selectable players on the bench",
+  retainedLineup.homePlayers.some(
+    (player) => player.id === "yamal" && player.section === "bench"
+  )
 );
 
 const fiveHome = new Set(["h1", "h2", "h3", "h4", "h5"]);

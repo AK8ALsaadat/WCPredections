@@ -11,6 +11,7 @@ import { enqueueBackgroundPrefetch } from "@/lib/prefetch-queue";
 const MATCH_FRESH_MS = 300_000;
 const LINEUP_FRESH_MS = 600_000;
 const LINEUP_PROBABLE_FRESH_MS = 45_000;
+const PREDICT_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 type LineupCacheMeta = {
   lineupStatus?: "official" | "probable" | "estimated";
@@ -45,7 +46,11 @@ export function predictMatchCacheKey(matchId: string) {
 }
 
 export function predictLineupCacheKey(matchId: string) {
-  return `predict:lineup:v7:${matchId}`;
+  return `predict:lineup:v8:${matchId}`;
+}
+
+function predictDraftCacheKey(matchId: string) {
+  return `predict:draft:v1:${matchId}`;
 }
 
 type ListMatchSeed = {
@@ -227,6 +232,21 @@ export function writePredictMatchCache<T>(matchId: string, data: T) {
 
 export function writePredictLineupCache<T>(matchId: string, data: T) {
   writeClientCache(predictLineupCacheKey(matchId), data);
+}
+
+export function readPredictDraft<T>(matchId: string): T | null {
+  return readClientCache<T>(
+    predictDraftCacheKey(matchId),
+    PREDICT_DRAFT_MAX_AGE_MS
+  );
+}
+
+export function writePredictDraft<T>(matchId: string, data: T) {
+  writeClientCache(predictDraftCacheKey(matchId), data);
+}
+
+export function clearPredictDraft(matchId: string) {
+  removeClientCache(predictDraftCacheKey(matchId));
 }
 
 export function isPredictMatchCacheFresh(matchId: string) {

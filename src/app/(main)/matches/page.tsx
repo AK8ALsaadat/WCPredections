@@ -66,7 +66,8 @@ type MatchesPageCache = {
 
 const REFRESH_MS = 60_000;
 const LIVE_REFRESH_MS = 15_000;
-const MATCHES_CACHE_FRESH_MS = 30_000;
+const MATCHES_CACHE_FRESH_MS = 60_000;
+const ROUNDS_CACHE_FRESH_MS = 5 * 60_000;
 
 function matchesCacheKey(roundId: string, page: number, matchType: string) {
   return `matches:v4:${matchType}:${roundId || "all"}:${page}`;
@@ -115,7 +116,7 @@ export default function MatchesPage() {
       targetRound: string,
       opts?: { showLoader?: boolean; force?: boolean; signal?: AbortSignal }
     ) => {
-const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
+      const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
       const seq = ++loadSeq.current;
 
       const cached = readClientCache<MatchesPageCache>(requestKey);
@@ -208,8 +209,13 @@ const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
   );
 
   useEffect(() => {
+    setTodayLabel(formatDayHeader(new Date(), locale));
+
     const cachedRounds = readClientCache<Round[]>("rounds");
     if (cachedRounds) setRounds(cachedRounds);
+    if (cachedRounds && isClientCacheFresh("rounds", ROUNDS_CACHE_FRESH_MS)) {
+      return;
+    }
 
     void clientFetch("/api/rounds")
       .then((r) => (r ? r.json() : null))
@@ -219,8 +225,6 @@ const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
           setRounds(data.data);
         }
       });
-
-    setTodayLabel(formatDayHeader(new Date(), locale));
   }, [locale]);
 
   useEffect(() => {

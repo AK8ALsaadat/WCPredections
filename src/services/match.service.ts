@@ -191,22 +191,30 @@ export async function getScheduleMatches(roundId?: string) {
 }
 
 export async function getUpcomingMatches(roundId?: string) {
-  return prisma.match.findMany({
-    where: {
-      roundId: roundId ?? undefined,
-      status: { in: ["SCHEDULED", "LIVE"] },
-      OR: [
-        { status: "LIVE" },
-        { status: "SCHEDULED", matchTime: { gte: new Date() } },
-      ],
-    },
-    include: {
-      homeTeam: { select: teamSelect },
-      awayTeam: { select: teamSelect },
-      round: { select: { id: true, name: true } },
-    },
-    orderBy: { matchTime: "asc" },
-  });
+  const rows = await unstable_cache(
+    () =>
+      prisma.match.findMany({
+        where: {
+          roundId: roundId ?? undefined,
+          status: { in: ["SCHEDULED", "LIVE"] },
+        },
+        include: {
+          homeTeam: { select: teamSelect },
+          awayTeam: { select: teamSelect },
+          round: { select: { id: true, name: true } },
+        },
+        orderBy: { matchTime: "asc" },
+      }),
+    ["upcoming-match-candidates", roundId ?? "all"],
+    { revalidate: 60, tags: ["matches-schedule"] }
+  )();
+  const now = Date.now();
+  return rows.filter(
+    (match) =>
+      match.status === "LIVE" ||
+      (match.status === "SCHEDULED" &&
+        new Date(match.matchTime).getTime() >= now)
+  );
 }
 
 export async function getCompletedMatches(roundId?: string) {
@@ -255,6 +263,7 @@ async function fetchMatchShell(matchId: string) {
     select: {
       id: true,
       matchTime: true,
+      status: true,
       isKnockout: true,
       roundId: true,
       homeTeam: { select: teamSelect },
@@ -266,7 +275,7 @@ async function fetchMatchShell(matchId: string) {
 function getCachedMatchShell(matchId: string) {
   return unstable_cache(
     () => fetchMatchShell(matchId),
-    ["match-shell", matchId],
+    ["match-shell-v2", matchId],
     { revalidate: MATCH_SHELL_REVALIDATE_SECONDS, tags: [`match-${matchId}`] }
   )();
 }
@@ -310,7 +319,7 @@ async function buildMatchLineup(matchId: string) {
 function getSharedMatchLineup(matchId: string) {
   return unstable_cache(
     () => buildMatchLineup(matchId),
-    ["match-lineup-v8", matchId],
+    ["match-lineup-v9", matchId],
     {
       revalidate: MATCH_LINEUP_SHARED_CACHE_SECONDS,
       tags: [`lineup-${matchId}`],
@@ -359,10 +368,6 @@ export async function getMatchLineup(
 /** بيانات خفيفة لصفحة التوقع — بدون أهداف المباراة أو التشكيلة */
 export async function getMatchByIdForPredict(matchId: string, userId?: string) {
   const match = await getCachedMatchShell(matchId);
-  const liveMeta = await prisma.match.findUnique({
-    where: { id: matchId },
-    select: { status: true },
-  });
   if (!match) return null;
 
   let userPrediction = null;
@@ -410,7 +415,6 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
 
   return {
     ...match,
-    status: liveMeta?.status ?? "SCHEDULED",
     userPrediction,
     userScorerPredictions,
     userBoldScorerBet,

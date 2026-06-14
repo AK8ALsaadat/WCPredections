@@ -4,7 +4,7 @@ import Image from "next/image";
 import { layoutFormation, getPlayerLabel } from "@/lib/formation-layout";
 import type { ScorerPicks } from "@/lib/scorer-prediction";
 import type { LineupSource, MatchPlayerView } from "@/services/match-players.service";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type PitchLineupProps = {
   home: {
@@ -401,20 +401,45 @@ export function PitchLineup({
     return () => clearTimeout(timer);
   }, []);
 
-  const homePlayers = withDisplayNumbers(home.players);
-  const awayPlayers = withDisplayNumbers(away.players);
-  const homeLineup = homePlayers.filter((p) => p.section === "lineup");
-  const awayLineup = awayPlayers.filter((p) => p.section === "lineup");
-  const homeBench = homePlayers.filter((p) => p.section === "bench");
-  const awayBench = awayPlayers.filter((p) => p.section === "bench");
-
-  const homeSlots = layoutFormation(homeLineup, home.formation, "home");
-  const awaySlots = layoutFormation(awayLineup, away.formation, "away");
-
-  const playersById = new Map<string, MatchPlayerView>();
-  for (const p of [...homePlayers, ...awayPlayers]) {
-    playersById.set(p.id, p);
-  }
+  const homePlayers = useMemo(
+    () => withDisplayNumbers(home.players),
+    [home.players]
+  );
+  const awayPlayers = useMemo(
+    () => withDisplayNumbers(away.players),
+    [away.players]
+  );
+  const homeLineup = useMemo(
+    () => homePlayers.filter((p) => p.section === "lineup"),
+    [homePlayers]
+  );
+  const awayLineup = useMemo(
+    () => awayPlayers.filter((p) => p.section === "lineup"),
+    [awayPlayers]
+  );
+  const homeBench = useMemo(
+    () => homePlayers.filter((p) => p.section === "bench"),
+    [homePlayers]
+  );
+  const awayBench = useMemo(
+    () => awayPlayers.filter((p) => p.section === "bench"),
+    [awayPlayers]
+  );
+  const homeSlots = useMemo(
+    () => layoutFormation(homeLineup, home.formation, "home"),
+    [homeLineup, home.formation]
+  );
+  const awaySlots = useMemo(
+    () => layoutFormation(awayLineup, away.formation, "away"),
+    [awayLineup, away.formation]
+  );
+  const playersById = useMemo(
+    () =>
+      new Map<string, MatchPlayerView>(
+        [...homePlayers, ...awayPlayers].map((player) => [player.id, player])
+      ),
+    [homePlayers, awayPlayers]
+  );
 
   return (
     <div className="space-y-4">

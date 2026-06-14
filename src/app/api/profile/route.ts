@@ -4,18 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { apiSuccess, handleApiError } from "@/lib/api";
 import { getSession, requireAuth } from "@/lib/session";
 import { parseBody, updateUsernameSchema } from "@/lib/validations";
-import { getUserTotalPoints } from "@/services/leaderboard.service";
 import { getUserPredictionHistory } from "@/services/prediction.service";
 
 export async function GET() {
   try {
     const sessionUser = await requireAuth();
-    const [user, totalPoints, history] = await Promise.all([
+    const [user, history] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: sessionUser.userId },
         select: { id: true, username: true, createdAt: true },
       }),
-      getUserTotalPoints(sessionUser.userId),
       getUserPredictionHistory(sessionUser.userId),
     ]);
 
@@ -36,6 +34,10 @@ export async function GET() {
     for (const bet of history.boldScorerBets) {
       roundPoints[bet.roundId] = (roundPoints[bet.roundId] ?? 0) + bet.points;
     }
+    const totalPoints = Object.values(roundPoints).reduce(
+      (sum, points) => sum + points,
+      0
+    );
 
     const correctPredictions = history.predictions.filter(
       (p) => p.points > 0

@@ -62,7 +62,7 @@ function spreadLine(
   const isCompactBackThree =
     players.length === 3 &&
     lineIndex === 0 &&
-    formationRows.join("-") === "3-5-2";
+    formationRows[0] === 3;
   if (isTwoPlayerAttack) return spreadRow(players, y, 36, 64);
   if (isCompactBackThree) return spreadRow(players, y, 24, 76);
   return spreadFormationRow(players, y);
@@ -140,8 +140,8 @@ export function layoutFromGrid(
   const orderedRows = [...columnsByRow.entries()].sort(
     ([left], [right]) => left - right
   );
-  const is352Grid =
-    orderedRows.map(([, columns]) => columns).join("-") === "1-3-5-2";
+  const hasBackThreeGrid =
+    orderedRows[0]?.[1] === 1 && orderedRows[1]?.[1] === 3;
   const defenseRow = orderedRows[1]?.[0];
 
   const slots: PitchSlot[] = [];
@@ -149,7 +149,7 @@ export function layoutFromGrid(
     const columns = columnsByRow.get(row) ?? 1;
     const isTwoPlayerAttack = columns === 2 && row === maxRow;
     const isCompactBackThree =
-      is352Grid && columns === 3 && row === defenseRow;
+      hasBackThreeGrid && columns === 3 && row === defenseRow;
     const xMin = isTwoPlayerAttack ? 36 : isCompactBackThree ? 24 : 10;
     const xMax = isTwoPlayerAttack ? 64 : isCompactBackThree ? 76 : 90;
     const x =

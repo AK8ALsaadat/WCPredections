@@ -5,7 +5,10 @@ import {
   BOLD_SCORER_POINTS,
   calculateBoldScorerBetPoints,
 } from "@/services/scoring.service";
-import { getUsageRoundScope } from "@/services/usage-round.service";
+import {
+  getUsageRoundScope,
+  type UsageRoundScope,
+} from "@/services/usage-round.service";
 import {
   getUserTotalPoints,
   MIN_POINTS_FOR_BOLD_SCORER_BET,
@@ -35,9 +38,10 @@ export async function getBoldScorerBetForMatch(userId: string, matchId: string) 
 
 export async function getBoldScorerBetStatus(
   userId: string,
-  matchId: string
+  matchId: string,
+  knownScope?: UsageRoundScope
 ) {
-  const scope = await getUsageRoundScope(matchId);
+  const scope = knownScope ?? (await getUsageRoundScope(matchId));
 
   const existing = await getBoldScorerBetForUserRound(
     userId,
@@ -83,7 +87,7 @@ export async function submitBoldScorerBet(
     throw new Error(lockReason);
   }
 
-  const scope = await getUsageRoundScope(matchId);
+  const scope = await getUsageRoundScope(matchId, match.roundId);
   const existing = await prisma.boldScorerBet.findUnique({
     where: {
       userId_usageRoundKey: { userId, usageRoundKey: scope.key },

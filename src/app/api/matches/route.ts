@@ -31,15 +31,17 @@ export async function GET(request: Request) {
       Math.max(1, Number.parseInt(searchParams.get("pageSize") ?? String(SCHEDULE_PAGE_SIZE), 10) || SCHEDULE_PAGE_SIZE)
     );
 
-    const user = await getCurrentUser();
-
-    const raw = completed
-      ? await getCompletedMatches(roundId)
+    const rawPromise = completed
+      ? getCompletedMatches(roundId)
       : schedule
-        ? await getScheduleMatches(roundId)
+        ? getScheduleMatches(roundId)
         : upcoming
-          ? await getUpcomingMatches(roundId)
-          : await getAllMatches(roundId);
+          ? getUpcomingMatches(roundId)
+          : getAllMatches(roundId);
+    const [user, raw] = await Promise.all([
+      getCurrentUser(),
+      rawPromise,
+    ]);
 
     if ((schedule || upcoming || completed) && paginated) {
       const { items, meta } = paginateSchedule(raw, page, pageSize);

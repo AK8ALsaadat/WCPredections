@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
 type UsageMatch = {
@@ -7,6 +8,12 @@ type UsageMatch = {
   awayTeamId: string;
   matchTime: Date;
   stageName: string | null;
+};
+
+export type UsageRoundScope = {
+  key: string;
+  matchIds: string[];
+  databaseRoundId: string;
 };
 
 function stageKey(stageName: string | null): string {
@@ -46,30 +53,48 @@ export function buildUsageRoundKey(
   return `${match.roundId}:group-gameweek:${gameweek}`;
 }
 
-export async function getUsageRoundScope(matchId: string) {
-  const match = await prisma.match.findUniqueOrThrow({
-    where: { id: matchId },
-    select: {
-      id: true,
-      roundId: true,
-      homeTeamId: true,
-      awayTeamId: true,
-      matchTime: true,
-      stageName: true,
-    },
-  });
+const usageMatchSelect = {
+  id: true,
+  roundId: true,
+  homeTeamId: true,
+  awayTeamId: true,
+  matchTime: true,
+  stageName: true,
+} as const;
 
-  const roundMatches = await prisma.match.findMany({
-    where: { roundId: match.roundId },
-    select: {
-      id: true,
-      roundId: true,
-      homeTeamId: true,
-      awayTeamId: true,
-      matchTime: true,
-      stageName: true,
-    },
-  });
+const getCachedUsageMatch = unstable_cache(
+  (matchId: string) =>
+    prisma.match.findUniqueOrThrow({
+      where: { id: matchId },
+      select: usageMatchSelect,
+    }),
+  ["usage-match-v2"],
+  { revalidate: 300, tags: ["matches-schedule"] }
+);
+
+const getCachedUsageRoundMatches = unstable_cache(
+  (roundId: string) =>
+    prisma.match.findMany({
+      where: { roundId },
+      select: usageMatchSelect,
+    }),
+  ["usage-round-matches-v2"],
+  { revalidate: 300, tags: ["matches-schedule"] }
+);
+
+export async function getUsageRoundScope(
+  matchId: string,
+  knownRoundId?: string
+): Promise<UsageRoundScope> {
+  const matchPromise = getCachedUsageMatch(matchId);
+  const [match, knownRoundMatches] = await Promise.all([
+    matchPromise,
+    knownRoundId
+      ? getCachedUsageRoundMatches(knownRoundId)
+      : Promise.resolve(null),
+  ]);
+  const roundMatches =
+    knownRoundMatches ?? (await getCachedUsageRoundMatches(match.roundId));
   const key = buildUsageRoundKey(match, roundMatches);
   const matchIds = roundMatches
     .filter((candidate) => buildUsageRoundKey(candidate, roundMatches) === key)

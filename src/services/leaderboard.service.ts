@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { getTournamentRoundName } from "@/lib/rounds";
 import { getTournamentRound } from "@/services/match.service";
 import type { LeaderboardEntry } from "@/types";
-import { getUserTotalPoints } from "@/services/user-points.service";
 
 export { getUserTotalPoints } from "@/services/user-points.service";
 
@@ -254,11 +253,12 @@ export async function getRoundLeaderboardStats(
 
 /** بيانات الرئيسية — استعلامات مجمّعة ومخزّنة مؤقتاً */
 export async function getDashboardData(userId: string) {
-  const [tournamentRound, totalPoints, overall] = await Promise.all([
+  const [tournamentRound, overall] = await Promise.all([
     getTournamentRound(),
-    getUserTotalPoints(userId),
     getOverallLeaderboard({ withTrend: true }),
   ]);
+  const totalPoints =
+    overall.find((entry) => entry.userId === userId)?.points ?? 0;
 
   return {
     tournamentRound,
