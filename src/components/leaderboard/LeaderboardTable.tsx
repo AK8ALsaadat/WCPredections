@@ -56,18 +56,40 @@ function pointsTone(points: number) {
   return "text-muted";
 }
 
-function RankBadge({ rank }: { rank: number }) {
+function RankBadge({
+  rank,
+  relegated = false,
+}: {
+  rank: number;
+  relegated?: boolean;
+}) {
   return (
     <span
       className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black shadow-inner ${
-        rank === 2
-          ? "border border-slate-200/30 bg-gradient-to-br from-slate-200/20 to-slate-500/10 text-slate-100"
-          : rank === 3
-            ? "border border-orange-300/30 bg-gradient-to-br from-orange-300/20 to-orange-700/10 text-orange-300"
-            : "border border-card-border bg-background/50 text-muted"
+        relegated
+          ? "border border-red-300/40 bg-gradient-to-br from-red-400/25 to-red-950/50 text-red-100 shadow-[0_0_18px_rgba(239,68,68,0.14)]"
+          : rank === 2
+            ? "border border-slate-200/30 bg-gradient-to-br from-slate-200/20 to-slate-500/10 text-slate-100"
+            : rank === 3
+              ? "border border-orange-300/30 bg-gradient-to-br from-orange-300/20 to-orange-700/10 text-orange-300"
+              : "border border-card-border bg-background/50 text-muted"
       }`}
     >
       {rank}
+    </span>
+  );
+}
+
+function RelegationTag() {
+  const { messages: t } = useI18n();
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-red-300/40 bg-red-500/15 px-2.5 py-1 text-[10px] font-black text-red-100 shadow-[0_0_16px_rgba(239,68,68,0.14)]">
+      <span
+        className="h-1.5 w-1.5 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.9)]"
+        aria-hidden
+      />
+      {t.leaderboard.relegated}
     </span>
   );
 }
@@ -157,54 +179,75 @@ function MobileLeaderboardList({
   highlightUserId,
   showRankTrend,
   pointsLabel,
+  relegatedUserIds,
 }: {
   entries: LeaderboardEntry[];
   highlightUserId?: string;
   showRankTrend?: boolean;
   pointsLabel?: string;
+  relegatedUserIds: Set<string>;
 }) {
   const { messages: t } = useI18n();
 
   return (
     <div className="space-y-2 md:hidden">
-      {entries.map((entry) => (
-        <Link
-          key={entry.userId}
-          href={`/user/${encodeURIComponent(entry.username)}`}
-          prefetch={false}
-          className={`flex items-center gap-3 rounded-xl border px-3 py-3 shadow-sm transition-colors ${
-            entry.userId === highlightUserId
-              ? "border-primary/40 bg-primary/10"
-              : entry.rank === 2
-                ? "border-slate-300/30 bg-gradient-to-l from-slate-300/[0.08] to-card"
-                : entry.rank === 3
-                  ? "border-orange-400/30 bg-gradient-to-l from-orange-400/[0.07] to-card"
-                  : "border-card-border bg-card"
-          }`}
-        >
-          <div className="min-w-0 flex-1 text-end">
-            <div className="flex min-w-0 items-center justify-end gap-2">
-              <span className="truncate font-semibold">{entry.username}</span>
-              <RankBadge rank={entry.rank} />
-            </div>
-            {showRankTrend && (
-              <div className="mt-0.5">
-                <RankTrend change={entry.rankChange} />
-              </div>
+      {entries.map((entry) => {
+        const isRelegated = relegatedUserIds.has(entry.userId);
+        const isMe = entry.userId === highlightUserId;
+
+        return (
+          <Link
+            key={entry.userId}
+            href={`/user/${encodeURIComponent(entry.username)}`}
+            prefetch={false}
+            className={`relative flex items-center gap-3 overflow-hidden rounded-xl border px-3 py-3 shadow-sm transition-colors ${
+              isRelegated
+                ? `border-red-400/45 bg-gradient-to-l from-red-950/75 via-red-950/35 to-card hover:border-red-300/60 ${
+                    isMe ? "ring-1 ring-primary/60" : ""
+                  }`
+                : isMe
+                  ? "border-primary/40 bg-primary/10"
+                  : entry.rank === 2
+                    ? "border-slate-300/30 bg-gradient-to-l from-slate-300/[0.08] to-card"
+                    : entry.rank === 3
+                      ? "border-orange-400/30 bg-gradient-to-l from-orange-400/[0.07] to-card"
+                      : "border-card-border bg-card"
+            }`}
+          >
+            {isRelegated && (
+              <span className="absolute inset-y-0 end-0 w-1 bg-gradient-to-b from-red-300 via-red-500 to-red-900" />
             )}
-          </div>
-          <div className="shrink-0 text-start">
-            <p className="text-[10px] text-muted">
-              {pointsLabel ?? t.leaderboard.points}
-            </p>
-            <p
-              className={`text-lg font-black tabular-nums ${pointsTone(entry.points)}`}
-            >
-              {entry.points}
-            </p>
-          </div>
-        </Link>
-      ))}
+            <div className="min-w-0 flex-1 text-end">
+              <div className="flex min-w-0 items-center justify-end gap-2">
+                {isRelegated && <RelegationTag />}
+                <span className="truncate font-semibold">{entry.username}</span>
+                <RankBadge rank={entry.rank} relegated={isRelegated} />
+              </div>
+              {showRankTrend && (
+                <div className="mt-0.5">
+                  <RankTrend change={entry.rankChange} />
+                </div>
+              )}
+            </div>
+            <div className="shrink-0 text-start">
+              <p
+                className={`text-[10px] ${
+                  isRelegated ? "text-red-200/70" : "text-muted"
+                }`}
+              >
+                {pointsLabel ?? t.leaderboard.points}
+              </p>
+              <p
+                className={`text-lg font-black tabular-nums ${
+                  isRelegated ? "text-red-200" : pointsTone(entry.points)
+                }`}
+              >
+                {entry.points}
+              </p>
+            </div>
+          </Link>
+        );
+      })}
     </div>
   );
 }
@@ -216,12 +259,14 @@ export function LeaderboardTable({
   pointsLabel,
   labels,
   realtimeEndpoint,
+  showRelegationZone = false,
 }: {
   entries: LeaderboardEntry[];
   highlightUserId?: string;
   showRankTrend?: boolean;
   pointsLabel?: string;
   realtimeEndpoint?: string;
+  showRelegationZone?: boolean;
   labels?: {
     rank: string;
     trend: string;
@@ -293,6 +338,11 @@ export function LeaderboardTable({
 
   const leader = liveEntries[0];
   const remainingEntries = liveEntries.slice(1);
+  const relegatedUserIds = new Set(
+    showRelegationZone && liveEntries.length > 3
+      ? liveEntries.slice(-3).map((entry) => entry.userId)
+      : []
+  );
 
   return (
     <div className="space-y-4">
@@ -308,6 +358,7 @@ export function LeaderboardTable({
         highlightUserId={highlightUserId}
         showRankTrend={showRankTrend}
         pointsLabel={pointsLabel}
+        relegatedUserIds={relegatedUserIds}
       />
 
       {remainingEntries.length > 0 && (
@@ -329,43 +380,55 @@ export function LeaderboardTable({
               </tr>
             </thead>
             <tbody>
-              {remainingEntries.map((entry) => (
-                <tr
-                  key={entry.userId}
-                  className={`border-b border-card-border/40 transition-colors ${
-                    entry.userId === highlightUserId
-                      ? "bg-primary/10"
-                      : entry.rank === 2
-                        ? "bg-slate-300/[0.04] hover:bg-slate-300/[0.08]"
-                        : entry.rank === 3
-                          ? "bg-orange-400/[0.035] hover:bg-orange-400/[0.075]"
-                          : "hover:bg-card-border/15"
-                  }`}
-                >
-                  {showRankTrend && (
-                    <td className="px-3 py-3 text-center">
-                      <RankTrend change={entry.rankChange} />
-                    </td>
-                  )}
-                  <td className="px-5 py-3 font-medium">
-                    <div className="flex items-center justify-end gap-3">
-                      <Link
-                        href={`/user/${encodeURIComponent(entry.username)}`}
-                        prefetch={false}
-                        className="font-semibold text-foreground transition-colors hover:text-primary"
-                      >
-                        {entry.username}
-                      </Link>
-                      <RankBadge rank={entry.rank} />
-                    </div>
-                  </td>
-                  <td
-                    className={`px-5 py-3 text-start text-lg font-black tabular-nums ${pointsTone(entry.points)}`}
+              {remainingEntries.map((entry) => {
+                const isRelegated = relegatedUserIds.has(entry.userId);
+                const isMe = entry.userId === highlightUserId;
+
+                return (
+                  <tr
+                    key={entry.userId}
+                    className={`border-b transition-colors ${
+                      isRelegated
+                        ? `border-red-400/20 bg-gradient-to-l from-red-950/70 via-red-950/25 to-transparent hover:from-red-900/70 ${
+                            isMe ? "outline outline-1 -outline-offset-1 outline-primary/60" : ""
+                          }`
+                        : isMe
+                          ? "border-card-border/40 bg-primary/10"
+                          : entry.rank === 2
+                            ? "border-card-border/40 bg-slate-300/[0.04] hover:bg-slate-300/[0.08]"
+                            : entry.rank === 3
+                              ? "border-card-border/40 bg-orange-400/[0.035] hover:bg-orange-400/[0.075]"
+                              : "border-card-border/40 hover:bg-card-border/15"
+                    }`}
                   >
-                    {entry.points}
-                  </td>
-                </tr>
-              ))}
+                    {showRankTrend && (
+                      <td className="px-3 py-3 text-center">
+                        <RankTrend change={entry.rankChange} />
+                      </td>
+                    )}
+                    <td className="px-5 py-3 font-medium">
+                      <div className="flex items-center justify-end gap-3">
+                        {isRelegated && <RelegationTag />}
+                        <Link
+                          href={`/user/${encodeURIComponent(entry.username)}`}
+                          prefetch={false}
+                          className="font-semibold text-foreground transition-colors hover:text-primary"
+                        >
+                          {entry.username}
+                        </Link>
+                        <RankBadge rank={entry.rank} relegated={isRelegated} />
+                      </div>
+                    </td>
+                    <td
+                      className={`px-5 py-3 text-start text-lg font-black tabular-nums ${
+                        isRelegated ? "text-red-200" : pointsTone(entry.points)
+                      }`}
+                    >
+                      {entry.points}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Card>

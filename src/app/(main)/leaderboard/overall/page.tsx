@@ -39,6 +39,7 @@ export default async function OverallLeaderboardPage() {
         realtimeEndpoint="/api/leaderboard/overall"
         highlightUserId={user?.userId}
         showRankTrend
+        showRelegationZone
         labels={{
           rank: t.leaderboard.rank,
           trend: t.leaderboard.trend,
