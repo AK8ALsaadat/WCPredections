@@ -1062,14 +1062,18 @@ export default function PredictPage() {
                     <span className="font-medium text-foreground">
                       {match.homeTeam.shortName}:{" "}
                     </span>
-                    {budget.homeTotal} / {predHome} {t.predict.goalsUnit}
+                    {budget.homeTotal} / {budget.homeTarget}{" "}
+                    {t.predict.goalsUnit}
                     {budget.homeExceeded && (
                       <span className="mr-1 font-bold"> — {t.predict.exceeded}</span>
                     )}
                     {!budget.homeExceeded && budget.homeIncomplete && predHome > 0 && (
                       <span className="mr-1 font-bold">
                         {" "}
-                        — {t.predict.scorersRemaining(predHome - budget.homeTotal)}
+                        —{" "}
+                        {t.predict.scorersRemaining(
+                          budget.homeTarget - budget.homeTotal
+                        )}
                       </span>
                     )}
                     {!budget.homeExceeded && budget.homeComplete && predHome > 0 && (
@@ -1090,14 +1094,18 @@ export default function PredictPage() {
                     <span className="font-medium text-foreground">
                       {match.awayTeam.shortName}:{" "}
                     </span>
-                    {budget.awayTotal} / {predAway} {t.predict.goalsUnit}
+                    {budget.awayTotal} / {budget.awayTarget}{" "}
+                    {t.predict.goalsUnit}
                     {budget.awayExceeded && (
                       <span className="mr-1 font-bold"> — {t.predict.exceeded}</span>
                     )}
                     {!budget.awayExceeded && budget.awayIncomplete && predAway > 0 && (
                       <span className="mr-1 font-bold">
                         {" "}
-                        — {t.predict.scorersRemaining(predAway - budget.awayTotal)}
+                        —{" "}
+                        {t.predict.scorersRemaining(
+                          budget.awayTarget - budget.awayTotal
+                        )}
                       </span>
                     )}
                     {!budget.awayExceeded && budget.awayComplete && predAway > 0 && (

@@ -1,6 +1,9 @@
 import { buildExpectedLineup } from "../src/lib/expected-lineup";
 import {
+  canAddScorer,
+  getScorerBudgetStatus,
   maxGoalsForPlayer,
+  pruneScorerPicksToBudget,
   type ScorerPicks,
 } from "../src/lib/scorer-prediction";
 import { playerNamesMatch } from "../src/lib/player-matching";
@@ -100,6 +103,49 @@ check(
     compactAttackDistance("4-4-2") === 28
 );
 
+const formation352Players = [
+  { id: "352-gk", name: "GK", position: "Goalkeeper", section: "lineup" as const },
+  ...Array.from({ length: 3 }, (_, index) => ({
+    id: `352-d${index}`,
+    name: `D${index}`,
+    position: "Defender",
+    section: "lineup" as const,
+  })),
+  ...Array.from({ length: 5 }, (_, index) => ({
+    id: `352-m${index}`,
+    name: `M${index}`,
+    position: "Midfielder",
+    section: "lineup" as const,
+  })),
+  ...Array.from({ length: 2 }, (_, index) => ({
+    id: `352-a${index}`,
+    name: `A${index}`,
+    position: "Forward",
+    section: "lineup" as const,
+  })),
+];
+const backThree = layoutFormation(formation352Players, "3-5-2", "home")
+  .filter((slot) => slot.player.position === "Defender")
+  .sort((left, right) => left.x - right.x);
+check(
+  "three defenders stay compact in 3-5-2",
+  backThree.length === 3 && backThree[2].x - backThree[0].x === 52
+);
+const grid352 = formation352Players.map((player, index) => {
+  if (index === 0) return { ...player, grid: "1:1" };
+  if (index <= 3) return { ...player, grid: `2:${index}` };
+  if (index <= 8) return { ...player, grid: `3:${index - 3}` };
+  return { ...player, grid: `4:${index - 8}` };
+});
+const gridBackThree = layoutFormation(grid352, "3-5-2", "home")
+  .filter((slot) => slot.player.position === "Defender")
+  .sort((left, right) => left.x - right.x);
+check(
+  "official 3-5-2 grid keeps the back three compact",
+  gridBackThree.length === 3 &&
+    gridBackThree[2].x - gridBackThree[0].x === 52
+);
+
 const fiveHome = new Set(["h1", "h2", "h3", "h4", "h5"]);
 const oneAway = new Set(["a1"]);
 const fiveScorers: ScorerPicks = {
@@ -123,6 +169,43 @@ check(
     5,
     1
   ) === 1
+);
+const highScoreHome = new Set(["h1", "h2", "h3"]);
+const cappedHighScore = { h1: 3, h2: 2 };
+const highScoreBudget = getScorerBudgetStatus(
+  cappedHighScore,
+  highScoreHome,
+  oneAway,
+  8,
+  0
+);
+check(
+  "large team score caps predicted scorer goals at five",
+  highScoreBudget.homeTarget === 5 &&
+    highScoreBudget.homeComplete &&
+    maxGoalsForPlayer(
+      cappedHighScore,
+      "h1",
+      highScoreHome,
+      oneAway,
+      8,
+      0
+    ) === 3 &&
+    !canAddScorer(
+      cappedHighScore,
+      "h3",
+      highScoreHome,
+      oneAway,
+      8,
+      0
+    ) &&
+    pruneScorerPicksToBudget(
+      { h1: 6 },
+      highScoreHome,
+      oneAway,
+      8,
+      0
+    ).h1 === 5
 );
 
 check(

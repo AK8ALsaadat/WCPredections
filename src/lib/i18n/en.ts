@@ -289,7 +289,7 @@ export const en = {
     scoreFirstHint: "Set the score first, then pick scorers",
     scorerPrediction: "Scorer prediction",
     scorerHint:
-      "Each team's scorer goals must exactly match your predicted score (e.g. 2-1 → 2 home goals + 1 away goal) — shootout goals don't count",
+      "Assign goals to predicted scorers, capped at 5 scorer goals per team even when your score is higher — shootout goals don't count",
     scorerHintNoGoals: "0-0 score — no scorers needed",
     scorerLimitHint: (perTeam: number, total: number) =>
       `Max ${perTeam} players per team, and ${total} players total for the match`,
@@ -299,16 +299,16 @@ export const en = {
       `You've reached the max (${max}) for this team`,
     scorerTotalLimitReached: (max: number) =>
       `You've reached the max number of scorers (${max}) for this match`,
-    scorersRequired: "Pick scorers matching your predicted score",
+    scorersRequired: "Pick scorers within the five-goal team cap",
     scorersIncomplete:
-      "Each team's total scorer goals must exactly match your prediction — not less, not more",
+      "Complete each team's scorer goals, capped at 5 goals per team",
     scorersComplete: "Complete",
     scorersRemaining: (n: number) =>
       n === 1 ? "1 goal left" : `${n} goals left`,
     scorersNeedLineup:
       "Your score has goals — wait for lineup or change the score to save",
     scorersExceeded:
-      "Too many scorers or too many goals for a team's predicted score",
+      "Too many scorers or scorer goals for one of the teams",
     goalsUnit: "goals",
     exceeded: "over limit",
     selectedScorers: "Selected scorers",

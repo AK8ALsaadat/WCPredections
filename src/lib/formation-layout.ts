@@ -55,12 +55,17 @@ function spreadLine(
   players: MatchPlayerView[],
   y: number,
   lineIndex: number,
-  lineCount: number
+  lineCount: number,
+  formationRows: number[]
 ) {
   const isTwoPlayerAttack = players.length === 2 && lineIndex === lineCount - 1;
-  return isTwoPlayerAttack
-    ? spreadRow(players, y, 36, 64)
-    : spreadFormationRow(players, y);
+  const isCompactBackThree =
+    players.length === 3 &&
+    lineIndex === 0 &&
+    formationRows.join("-") === "3-5-2";
+  if (isTwoPlayerAttack) return spreadRow(players, y, 36, 64);
+  if (isCompactBackThree) return spreadRow(players, y, 24, 76);
+  return spreadFormationRow(players, y);
 }
 
 function isGoalkeeper(player: MatchPlayerView) {
@@ -132,13 +137,21 @@ export function layoutFromGrid(
   for (const { row, col } of parsed) {
     columnsByRow.set(row, Math.max(columnsByRow.get(row) ?? 0, col));
   }
+  const orderedRows = [...columnsByRow.entries()].sort(
+    ([left], [right]) => left - right
+  );
+  const is352Grid =
+    orderedRows.map(([, columns]) => columns).join("-") === "1-3-5-2";
+  const defenseRow = orderedRows[1]?.[0];
 
   const slots: PitchSlot[] = [];
   for (const { player, row, col } of parsed) {
     const columns = columnsByRow.get(row) ?? 1;
     const isTwoPlayerAttack = columns === 2 && row === maxRow;
-    const xMin = isTwoPlayerAttack ? 36 : 10;
-    const xMax = isTwoPlayerAttack ? 64 : 90;
+    const isCompactBackThree =
+      is352Grid && columns === 3 && row === defenseRow;
+    const xMin = isTwoPlayerAttack ? 36 : isCompactBackThree ? 24 : 10;
+    const xMax = isTwoPlayerAttack ? 64 : isCompactBackThree ? 76 : 90;
     const x =
       columns === 1 ? 50 : xMin + ((col - 1) / (columns - 1)) * (xMax - xMin);
     const rowNorm = maxRow === 1 ? 0 : (row - 1) / (maxRow - 1);
@@ -190,7 +203,7 @@ export function layoutFormation(
       const y =
         homeLineYs?.[lineIndex] ??
         12 + ((lineIndex + 1) / (lines.length + 1)) * 36;
-      slots.push(...spreadLine(players, y, lineIndex, lines.length));
+      slots.push(...spreadLine(players, y, lineIndex, lines.length, rows));
     });
     return slots;
   }
@@ -200,7 +213,7 @@ export function layoutFormation(
       const y =
         awayLineYs?.[lineIndex] ??
         88 - ((lineIndex + 1) / (lines.length + 1)) * 36;
-    slots.push(...spreadLine(players, y, lineIndex, lines.length));
+    slots.push(...spreadLine(players, y, lineIndex, lines.length, rows));
   });
   return slots;
 }

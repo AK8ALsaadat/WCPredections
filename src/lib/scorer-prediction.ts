@@ -8,6 +8,16 @@ export const MAX_SCORERS_PER_TEAM = 3;
 /** أقصى عدد لاعبين إجمالي (المنتخبين معاً) يقدر اليوزر يختارهم كهدافين */
 export const MAX_SCORERS_TOTAL = 5;
 
+/** أقصى مجموع أهداف يمكن توزيعه على هدافي منتخب واحد */
+export const MAX_PREDICTED_SCORER_GOALS_PER_TEAM = 5;
+
+export function scorerGoalTarget(predictedGoals: number) {
+  return Math.min(
+    Math.max(0, predictedGoals),
+    MAX_PREDICTED_SCORER_GOALS_PER_TEAM
+  );
+}
+
 export function buildPlayerTeamSets(lineup: {
   homePlayers: MatchPlayerView[];
   awayPlayers: MatchPlayerView[];
@@ -70,8 +80,8 @@ export function canAddScorer(
   const isAway = awayPlayerIds.has(playerId);
   if (!isHome && !isAway) return false;
 
-  const pred = isHome ? predHome : predAway;
-  if (pred <= 0) return false;
+  const target = scorerGoalTarget(isHome ? predHome : predAway);
+  if (target <= 0) return false;
 
   const { homeCount, awayCount } = countTeamScorers(
     picks,
@@ -79,7 +89,7 @@ export function canAddScorer(
     awayPlayerIds
   );
   const teamCount = isHome ? homeCount : awayCount;
-  if (teamCount >= pred) return false;
+  if (teamCount >= target) return false;
 
   if (teamCount >= MAX_SCORERS_PER_TEAM) return false;
   if (homeCount + awayCount >= MAX_SCORERS_TOTAL) return false;
@@ -90,7 +100,7 @@ export function canAddScorer(
     awayPlayerIds
   );
   const teamTotal = isHome ? homeTotal : awayTotal;
-  return teamTotal + 1 <= pred;
+  return teamTotal + 1 <= target;
 }
 
 export function maxGoalsForPlayer(
@@ -102,7 +112,7 @@ export function maxGoalsForPlayer(
   predAway: number
 ) {
   const isHome = homePlayerIds.has(playerId);
-  const pred = isHome ? predHome : predAway;
+  const target = scorerGoalTarget(isHome ? predHome : predAway);
   const { homeTotal, awayTotal } = computeTeamGoalTotals(
     picks,
     homePlayerIds,
@@ -110,7 +120,7 @@ export function maxGoalsForPlayer(
   );
   const teamTotal = isHome ? homeTotal : awayTotal;
   const current = picks[playerId] ?? 1;
-  return Math.max(1, pred - (teamTotal - current));
+  return Math.max(1, target - (teamTotal - current));
 }
 
 function trimTeamPicks(
@@ -119,21 +129,22 @@ function trimTeamPicks(
   predGoals: number
 ): ScorerPicks {
   const next = { ...picks };
+  const target = scorerGoalTarget(predGoals);
   const teamIds = Object.keys(next).filter((id) => teamPlayerIds.has(id));
 
   for (const id of teamIds) {
-    if (predGoals <= 0) delete next[id];
+    if (target <= 0) delete next[id];
   }
 
   let ids = Object.keys(next).filter((id) => teamPlayerIds.has(id));
-  while (ids.length > predGoals) {
+  while (ids.length > target) {
     const removeId = ids.pop()!;
     delete next[removeId];
   }
 
   ids = Object.keys(next).filter((id) => teamPlayerIds.has(id));
   let total = ids.reduce((sum, id) => sum + (next[id] ?? 1), 0);
-  while (total > predGoals && ids.length > 0) {
+  while (total > target && ids.length > 0) {
     const lastId = ids[ids.length - 1];
     if ((next[lastId] ?? 1) > 1) {
       next[lastId]--;
@@ -208,19 +219,27 @@ export function getScorerBudgetStatus(
     awayPlayerIds
   );
 
-  const homeGoalsExceeded = homeTotal > predHome;
-  const awayGoalsExceeded = awayTotal > predAway;
-  const homeScorersExceeded = homeCount > predHome;
-  const awayScorersExceeded = awayCount > predAway;
+  const homeTarget = scorerGoalTarget(predHome);
+  const awayTarget = scorerGoalTarget(predAway);
+  const homeGoalsExceeded = homeTotal > homeTarget;
+  const awayGoalsExceeded = awayTotal > awayTarget;
+  const homeScorersExceeded = homeCount > homeTarget;
+  const awayScorersExceeded = awayCount > awayTarget;
 
-  const homeIncomplete = predHome > 0 && homeTotal < predHome;
-  const awayIncomplete = predAway > 0 && awayTotal < predAway;
+  const homeIncomplete = homeTarget > 0 && homeTotal < homeTarget;
+  const awayIncomplete = awayTarget > 0 && awayTotal < awayTarget;
   const homeComplete =
-    predHome === 0 ? homeTotal === 0 && homeCount === 0 : homeTotal === predHome;
+    homeTarget === 0
+      ? homeTotal === 0 && homeCount === 0
+      : homeTotal === homeTarget;
   const awayComplete =
-    predAway === 0 ? awayTotal === 0 && awayCount === 0 : awayTotal === predAway;
+    awayTarget === 0
+      ? awayTotal === 0 && awayCount === 0
+      : awayTotal === awayTarget;
 
   return {
+    homeTarget,
+    awayTarget,
     homeTotal,
     awayTotal,
     homeCount,

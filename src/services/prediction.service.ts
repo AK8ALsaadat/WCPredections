@@ -4,8 +4,10 @@ import { resolveScorerGoalsForPlayer } from "@/lib/player-matching";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason, isPredictionAllowed } from "@/lib/utils";
 import {
+  MAX_PREDICTED_SCORER_GOALS_PER_TEAM,
   MAX_SCORERS_PER_TEAM,
   MAX_SCORERS_TOTAL,
+  scorerGoalTarget,
 } from "@/lib/scorer-prediction";
 import type { LeagueMatchPredictionRow } from "@/types";
 import { calculateBoldScorerBetPointsForMatch } from "@/services/bold-scorer-bet.service";
@@ -202,15 +204,17 @@ async function validateScorerPicks(
       awayScorers++;
     }
   }
+  const homeTarget = scorerGoalTarget(predHome);
+  const awayTarget = scorerGoalTarget(predAway);
 
-  if (homeScorers > predHome) {
+  if (homeScorers > homeTarget) {
     throw new Error(
-      `عدد هدافي ${match.homeTeam.shortName} (${homeScorers}) زاد عن أهدافه المتوقعة (${predHome})`
+      `عدد هدافي ${match.homeTeam.shortName} (${homeScorers}) زاد عن الحد (${homeTarget})`
     );
   }
-  if (awayScorers > predAway) {
+  if (awayScorers > awayTarget) {
     throw new Error(
-      `عدد هدافي ${match.awayTeam.shortName} (${awayScorers}) زاد عن أهدافه المتوقعة (${predAway})`
+      `عدد هدافي ${match.awayTeam.shortName} (${awayScorers}) زاد عن الحد (${awayTarget})`
     );
   }
 
@@ -230,25 +234,25 @@ async function validateScorerPicks(
     );
   }
 
-  if (homeGoals > predHome) {
+  if (homeGoals > homeTarget) {
     throw new Error(
-      `أهداف ${match.homeTeam.shortName} (${homeGoals}) زادت عن النتيجة المتوقعة (${predHome})`
+      `أهداف هدافي ${match.homeTeam.shortName} (${homeGoals}) زادت عن الحد ${MAX_PREDICTED_SCORER_GOALS_PER_TEAM}`
     );
   }
-  if (awayGoals > predAway) {
+  if (awayGoals > awayTarget) {
     throw new Error(
-      `أهداف ${match.awayTeam.shortName} (${awayGoals}) زادت عن النتيجة المتوقعة (${predAway})`
+      `أهداف هدافي ${match.awayTeam.shortName} (${awayGoals}) زادت عن الحد ${MAX_PREDICTED_SCORER_GOALS_PER_TEAM}`
     );
   }
 
-  if (predHome > 0 && homeGoals !== predHome) {
+  if (homeTarget > 0 && homeGoals !== homeTarget) {
     throw new Error(
-      `لازم توزّع ${predHome} ${predHome === 1 ? "هدف" : "أهداف"} على هدافي ${match.homeTeam.shortName} (حالياً ${homeGoals})`
+      `لازم توزّع ${homeTarget} ${homeTarget === 1 ? "هدف" : "أهداف"} على هدافي ${match.homeTeam.shortName} (حالياً ${homeGoals})`
     );
   }
-  if (predAway > 0 && awayGoals !== predAway) {
+  if (awayTarget > 0 && awayGoals !== awayTarget) {
     throw new Error(
-      `لازم توزّع ${predAway} ${predAway === 1 ? "هدف" : "أهداف"} على هدافي ${match.awayTeam.shortName} (حالياً ${awayGoals})`
+      `لازم توزّع ${awayTarget} ${awayTarget === 1 ? "هدف" : "أهداف"} على هدافي ${match.awayTeam.shortName} (حالياً ${awayGoals})`
     );
   }
   if (predHome === 0 && homeGoals > 0) {
