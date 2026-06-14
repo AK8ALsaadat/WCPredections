@@ -159,6 +159,75 @@ check(
   gridBackThree.length === 3 &&
     gridBackThree[2].x - gridBackThree[0].x === 52
 );
+const spainBackFour = layoutFormation(
+  [
+    {
+      id: "unai",
+      name: "Unai Simon",
+      position: "Goalkeeper",
+      section: "lineup" as const,
+      grid: "1",
+    },
+    {
+      id: "laporte",
+      name: "Aymeric Laporte",
+      position: "Center Left Defender",
+      section: "lineup" as const,
+      grid: "6",
+    },
+    {
+      id: "cubarsi",
+      name: "Pau Cubarsi",
+      position: "Center Right Defender",
+      section: "lineup" as const,
+      grid: "5",
+    },
+    {
+      id: "cucurella",
+      name: "Marc Cucurella",
+      position: "Left Back",
+      section: "lineup" as const,
+      grid: "3",
+    },
+    {
+      id: "llorente",
+      name: "Marcos Llorente",
+      position: "Right Back",
+      section: "lineup" as const,
+      grid: "2",
+    },
+    ...Array.from({ length: 3 }, (_, index) => ({
+      id: `spain-m${index}`,
+      name: `M${index}`,
+      position: "Midfielder",
+      section: "lineup" as const,
+    })),
+    ...Array.from({ length: 3 }, (_, index) => ({
+      id: `spain-a${index}`,
+      name: `A${index}`,
+      position: "Forward",
+      section: "lineup" as const,
+    })),
+  ],
+  "4-3-3",
+  "home"
+);
+const spainDefenderXs = new Map(
+  spainBackFour
+    .filter((slot) =>
+      ["laporte", "cubarsi", "cucurella", "llorente"].includes(
+        slot.player.id
+      )
+    )
+    .map((slot) => [slot.player.id, slot.x])
+);
+check(
+  "fullbacks stay outside Spain center backs",
+  spainDefenderXs.get("llorente") === 10 &&
+    spainDefenderXs.get("cubarsi")! > 10 &&
+    spainDefenderXs.get("laporte")! < 90 &&
+    spainDefenderXs.get("cucurella") === 90
+);
 const formation343Players = formation352Players.map((player, index) => {
   if (index >= 4 && index <= 7) {
     return { ...player, id: `343-m${index}`, position: "Midfielder" };
@@ -175,6 +244,79 @@ check(
   "three defenders stay compact in 3-4-3",
   backThree343.length === 3 &&
     backThree343[2].x - backThree343[0].x === 52
+);
+const wingback343 = layoutFormation(
+  [
+    {
+      id: "343-gk",
+      name: "GK",
+      position: "Goalkeeper",
+      section: "lineup" as const,
+    },
+    {
+      id: "343-lwb",
+      name: "LWB",
+      position: "Left Back",
+      section: "lineup" as const,
+      grid: "3",
+    },
+    {
+      id: "343-rcb",
+      name: "RCB",
+      position: "Center Right Defender",
+      section: "lineup" as const,
+      grid: "5",
+    },
+    {
+      id: "343-rwb",
+      name: "RWB",
+      position: "Right Back",
+      section: "lineup" as const,
+      grid: "2",
+    },
+    {
+      id: "343-cb",
+      name: "CB",
+      position: "Center Defender",
+      section: "lineup" as const,
+      grid: "4",
+    },
+    {
+      id: "343-lcb",
+      name: "LCB",
+      position: "Center Left Defender",
+      section: "lineup" as const,
+      grid: "6",
+    },
+    ...Array.from({ length: 2 }, (_, index) => ({
+      id: `343-mid${index}`,
+      name: `M${index}`,
+      position: "Center Midfielder",
+      section: "lineup" as const,
+    })),
+    ...Array.from({ length: 3 }, (_, index) => ({
+      id: `343-forward${index}`,
+      name: `F${index}`,
+      position: "Forward",
+      section: "lineup" as const,
+    })),
+  ],
+  "3-4-3",
+  "home"
+);
+const backThreeIds = wingback343
+  .filter((slot) => slot.y === 18)
+  .map((slot) => slot.player.id);
+const wingbackSlots = wingback343.filter((slot) =>
+  ["343-lwb", "343-rwb"].includes(slot.player.id)
+);
+check(
+  "3-4-3 keeps center backs in defense and wingbacks on midfield edges",
+  backThreeIds.length === 3 &&
+    backThreeIds.every((id) => ["343-lcb", "343-cb", "343-rcb"].includes(id)) &&
+    wingbackSlots.every((slot) => slot.y === 31) &&
+    Math.min(...wingbackSlots.map((slot) => slot.x)) === 10 &&
+    Math.max(...wingbackSlots.map((slot) => slot.x)) === 90
 );
 
 const probableBench = mergeProbableBenchWithCurrentRoster(

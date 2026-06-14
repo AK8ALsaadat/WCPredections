@@ -75,12 +75,27 @@ function isGoalkeeper(player: MatchPlayerView) {
 
 function positionRank(player: MatchPlayerView) {
   const position = (player.position ?? "").toLowerCase();
-  if (
+  const gridPlace = /^\d+$/.test(player.grid ?? "")
+    ? Number.parseInt(player.grid!, 10)
+    : null;
+  const isDefender =
     position.includes("def") ||
     position.includes("back") ||
-    position.includes("sweeper")
-  ) return 0;
-  if (position.includes("mid")) return 1;
+    position.includes("sweeper");
+
+  if (isDefender) {
+    const isFullback =
+      (position.includes("back") ||
+        position.includes("left") ||
+        position.includes("right")) &&
+      !position.includes("center") &&
+      !position.includes("central");
+    if (isFullback || gridPlace === 2 || gridPlace === 3) return 0.5;
+    return 0;
+  }
+  if (position.includes("defensive") && position.includes("mid")) return 1;
+  if (position.includes("attack") && position.includes("mid")) return 3;
+  if (position.includes("mid")) return 2;
   if (
     position.includes("attack") ||
     position.includes("forward") ||
@@ -89,9 +104,54 @@ function positionRank(player: MatchPlayerView) {
     position.includes("striker") ||
     position.includes("wing")
   ) {
-    return 2;
+    return 4;
   }
-  return 3;
+  return 5;
+}
+
+function horizontalRoleRank(player: MatchPlayerView) {
+  const position = (player.position ?? "").toLowerCase();
+  const isLeft = position.includes("left");
+  const isRight = position.includes("right");
+  const isCenter =
+    position.includes("center") || position.includes("central");
+
+  if (isLeft) return isCenter ? 1 : 0;
+  if (isRight) return isCenter ? 3 : 4;
+  if (isCenter) return 2;
+
+  // ESPN formationPlace values are tactical roles rather than coordinates.
+  // Use them only to order players within a formation row.
+  if (/^\d+$/.test(player.grid ?? "")) {
+    const place = Number.parseInt(player.grid!, 10);
+    if (place === 3 || place === 8 || place === 11) return 0;
+    if (place === 6) return 1;
+    if (place === 1 || place === 4 || place === 9) return 2;
+    if (place === 5) return 3;
+    if (place === 2 || place === 7 || place === 10) return 4;
+  }
+
+  return 2;
+}
+
+function sortFormationLine(
+  players: MatchPlayerView[],
+  side: "home" | "away"
+) {
+  return players
+    .map((player, index) => ({
+      player,
+      index,
+      rank: horizontalRoleRank(player),
+    }))
+    .sort((left, right) => {
+      const rankDifference =
+        side === "home"
+          ? right.rank - left.rank
+          : left.rank - right.rank;
+      return rankDifference || left.index - right.index;
+    })
+    .map(({ player }) => player);
 }
 
 function sortStartersByRole(starters: MatchPlayerView[]) {
@@ -203,7 +263,15 @@ export function layoutFormation(
       const y =
         homeLineYs?.[lineIndex] ??
         12 + ((lineIndex + 1) / (lines.length + 1)) * 36;
-      slots.push(...spreadLine(players, y, lineIndex, lines.length, rows));
+      slots.push(
+        ...spreadLine(
+          sortFormationLine(players, side),
+          y,
+          lineIndex,
+          lines.length,
+          rows
+        )
+      );
     });
     return slots;
   }
@@ -213,7 +281,15 @@ export function layoutFormation(
       const y =
         awayLineYs?.[lineIndex] ??
         88 - ((lineIndex + 1) / (lines.length + 1)) * 36;
-    slots.push(...spreadLine(players, y, lineIndex, lines.length, rows));
+    slots.push(
+      ...spreadLine(
+        sortFormationLine(players, side),
+        y,
+        lineIndex,
+        lines.length,
+        rows
+      )
+    );
   });
   return slots;
 }
