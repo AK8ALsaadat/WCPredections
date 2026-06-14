@@ -39,6 +39,10 @@ check(
   playerNamesMatch("Vinícius Jr.", "Vinicius Junior")
 );
 check(
+  "players sharing only a surname stay distinct",
+  !playerNamesMatch("Enner Valencia", "Anthony Valencia")
+);
+check(
   "Turkey and Turkiye share one match identity",
   matchIdentityKey("Turkey", "Australia") ===
     matchIdentityKey("Türkiye", "Australia")

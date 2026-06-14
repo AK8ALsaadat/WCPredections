@@ -18,6 +18,7 @@ import {
 import { fetchWikidataPlayerPhotos } from "@/services/wikidata-player-photos.service";
 import {
   normalizePlayerName,
+  playerNamesMatch,
   resolvePlayerInSquad,
 } from "@/lib/player-matching";
 
@@ -519,11 +520,11 @@ async function ensureExternalPlayersInDatabase(
         (candidate) =>
           normalizePlayerName(candidate.name) ===
           normalizePlayerName(external.name)
-      );
+    );
     if (duplicateExternal) return false;
-    return !resolvePlayerInSquad(squad, {
-      playerName: external.name,
-    });
+    return !squad.some((player) =>
+      playerNamesMatch(player.name, external.name)
+    );
   });
 
   if (missing.length === 0) return squad;
