@@ -16,7 +16,7 @@ export function TeamLogo({ name, shortName, logoUrl, size = "md" }: TeamLogoProp
   
   // محاولة استخدام العلم الرسمي أولاً
   const flagUrl = getFlagUrl(name) || getFlagUrl(shortName);
-  const finalLogoUrl = logoUrl || flagUrl;
+  const finalLogoUrl = flagUrl || logoUrl;
 
   if (finalLogoUrl) {
     return (

@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getTournamentRoundName } from "@/lib/rounds";
 import { getTournamentRound } from "@/services/match.service";
 import type { LeaderboardEntry } from "@/types";
+import { getUserTotalPoints } from "@/services/user-points.service";
+
+export { getUserTotalPoints } from "@/services/user-points.service";
 
 type PointsRow = { username: string; points: number };
 
@@ -305,34 +308,3 @@ export async function getCurrentSubRound() {
 
 /** @deprecated Use getCurrentSubRound */
 export const getCurrentGameweek = getCurrentSubRound;
-
-export async function getUserTotalPoints(userId: string): Promise<number> {
-  const [predictionAgg, scorerAgg, boldAgg] = await Promise.all([
-    prisma.prediction.aggregate({
-      where: { userId },
-      _sum: {
-        points: true,
-        doubleBonus: true,
-        finishTypePoints: true,
-        penaltyWinnerPoints: true,
-      },
-    }),
-    prisma.scorerPrediction.aggregate({
-      where: { userId },
-      _sum: { points: true },
-    }),
-    prisma.boldScorerBet.aggregate({
-      where: { userId },
-      _sum: { points: true },
-    }),
-  ]);
-
-  return (
-    (predictionAgg._sum.points ?? 0) +
-    (predictionAgg._sum.doubleBonus ?? 0) +
-    (predictionAgg._sum.finishTypePoints ?? 0) +
-    (predictionAgg._sum.penaltyWinnerPoints ?? 0) +
-    (scorerAgg._sum.points ?? 0) +
-    (boldAgg._sum.points ?? 0)
-  );
-}

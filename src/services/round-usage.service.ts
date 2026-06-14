@@ -2,8 +2,13 @@ import { getBoldScorerBetStatus } from "@/services/bold-scorer-bet.service";
 import { MAX_DOUBLES_PER_ROUND } from "@/services/prediction.service";
 import { prisma } from "@/lib/prisma";
 import { getUsageRoundScope } from "@/services/usage-round.service";
+import {
+  getUserTotalPoints,
+  MIN_POINTS_FOR_BOLD_SCORER_BET,
+} from "@/services/user-points.service";
 
 export const MAX_BOLD_SCORER_BETS_PER_ROUND = 1;
+export { MIN_POINTS_FOR_BOLD_SCORER_BET } from "@/services/user-points.service";
 
 export async function getRoundUsageLimits(
   userId: string,
@@ -13,7 +18,7 @@ export async function getRoundUsageLimits(
   const scope = await getUsageRoundScope(matchId);
   const resolvedRoundId = roundId ?? scope.databaseRoundId;
 
-  const [roundPredictions, boldStatus] = await Promise.all([
+  const [roundPredictions, boldStatus, totalPoints] = await Promise.all([
     prisma.prediction.findMany({
       where: {
         userId,
@@ -22,7 +27,9 @@ export async function getRoundUsageLimits(
       select: { matchId: true, isDouble: true },
     }),
     getBoldScorerBetStatus(userId, matchId),
+    getUserTotalPoints(userId),
   ]);
+  const hasBoldPoints = totalPoints >= MIN_POINTS_FOR_BOLD_SCORER_BET;
 
   const doubleOnThisMatch =
     roundPredictions.find((prediction) => prediction.matchId === matchId)
@@ -47,7 +54,12 @@ export async function getRoundUsageLimits(
       max: MAX_BOLD_SCORER_BETS_PER_ROUND,
       onThisMatch: boldStatus.onThisMatch,
       onOtherMatch: boldStatus.onOtherMatch,
-      canUse: !boldStatus.used || boldStatus.onThisMatch,
+      canUse:
+        boldStatus.onThisMatch ||
+        (hasBoldPoints && !boldStatus.used),
+      hasMinimumPoints: hasBoldPoints,
+      minimumPoints: MIN_POINTS_FOR_BOLD_SCORER_BET,
+      userPoints: totalPoints,
       otherMatchId: boldStatus.otherMatchId,
       playerName: boldStatus.bet?.playerName ?? null,
       playerId: boldStatus.bet?.playerId ?? null,

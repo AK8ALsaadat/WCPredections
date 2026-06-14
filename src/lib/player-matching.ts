@@ -1,9 +1,17 @@
 export function normalizePlayerName(name: string): string {
   return name
+    .replace(/[ıİ]/g, "i")
+    .replace(/[łŁ]/g, "l")
+    .replace(/[đĐ]/g, "d")
+    .replace(/[øØ]/g, "o")
+    .replace(/[æÆ]/g, "ae")
+    .replace(/[œŒ]/g, "oe")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^0-9a-z\s]+/g, " ")
+    .replace(/\bjr\b/g, "junior")
+    .replace(/\b(?:filho|neto)\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -110,6 +110,9 @@ type MatchData = {
       onThisMatch: boolean;
       onOtherMatch: boolean;
       canUse: boolean;
+      hasMinimumPoints: boolean;
+      minimumPoints: number;
+      userPoints: number;
       otherMatchId: string | null;
       playerName: string | null;
     };
@@ -547,6 +550,19 @@ export default function PredictPage() {
 
   function handleBoldToggle(checked: boolean) {
     const limits = match?.roundUsageLimits?.boldScorer;
+    if (
+      checked &&
+      limits &&
+      !limits.hasMinimumPoints &&
+      !limits.onThisMatch
+    ) {
+      setError(
+        locale === "ar"
+          ? `تحتاج ${limits.minimumPoints} نقاط على الأقل لاستخدام الرهان`
+          : `You need at least ${limits.minimumPoints} points to use the scorer bet`
+      );
+      return;
+    }
     if (checked && limits && !limits.canUse && !limits.onThisMatch) {
       setError(t.predict.boldExhausted);
       return;
@@ -882,6 +898,10 @@ export default function PredictPage() {
               <span>
                 {boldLimits.onThisMatch && boldLimits.playerName
                   ? t.predict.boldUsedHere(boldLimits.playerName)
+                  : !boldLimits.hasMinimumPoints
+                    ? locale === "ar"
+                      ? `يتطلب ${boldLimits.minimumPoints} نقاط (نقاطك ${boldLimits.userPoints})`
+                      : `Requires ${boldLimits.minimumPoints} points (${boldLimits.userPoints} now)`
                   : boldLimits.onOtherMatch
                     ? t.predict.boldExhausted
                     : t.predict.boldAvailable}

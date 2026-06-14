@@ -422,7 +422,7 @@ export function PitchLineup({
       </div>
 
       <div className="overflow-x-auto pb-2">
-      <div className="relative mx-auto min-w-[520px] max-w-3xl overflow-hidden rounded-2xl border border-emerald-600/40 shadow-inner">
+      <div className="relative mx-auto min-w-[620px] max-w-3xl overflow-hidden rounded-2xl border border-emerald-600/40 shadow-inner">
         <div className="relative aspect-[4/5] w-full bg-gradient-to-b from-emerald-700 via-emerald-600 to-emerald-700">
           <div className="absolute inset-3 rounded-xl border-2 border-white/25" />
           <div className="absolute left-3 right-3 top-1/2 border-t-2 border-white/25" />

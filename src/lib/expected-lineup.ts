@@ -7,14 +7,7 @@ type SquadPlayer = {
 
 export const EXPECTED_FORMATION = "4-3-3";
 
-const EXPECTED_SLOTS = {
-  gk: 1,
-  def: 4,
-  mid: 3,
-  att: 3,
-} as const;
-
-type PositionBucket = keyof typeof EXPECTED_SLOTS | "other";
+type PositionBucket = "gk" | "def" | "mid" | "att" | "other";
 
 function getPositionBucket(position?: string | null): PositionBucket {
   const p = (position ?? "").toLowerCase();
@@ -32,8 +25,30 @@ function getPositionBucket(position?: string | null): PositionBucket {
   return "other";
 }
 
-/** تشكيلة متوقعة 4-3-3 من قائمة المنتخب */
-export function buildExpectedLineup(squad: SquadPlayer[]) {
+/** تشكيلة متوقعة من قائمة المنتخب مع الحفاظ على آخر خطة معروفة. */
+function formationSlots(formation?: string | null) {
+  const rows = (formation ?? EXPECTED_FORMATION)
+    .split("-")
+    .map((value) => Number.parseInt(value, 10))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  const valid =
+    rows.length >= 2 &&
+    rows.reduce((sum, value) => sum + value, 0) === 10;
+  const selected = valid ? rows : [4, 3, 3];
+
+  return {
+    formation: selected.join("-"),
+    def: selected[0],
+    mid: selected.slice(1, -1).reduce((sum, value) => sum + value, 0),
+    att: selected[selected.length - 1],
+  };
+}
+
+export function buildExpectedLineup(
+  squad: SquadPlayer[],
+  formation?: string | null
+) {
+  const slots = formationSlots(formation);
   const buckets: Record<PositionBucket, SquadPlayer[]> = {
     gk: [],
     def: [],
@@ -52,10 +67,10 @@ export function buildExpectedLineup(squad: SquadPlayer[]) {
     lineup.push(...taken);
   };
 
-  pick("gk", EXPECTED_SLOTS.gk);
-  pick("def", EXPECTED_SLOTS.def);
-  pick("mid", EXPECTED_SLOTS.mid);
-  pick("att", EXPECTED_SLOTS.att);
+  pick("gk", 1);
+  pick("def", slots.def);
+  pick("mid", slots.mid);
+  pick("att", slots.att);
 
   if (lineup.length < 11) {
     const remaining = [
@@ -74,7 +89,7 @@ export function buildExpectedLineup(squad: SquadPlayer[]) {
   const bench = squad.filter((p) => !usedIds.has(p.id));
 
   return {
-    formation: EXPECTED_FORMATION,
+    formation: slots.formation,
     lineup,
     bench,
   };

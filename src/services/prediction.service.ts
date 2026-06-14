@@ -11,6 +11,10 @@ import type { LeagueMatchPredictionRow } from "@/types";
 import { calculateBoldScorerBetPointsForMatch } from "@/services/bold-scorer-bet.service";
 import { getUsageRoundScope } from "@/services/usage-round.service";
 import {
+  getUserTotalPoints,
+  MIN_POINTS_FOR_BOLD_SCORER_BET,
+} from "@/services/user-points.service";
+import {
   calculateDoubleBonus,
   calculateFinishTypePoints,
   calculatePenaltyWinnerPoints,
@@ -27,14 +31,11 @@ import {
 
 export const MAX_DOUBLES_PER_ROUND = 2;
 
-const LEGACY_BASE_SCORER_PREDICTION_IDS = new Set([
-  "cmq9m49xg000jjr046zbmcy8a",
-]);
-
 export function shouldIgnorePositionMultiplierForScorerPrediction(
   scorerPredictionId: string
 ): boolean {
-  return LEGACY_BASE_SCORER_PREDICTION_IDS.has(scorerPredictionId);
+  void scorerPredictionId;
+  return false;
 }
 
 export async function countDoublesUsedInRound(
@@ -445,6 +446,15 @@ export async function submitMatchPredictionBundle(
       },
     },
   });
+
+  if (data.boldPlayerId && !storedBold) {
+    const totalPoints = await getUserTotalPoints(userId);
+    if (totalPoints < MIN_POINTS_FOR_BOLD_SCORER_BET) {
+      throw new Error(
+        `You need at least ${MIN_POINTS_FOR_BOLD_SCORER_BET} points to use the scorer bet`
+      );
+    }
+  }
 
   // ✅ منع استخدام الـ Double والـ Bold معاً على نفس المباراة
   if (isDouble && data.boldPlayerId) {

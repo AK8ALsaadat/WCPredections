@@ -6,6 +6,10 @@ import {
   calculateBoldScorerBetPoints,
 } from "@/services/scoring.service";
 import { getUsageRoundScope } from "@/services/usage-round.service";
+import {
+  getUserTotalPoints,
+  MIN_POINTS_FOR_BOLD_SCORER_BET,
+} from "@/services/user-points.service";
 
 export { BOLD_SCORER_POINTS };
 
@@ -94,6 +98,15 @@ export async function submitBoldScorerBet(
     // allow cancellation prior to lock (lockReason was checked above)
     await prisma.boldScorerBet.delete({ where: { id: existing.id } });
     return null;
+  }
+
+  if (!existing) {
+    const totalPoints = await getUserTotalPoints(userId);
+    if (totalPoints < MIN_POINTS_FOR_BOLD_SCORER_BET) {
+      throw new Error(
+        `You need at least ${MIN_POINTS_FOR_BOLD_SCORER_BET} points to use the scorer bet`
+      );
+    }
   }
 
   if (existing?.matchId === matchId && existing.playerId !== playerId) {

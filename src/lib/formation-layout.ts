@@ -48,7 +48,7 @@ function spreadFormationRow(players: MatchPlayerView[], y: number) {
 
   return isCompactMidfield
     ? spreadRow(players, y, 24, 76)
-    : spreadRow(players, y, 8, 92);
+    : spreadRow(players, y, 10, 90);
 }
 
 function isGoalkeeper(player: MatchPlayerView) {
@@ -113,7 +113,7 @@ export function layoutFromGrid(
   const slots: PitchSlot[] = [];
   for (const { player, row, col } of parsed) {
     const columns = columnsByRow.get(row) ?? 1;
-    const x = columns === 1 ? 50 : 8 + ((col - 1) / (columns - 1)) * 84;
+    const x = columns === 1 ? 50 : 10 + ((col - 1) / (columns - 1)) * 80;
     const rowNorm = maxRow === 1 ? 0 : (row - 1) / (maxRow - 1);
 
     const y =
@@ -134,6 +134,9 @@ export function layoutFormation(
   side: "home" | "away"
 ): PitchSlot[] {
   const starters = lineup.slice(0, 11);
+  const gridSlots = layoutFromGrid(starters, side);
+  if (gridSlots) return gridSlots;
+
   const { gk, outfield } = sortStartersByRole(starters);
   const rows = parseFormation(formation);
 

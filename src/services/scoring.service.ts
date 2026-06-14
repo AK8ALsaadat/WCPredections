@@ -233,7 +233,15 @@ export type PlayerPositionType = "Attacker" | "Midfielder" | "Defender" | null |
 export function getPositionPointsMultiplier(position: PlayerPositionType): number {
   if (!position) return 1;
   const lower = position.toLowerCase();
-  if (lower.includes("attacker") || lower.includes("forward") || lower.includes("striker")) return 1;
+  if (
+    lower.includes("attacker") ||
+    lower.includes("attack") ||
+    lower.includes("forward") ||
+    lower.includes("striker") ||
+    lower.includes("offence") ||
+    lower.includes("offense") ||
+    lower.includes("winger")
+  ) return 1;
   if (lower.includes("midfielder") || lower.includes("mid")) return 2;
   if (lower.includes("defender") || lower.includes("defence") || lower.includes("defense")) return 3;
   return 1;

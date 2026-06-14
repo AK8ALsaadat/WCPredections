@@ -10,6 +10,10 @@ import { FootballDataProvider } from "./football-data.provider";
 import { SportScoreProvider } from "./sportscore.provider";
 import type { ExternalMatch, FootballApiProvider, SyncOptions } from "./types";
 import { resolveFootballApiProviderName } from "./types";
+import {
+  matchIdentityKey,
+  normalizeTeamIdentity,
+} from "@/lib/team-identity";
 
 export function getFootballApiProvider(): FootballApiProvider {
   const provider = resolveFootballApiProviderName();
@@ -121,11 +125,18 @@ async function resolveTeamId(
   }
 
   if (fallback?.name) {
-    const byName = await prisma.team.findFirst({
-      where: {
-        name: { equals: fallback.name, mode: "insensitive" },
-      },
+    const exactName = await prisma.team.findFirst({
+      where: { name: { equals: fallback.name, mode: "insensitive" } },
     });
+    const targetIdentity = normalizeTeamIdentity(fallback.name);
+    const candidates =
+      exactName || !targetIdentity ? [] : await prisma.team.findMany();
+    const byName =
+      exactName ??
+      candidates.find(
+        (candidate) =>
+          normalizeTeamIdentity(candidate.name) === targetIdentity
+      );
     if (byName) {
       await prisma.team.update({
         where: { id: byName.id },
@@ -282,7 +293,7 @@ export async function reconcileDuplicateMatchesInRound(roundId: string) {
 
   const byPair = new Map<string, typeof matches>();
   for (const m of matches) {
-    const key = `${m.homeTeam.name.toLowerCase()}|${m.awayTeam.name.toLowerCase()}`;
+    const key = matchIdentityKey(m.homeTeam.name, m.awayTeam.name);
     const list = byPair.get(key) ?? [];
     list.push(m);
     byPair.set(key, list);

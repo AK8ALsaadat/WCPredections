@@ -254,7 +254,7 @@ ok(
 );
 ok(
   "استثناء توقع مدافع danger التاريخي من مضاعف المركز",
-  shouldIgnorePositionMultiplierForScorerPrediction(
+  !shouldIgnorePositionMultiplierForScorerPrediction(
     "cmq9m49xg000jjr046zbmcy8a"
   ) &&
     !shouldIgnorePositionMultiplierForScorerPrediction("new-prediction")
