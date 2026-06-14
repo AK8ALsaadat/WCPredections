@@ -190,7 +190,7 @@ function PlayerDot({
       onClick={onToggle}
       disabled={!selected && !selectable}
       style={style}
-      className={`absolute z-10 flex w-[88px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 transition-transform sm:w-[104px] ${
+      className={`absolute z-10 flex w-[58px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 transition-transform sm:w-[88px] sm:gap-1 md:w-[104px] ${
         !selected && !selectable
           ? "cursor-not-allowed opacity-45"
           : "hover:scale-105"
@@ -198,7 +198,7 @@ function PlayerDot({
     >
       <span className="relative">
         <span
-          className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full text-xs font-bold shadow-lg ${
+          className={`relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold shadow-lg sm:h-11 sm:w-11 sm:text-xs ${
             selected
               ? "bg-primary text-white ring-2 ring-white"
               : gk
@@ -206,7 +206,7 @@ function PlayerDot({
                 : "bg-white/95 text-emerald-900"
           }`}
         >
-          <span className="flex h-full w-full items-center justify-center text-[14px] font-black text-emerald-950">
+          <span className="flex h-full w-full items-center justify-center text-[11px] font-black text-emerald-950 sm:text-[14px]">
             {player.shirtNumber ?? positionFallback(player.position)}
           </span>
           <PlayerPortrait
@@ -215,18 +215,18 @@ function PlayerDot({
             enabled={showPhotos}
           />
         </span>
-        <span className="absolute -bottom-1 -left-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-white/70 bg-emerald-950 px-1 text-[9px] font-black text-white">
+        <span className="absolute -bottom-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-white/70 bg-emerald-950 px-0.5 text-[8px] font-black text-white sm:h-5 sm:min-w-5 sm:px-1 sm:text-[9px]">
           {player.shirtNumber ?? positionFallback(player.position)}
         </span>
         {selected && goals > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-0.5 text-[9px] font-bold text-black">
+          <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-warning px-0.5 text-[8px] font-bold text-black sm:h-4 sm:min-w-4 sm:text-[9px]">
             {goals}
           </span>
         )}
       </span>
       <span
         title={player.name}
-        className={`line-clamp-2 min-h-7 max-w-[88px] rounded-md px-1.5 py-0.5 text-center text-[10px] font-semibold leading-3 shadow-sm sm:max-w-[104px] sm:text-[11px] ${
+        className={`line-clamp-2 min-h-5 max-w-[58px] rounded px-1 py-0.5 text-center text-[8px] font-semibold leading-[10px] shadow-sm sm:min-h-7 sm:max-w-[88px] sm:rounded-md sm:px-1.5 sm:text-[10px] sm:leading-3 md:max-w-[104px] md:text-[11px] ${
           selected ? "bg-primary/90 text-white" : "bg-black/50 text-white"
         }`}
       >
@@ -448,43 +448,42 @@ export function PitchLineup({
         <p className="text-sm text-muted">{labels.hint}</p>
       </div>
 
-      <div className="overflow-x-auto pb-2">
-      <div className="relative mx-auto min-w-[620px] max-w-3xl overflow-hidden rounded-2xl border border-emerald-600/40 shadow-inner">
-        <div className="relative aspect-[4/5] w-full bg-gradient-to-b from-emerald-700 via-emerald-600 to-emerald-700">
-          <div className="absolute inset-3 rounded-xl border-2 border-white/25" />
-          <div className="absolute left-3 right-3 top-1/2 border-t-2 border-white/25" />
-          <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/25" />
-          <div className="absolute left-1/2 top-3 h-14 w-36 -translate-x-1/2 rounded-b-lg border-2 border-t-0 border-white/20" />
-          <div className="absolute bottom-3 left-1/2 h-14 w-36 -translate-x-1/2 rounded-t-lg border-2 border-b-0 border-white/20" />
+      <div className="relative mx-auto w-full max-w-3xl overflow-hidden rounded-xl border border-emerald-600/40 shadow-inner sm:rounded-2xl">
+        <div className="relative aspect-[3/5] w-full bg-gradient-to-b from-emerald-700 via-emerald-600 to-emerald-700 sm:aspect-[4/5]">
+          <div className="absolute inset-2 rounded-lg border border-white/25 sm:inset-3 sm:rounded-xl sm:border-2" />
+          <div className="absolute left-2 right-2 top-1/2 border-t border-white/25 sm:left-3 sm:right-3 sm:border-t-2" />
+          <div className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/25 sm:h-20 sm:w-20 sm:border-2" />
+          <div className="absolute left-1/2 top-2 h-10 w-24 -translate-x-1/2 rounded-b-lg border border-t-0 border-white/20 sm:top-3 sm:h-14 sm:w-36 sm:border-2 sm:border-t-0" />
+          <div className="absolute bottom-2 left-1/2 h-10 w-24 -translate-x-1/2 rounded-t-lg border border-b-0 border-white/20 sm:bottom-3 sm:h-14 sm:w-36 sm:border-2 sm:border-b-0" />
 
-          <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
-            <span className="rounded bg-black/40 px-2 py-1 text-xs font-semibold text-white">
+          <div className="absolute left-2 top-2 flex max-w-[72%] flex-wrap items-center gap-1 sm:left-3 sm:top-3 sm:gap-2">
+            <span className="rounded bg-black/40 px-1.5 py-0.5 text-[9px] font-semibold text-white sm:px-2 sm:py-1 sm:text-xs">
               {home.shortName}
             </span>
             <span
-              className={`rounded px-2 py-0.5 text-[10px] ${sourceBadgeClass(home.source)}`}
+              className={`rounded px-1.5 py-0.5 text-[8px] sm:px-2 sm:text-[10px] ${sourceBadgeClass(home.source)}`}
             >
               {sourceBadgeLabel(home.source, labels)}
             </span>
             {home.formation && (
-              <span className="text-[10px] text-white/80">
+              <span className="text-[8px] text-white/80 sm:text-[10px]">
                 {labels.formation} {home.formation}
               </span>
             )}
           </div>
 
-          <div className="absolute bottom-3 right-3 flex flex-wrap items-center justify-end gap-2">
+          <div className="absolute bottom-2 right-2 flex max-w-[72%] flex-wrap items-center justify-end gap-1 sm:bottom-3 sm:right-3 sm:gap-2">
             {away.formation && (
-              <span className="text-[10px] text-white/80">
+              <span className="text-[8px] text-white/80 sm:text-[10px]">
                 {labels.formation} {away.formation}
               </span>
             )}
             <span
-              className={`rounded px-2 py-0.5 text-[10px] ${sourceBadgeClass(away.source)}`}
+              className={`rounded px-1.5 py-0.5 text-[8px] sm:px-2 sm:text-[10px] ${sourceBadgeClass(away.source)}`}
             >
               {sourceBadgeLabel(away.source, labels)}
             </span>
-            <span className="rounded bg-black/40 px-2 py-1 text-xs font-semibold text-white">
+            <span className="rounded bg-black/40 px-1.5 py-0.5 text-[9px] font-semibold text-white sm:px-2 sm:py-1 sm:text-xs">
               {away.shortName}
             </span>
           </div>
@@ -521,7 +520,6 @@ export function PitchLineup({
             />
           ))}
         </div>
-      </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
