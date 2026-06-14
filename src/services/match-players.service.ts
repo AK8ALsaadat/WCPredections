@@ -7,8 +7,14 @@ import {
   fetchProbableLineupFromApiFootball,
   type ExternalLineupPlayer,
 } from "@/services/api-football-lineup.service";
-import { fetchLastEspnLineup } from "@/services/espn-roster.service";
-import { normalizePlayerName } from "@/lib/player-matching";
+import {
+  fetchEspnRoster,
+  fetchLastEspnLineup,
+} from "@/services/espn-roster.service";
+import {
+  normalizePlayerName,
+  resolvePlayerInSquad,
+} from "@/lib/player-matching";
 
 const EXPECTED_LINEUP_CACHE_MS = 60 * 60 * 1000;
 const TEAM_PLAYERS_CACHE_MS = 30 * 60 * 1000;
@@ -361,9 +367,53 @@ async function mapProbableLineupByName(
   teamId: string,
   formation: string | null,
   lineup: ExternalLineupPlayer[],
-  bench: ExternalLineupPlayer[]
+  bench: ExternalLineupPlayer[],
+  source: LineupSource = "probable"
 ): Promise<TeamPlayersView | null> {
   const squad = await prisma.player.findMany({ where: { teamId } });
+  const externalPlayers = [...lineup, ...bench];
+
+  // New tournament teams may have no locally synced squad yet. Persist the
+  // trusted previous-match roster so predictions always use real Player rows.
+  const missing = externalPlayers.filter((external, index) => {
+    const duplicateExternal = externalPlayers
+      .slice(0, index)
+      .some(
+        (candidate) =>
+          normalizePlayerName(candidate.name) ===
+          normalizePlayerName(external.name)
+      );
+    if (duplicateExternal) return false;
+    return !resolvePlayerInSquad(squad, {
+      playerName: external.name,
+    });
+  });
+
+  if (missing.length > 0) {
+    await prisma.player.createMany({
+      data: missing.map((external) => {
+        const normalized = normalizePlayerName(external.name).replace(
+          /\s+/g,
+          "-"
+        );
+        return {
+          teamId,
+          apiPlayerId: `lineup:${normalized || external.id}`,
+          name: external.name,
+          position: external.position ?? null,
+          shirtNumber: external.shirtNumber ?? null,
+          photoUrl: external.photoUrl ?? null,
+        };
+      }),
+      skipDuplicates: true,
+    });
+    squad.splice(
+      0,
+      squad.length,
+      ...(await prisma.player.findMany({ where: { teamId } }))
+    );
+  }
+
   if (squad.length === 0) return null;
 
   const byFull = new Map(squad.map((p) => [normalizePlayerName(p.name), p]));
@@ -439,7 +489,7 @@ async function mapProbableLineupByName(
   return {
     formation: formation ?? formationFromGrid(lineup),
     players: [...mappedLineup, ...mappedBench],
-    source: "probable",
+    source,
   };
 }
 
@@ -814,7 +864,8 @@ async function syncProbableLineup(
 
 async function syncEstimatedLineup(
   teamId: string,
-  apiTeamId: string
+  apiTeamId: string,
+  teamName: string
 ): Promise<TeamPlayersView> {
   const cacheKey = `${teamId}:${apiTeamId}:estimated`;
   const cached = expectedLineupCache.get(cacheKey);
@@ -828,6 +879,21 @@ async function syncEstimatedLineup(
       where: { teamId },
       orderBy: [{ shirtNumber: "asc" }, { name: "asc" }],
     });
+    if (databasePlayers.length < 11) {
+      const espnRoster = await within(fetchEspnRoster(teamName), 4_000, []);
+      if (espnRoster.length >= 11) {
+        const expected = buildExpectedLineup(espnRoster);
+        const mapped = await mapProbableLineupByName(
+          teamId,
+          expected.formation,
+          expected.lineup,
+          expected.bench,
+          "estimated"
+        );
+        if (mapped) return mapped;
+      }
+    }
+
     const expected = buildExpectedLineup(
       databasePlayers.map((player, index) => ({
         id: index,
@@ -887,7 +953,7 @@ async function syncExpectedLineup(
   );
   if (probable) return probable;
 
-  return syncEstimatedLineup(teamId, apiTeamId);
+  return syncEstimatedLineup(teamId, apiTeamId, teamName);
 }
 
 async function getTeamPlayersForMatch(

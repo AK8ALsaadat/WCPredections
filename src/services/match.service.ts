@@ -459,7 +459,18 @@ export async function getMatchLineup(
     return hit.data;
   }
 
-  const data = await buildFastMatchLineup(matchId);
+  let data: Awaited<ReturnType<typeof buildMatchLineup>> =
+    await buildFastMatchLineup(matchId);
+  const hasCompleteFastLineup =
+    (data?.homePlayers.filter((player) => player.section === "lineup").length ??
+      0) >= 11 &&
+    (data?.awayPlayers.filter((player) => player.section === "lineup").length ??
+      0) >= 11;
+
+  if (!hasCompleteFastLineup) {
+    data = await buildMatchLineup(matchId);
+  }
+
   if (data) {
     matchLineupCache.set(matchId, {
       data,

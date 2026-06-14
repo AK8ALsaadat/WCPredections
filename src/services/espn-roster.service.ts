@@ -12,7 +12,9 @@ type EspnSearchResponse = {
 };
 
 export type EspnRosterPlayer = {
+  id: number;
   name: string;
+  position?: string | null;
   shirtNumber: number;
   photoUrl?: string | null;
 };
@@ -36,6 +38,7 @@ export type EspnPreviousLineup = {
 const ESPN_TEAM_ALIASES: Record<string, string> = {
   turkey: "Türkiye",
   curacao: "Curaçao",
+  "cape verde islands": "Cape Verde",
   usa: "United States",
 };
 
@@ -103,19 +106,26 @@ async function loadEspnRoster(teamName: string): Promise<EspnRosterPlayer[]> {
 
   const data = (await response.json()) as {
     athletes?: {
+      id?: string;
       fullName?: string;
       displayName?: string;
       jersey?: string;
       headshot?: { href?: string };
+      position?: { name?: string };
     }[];
   };
 
   return (data.athletes ?? []).flatMap((athlete) => {
     const name = decodeHtml(athlete.fullName ?? athlete.displayName ?? "");
+    const id = Number.parseInt(athlete.id ?? "", 10);
     const shirtNumber = Number.parseInt(athlete.jersey ?? "", 10);
-    if (!name || !Number.isInteger(shirtNumber)) return [];
+    if (!name || !Number.isInteger(id) || !Number.isInteger(shirtNumber)) {
+      return [];
+    }
     return [{
+      id,
       name,
+      position: athlete.position?.name ?? null,
       shirtNumber,
       photoUrl: athlete.headshot?.href ?? null,
     }];
