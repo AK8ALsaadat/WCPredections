@@ -363,6 +363,7 @@ export const en = {
     rankDown: "Rank dropped since last week",
     leaderTag: "Leader",
     relegated: "Relegated",
+    administrationExemption: "Management exemption",
     username: "Predictor",
     points: "Points",
     empty: "No points yet — be the first to predict!",

@@ -357,6 +357,7 @@ export const ar = {
     rankDown: "تراجع الترتيب عن الأسبوع الماضي",
     leaderTag: "المتصدر",
     relegated: "هابط",
+    administrationExemption: "استثناء من الإدارة",
     username: "المتوقع",
     points: "النقاط",
     empty: "لسه ما فيه نقاط — كن أول واحد يتوقع!",

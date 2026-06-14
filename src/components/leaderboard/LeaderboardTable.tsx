@@ -6,6 +6,7 @@ import type { LeaderboardEntry } from "@/types";
 import { Card } from "@/components/ui/Card";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { clientFetch } from "@/lib/client-fetch";
+import { getRelegationStatus } from "@/lib/leaderboard-relegation";
 
 function CrownIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -59,14 +60,18 @@ function pointsTone(points: number) {
 function RankBadge({
   rank,
   relegated = false,
+  exempt = false,
 }: {
   rank: number;
   relegated?: boolean;
+  exempt?: boolean;
 }) {
   return (
     <span
       className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black shadow-inner ${
-        relegated
+        exempt
+          ? "border border-emerald-200/50 bg-gradient-to-br from-emerald-300/30 via-emerald-500/20 to-emerald-950/60 text-emerald-50 shadow-[0_0_22px_rgba(16,185,129,0.22)]"
+          : relegated
           ? "border border-red-300/40 bg-gradient-to-br from-red-400/25 to-red-950/50 text-red-100 shadow-[0_0_18px_rgba(239,68,68,0.14)]"
           : rank === 2
             ? "border border-slate-200/30 bg-gradient-to-br from-slate-200/20 to-slate-500/10 text-slate-100"
@@ -76,6 +81,20 @@ function RankBadge({
       }`}
     >
       {rank}
+    </span>
+  );
+}
+
+function AdministrationExemptionTag() {
+  const { messages: t } = useI18n();
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/50 bg-emerald-400/15 px-2.5 py-1 text-[10px] font-black text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.2)]">
+      <span
+        className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_9px_rgba(110,231,183,1)]"
+        aria-hidden
+      />
+      {t.leaderboard.administrationExemption}
     </span>
   );
 }
@@ -180,12 +199,14 @@ function MobileLeaderboardList({
   showRankTrend,
   pointsLabel,
   relegatedUserIds,
+  exemptUserIds,
 }: {
   entries: LeaderboardEntry[];
   highlightUserId?: string;
   showRankTrend?: boolean;
   pointsLabel?: string;
   relegatedUserIds: Set<string>;
+  exemptUserIds: Set<string>;
 }) {
   const { messages: t } = useI18n();
 
@@ -193,6 +214,7 @@ function MobileLeaderboardList({
     <div className="space-y-2 md:hidden">
       {entries.map((entry) => {
         const isRelegated = relegatedUserIds.has(entry.userId);
+        const isExempt = exemptUserIds.has(entry.userId);
         const isMe = entry.userId === highlightUserId;
 
         return (
@@ -201,7 +223,11 @@ function MobileLeaderboardList({
             href={`/user/${encodeURIComponent(entry.username)}`}
             prefetch={false}
             className={`relative flex items-center gap-3 overflow-hidden rounded-xl border px-3 py-3 shadow-sm transition-colors ${
-              isRelegated
+              isExempt
+                ? `border-emerald-300/55 bg-gradient-to-l from-emerald-950/80 via-emerald-900/45 to-card shadow-[0_10px_32px_rgba(5,150,105,0.18)] hover:border-emerald-200/70 ${
+                    isMe ? "ring-1 ring-primary/60" : ""
+                  }`
+                : isRelegated
                 ? `border-red-400/45 bg-gradient-to-l from-red-950/75 via-red-950/35 to-card hover:border-red-300/60 ${
                     isMe ? "ring-1 ring-primary/60" : ""
                   }`
@@ -214,14 +240,28 @@ function MobileLeaderboardList({
                       : "border-card-border bg-card"
             }`}
           >
-            {isRelegated && (
-              <span className="absolute inset-y-0 end-0 w-1 bg-gradient-to-b from-red-300 via-red-500 to-red-900" />
+            {(isRelegated || isExempt) && (
+              <span
+                className={`absolute inset-y-0 end-0 w-1 ${
+                  isExempt
+                    ? "bg-gradient-to-b from-emerald-200 via-emerald-400 to-emerald-900"
+                    : "bg-gradient-to-b from-red-300 via-red-500 to-red-900"
+                }`}
+              />
             )}
             <div className="min-w-0 flex-1 text-end">
               <div className="flex min-w-0 items-center justify-end gap-2">
-                {isRelegated && <RelegationTag />}
+                {isExempt ? (
+                  <AdministrationExemptionTag />
+                ) : isRelegated ? (
+                  <RelegationTag />
+                ) : null}
                 <span className="truncate font-semibold">{entry.username}</span>
-                <RankBadge rank={entry.rank} relegated={isRelegated} />
+                <RankBadge
+                  rank={entry.rank}
+                  relegated={isRelegated}
+                  exempt={isExempt}
+                />
               </div>
               {showRankTrend && (
                 <div className="mt-0.5">
@@ -232,14 +272,22 @@ function MobileLeaderboardList({
             <div className="shrink-0 text-start">
               <p
                 className={`text-[10px] ${
-                  isRelegated ? "text-red-200/70" : "text-muted"
+                  isExempt
+                    ? "text-emerald-100/70"
+                    : isRelegated
+                      ? "text-red-200/70"
+                      : "text-muted"
                 }`}
               >
                 {pointsLabel ?? t.leaderboard.points}
               </p>
               <p
                 className={`text-lg font-black tabular-nums ${
-                  isRelegated ? "text-red-200" : pointsTone(entry.points)
+                  isExempt
+                    ? "text-emerald-200"
+                    : isRelegated
+                      ? "text-red-200"
+                      : pointsTone(entry.points)
                 }`}
               >
                 {entry.points}
@@ -338,10 +386,9 @@ export function LeaderboardTable({
 
   const leader = liveEntries[0];
   const remainingEntries = liveEntries.slice(1);
-  const relegatedUserIds = new Set(
-    showRelegationZone && liveEntries.length > 3
-      ? liveEntries.slice(-3).map((entry) => entry.userId)
-      : []
+  const { relegatedUserIds, exemptUserIds } = getRelegationStatus(
+    liveEntries,
+    showRelegationZone
   );
 
   return (
@@ -359,6 +406,7 @@ export function LeaderboardTable({
         showRankTrend={showRankTrend}
         pointsLabel={pointsLabel}
         relegatedUserIds={relegatedUserIds}
+        exemptUserIds={exemptUserIds}
       />
 
       {remainingEntries.length > 0 && (
@@ -382,13 +430,18 @@ export function LeaderboardTable({
             <tbody>
               {remainingEntries.map((entry) => {
                 const isRelegated = relegatedUserIds.has(entry.userId);
+                const isExempt = exemptUserIds.has(entry.userId);
                 const isMe = entry.userId === highlightUserId;
 
                 return (
                   <tr
                     key={entry.userId}
                     className={`border-b transition-colors ${
-                      isRelegated
+                      isExempt
+                        ? `border-emerald-300/25 bg-gradient-to-l from-emerald-950/80 via-emerald-900/35 to-transparent shadow-[inset_4px_0_0_rgba(52,211,153,0.75)] hover:from-emerald-900/80 ${
+                            isMe ? "outline outline-1 -outline-offset-1 outline-primary/60" : ""
+                          }`
+                        : isRelegated
                         ? `border-red-400/20 bg-gradient-to-l from-red-950/70 via-red-950/25 to-transparent hover:from-red-900/70 ${
                             isMe ? "outline outline-1 -outline-offset-1 outline-primary/60" : ""
                           }`
@@ -408,7 +461,11 @@ export function LeaderboardTable({
                     )}
                     <td className="px-5 py-3 font-medium">
                       <div className="flex items-center justify-end gap-3">
-                        {isRelegated && <RelegationTag />}
+                        {isExempt ? (
+                          <AdministrationExemptionTag />
+                        ) : isRelegated ? (
+                          <RelegationTag />
+                        ) : null}
                         <Link
                           href={`/user/${encodeURIComponent(entry.username)}`}
                           prefetch={false}
@@ -416,12 +473,20 @@ export function LeaderboardTable({
                         >
                           {entry.username}
                         </Link>
-                        <RankBadge rank={entry.rank} relegated={isRelegated} />
+                        <RankBadge
+                          rank={entry.rank}
+                          relegated={isRelegated}
+                          exempt={isExempt}
+                        />
                       </div>
                     </td>
                     <td
                       className={`px-5 py-3 text-start text-lg font-black tabular-nums ${
-                        isRelegated ? "text-red-200" : pointsTone(entry.points)
+                        isExempt
+                          ? "text-emerald-200"
+                          : isRelegated
+                            ? "text-red-200"
+                            : pointsTone(entry.points)
                       }`}
                     >
                       {entry.points}
