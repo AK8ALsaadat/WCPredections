@@ -109,6 +109,8 @@ function PredictionScoreboard({
   homeScorers,
   awayScorers,
   allScorers,
+  homeTeamId,
+  awayTeamId,
   scorePoints,
   showResults,
   showMisses,
@@ -120,6 +122,8 @@ function PredictionScoreboard({
   homeScorers: LeagueMatchPredictionRow["scorerPredictions"];
   awayScorers: LeagueMatchPredictionRow["scorerPredictions"];
   allScorers: LeagueMatchPredictionRow["scorerPredictions"];
+  homeTeamId: string;
+  awayTeamId: string;
   scorePoints?: number | null;
   showResults: boolean;
   showMisses: boolean;
@@ -189,16 +193,49 @@ function PredictionScoreboard({
             </div>
           </div>
         ) : (
-          <div className="w-full">
-            <p className="mb-1 hidden text-[10px] font-medium text-muted md:block text-center">Scorers</p>
-            <div className="flex justify-center">
-              <ScorerChips
-                scorers={allScorers}
-                showResults={showResults}
-                showMisses={showMisses}
-              />
-            </div>
-          </div>
+          (() => {
+            const groupedHome = allScorers.filter(s => s.player.teamId === homeTeamId);
+            const groupedAway = allScorers.filter(s => s.player.teamId === awayTeamId);
+            if (groupedHome.length > 0 || groupedAway.length > 0) {
+              return (
+                <div className="grid w-full grid-cols-2 gap-1.5">
+                  <div className="min-w-0">
+                    <div className="mb-1 flex items-center gap-1 md:hidden">
+                      <TeamLogo {...homeTeam} size="sm" />
+                      <span className="truncate text-[10px] font-medium text-muted">
+                        {homeTeam.shortName}
+                      </span>
+                    </div>
+                    <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
+                      {homeTeam.shortName}
+                    </p>
+                    <ScorerChips scorers={groupedHome} showResults={showResults} showMisses={showMisses} />
+                  </div>
+                  <div className="min-w-0 text-end">
+                    <div className="mb-1 flex items-center justify-end gap-1 md:hidden">
+                      <span className="truncate text-[10px] font-medium text-muted">
+                        {awayTeam.shortName}
+                      </span>
+                      <TeamLogo {...awayTeam} size="sm" />
+                    </div>
+                    <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
+                      {awayTeam.shortName}
+                    </p>
+                    <ScorerChips scorers={groupedAway} align="end" showResults={showResults} showMisses={showMisses} />
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="w-full">
+                <p className="mb-1 hidden text-[10px] font-medium text-muted md:block text-center">Scorers</p>
+                <div className="flex justify-center">
+                  <ScorerChips scorers={allScorers} showResults={showResults} showMisses={showMisses} />
+                </div>
+              </div>
+            );
+          })()
         )
       )}
     </div>
@@ -422,6 +459,8 @@ function LeaguePredictionRow({
           homeScorers={homeScorers}
           awayScorers={awayScorers}
           allScorers={row.scorerPredictions}
+          homeTeamId={homeTeamId}
+          awayTeamId={awayTeamId}
           scorePoints={showScoreResults ? row.prediction?.points : undefined}
           showResults={showScorerResults}
           showMisses={isFinished}
