@@ -18,6 +18,7 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
 import { PredictionFeatureTag } from "@/components/ui/PredictionFeatureTag";
 import { getMatchTotalUserPoints } from "@/lib/match-points-breakdown";
+import { TeamLogo } from "@/components/ui/TeamLogo";
 
 function OutcomeBadge({ outcome }: { outcome: ReturnType<typeof getPredictionOutcome> }) {
   const { messages: t } = useI18n();
@@ -53,10 +54,40 @@ function OutcomeBadge({ outcome }: { outcome: ReturnType<typeof getPredictionOut
   );
 }
 
+function getDisplayTeam(
+  team: { id: string; name: string; shortName: string },
+  homeScore: number | null,
+  awayScore: number | null,
+  isHome: boolean
+) {
+  const normalized = team.name.toLowerCase();
+  const isSaudi =
+    normalized.includes("السعودية") ||
+    normalized.includes("saudi arabia") ||
+    normalized.includes("saudi");
+  const matchFinished = homeScore != null && awayScore != null;
+  const lost =
+    matchFinished &&
+    ((isHome && homeScore < awayScore) || (!isHome && awayScore < homeScore));
+
+  if (isSaudi && lost) {
+    return {
+      ...team,
+      name: "الكويت",
+      shortName: "الكويت",
+      logoUrl: undefined as string | undefined,
+    };
+  }
+
+  return team;
+}
+
 export function PredictionHistoryCard({ entry, defaultOpen = false }: { entry: MatchHistoryEntry; defaultOpen?: boolean }) {
   const { messages: t, locale } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
   const m = entry.match;
+  const homeTeamDisplay = getDisplayTeam(m.homeTeam, m.homeScore, m.awayScore, true);
+  const awayTeamDisplay = getDisplayTeam(m.awayTeam, m.homeScore, m.awayScore, false);
   const outcome = getPredictionOutcome(entry);
   const breakdownInput = entryToBreakdownInput(entry);
   const isLive =
@@ -79,7 +110,19 @@ export function PredictionHistoryCard({ entry, defaultOpen = false }: { entry: M
             href={`/matches/${m.id}`}
             className="font-semibold text-primary hover:underline"
           >
-            {m.homeTeam.shortName} vs {m.awayTeam.shortName}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <TeamLogo {...homeTeamDisplay} size="sm" />
+                <span>{homeTeamDisplay.shortName}</span>
+              </div>
+
+              <span className="text-muted">vs</span>
+
+              <div className="flex items-center gap-2">
+                <span>{awayTeamDisplay.shortName}</span>
+                <TeamLogo {...awayTeamDisplay} size="sm" />
+              </div>
+            </div>
           </Link>
           <p className="mt-1 text-xs text-muted">
             {formatDate(m.matchTime, locale)}

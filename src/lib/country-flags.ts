@@ -114,6 +114,8 @@ const COUNTRY_CODES: Record<string, string> = {
   "كوريا الجنوبية": "kr",
   "south korea": "kr",
   "korea": "kr",
+  "الكويت": "kw",
+  "kuwait": "kw",
   
   // Also add some common team names
   "samir": "sa",
