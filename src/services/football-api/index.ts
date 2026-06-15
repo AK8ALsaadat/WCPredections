@@ -126,7 +126,7 @@ async function resolveTeamId(
 
   if (fallback?.name) {
     const exactName = await prisma.team.findFirst({
-      where: { name: { equals: fallback.name, mode: "insensitive" } },
+      where: { name: { equals: fallback.name } },
     });
     const targetIdentity = normalizeTeamIdentity(fallback.name);
     const candidates =
@@ -192,10 +192,10 @@ async function findExistingMatch(
       where: {
         roundId,
         homeTeam: {
-          name: { equals: mapped.homeTeamName, mode: "insensitive" },
+          name: { equals: mapped.homeTeamName },
         },
         awayTeam: {
-          name: { equals: mapped.awayTeamName, mode: "insensitive" },
+          name: { equals: mapped.awayTeamName },
         },
       },
     });

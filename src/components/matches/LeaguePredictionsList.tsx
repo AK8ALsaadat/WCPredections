@@ -109,8 +109,6 @@ function PredictionScoreboard({
   homeScorers,
   awayScorers,
   allScorers,
-  homeTeamId,
-  awayTeamId,
   scorePoints,
   showResults,
   showMisses,
@@ -122,8 +120,6 @@ function PredictionScoreboard({
   homeScorers: LeagueMatchPredictionRow["scorerPredictions"];
   awayScorers: LeagueMatchPredictionRow["scorerPredictions"];
   allScorers: LeagueMatchPredictionRow["scorerPredictions"];
-  homeTeamId: string;
-  awayTeamId: string;
   scorePoints?: number | null;
   showResults: boolean;
   showMisses: boolean;
@@ -131,51 +127,80 @@ function PredictionScoreboard({
   const hasScore = predHome != null && predAway != null;
 
   return (
-    <div className="flex w-full min-w-0 flex-col items-center gap-1.5 md:max-w-xs md:justify-self-center" dir="ltr">
-      <div className="w-full rounded-lg border border-card-border/60 bg-background/30 p-2">
-        <div className="w-full flex items-center justify-center gap-3">
-        <div className="flex flex-col items-center gap-1 min-w-[5rem]">
-          <TeamLogo {...homeTeam} size="sm" />
-          <span className="text-xs font-medium">{homeTeam.shortName}</span>
+    <div
+      className="flex w-full min-w-0 flex-col items-center gap-1.5 md:max-w-xs md:justify-self-center"
+      dir="ltr"
+    >
+      {hasScore ? (
+        <div className="flex items-baseline gap-1.5 tabular-nums tracking-tight">
+          <span className="text-2xl font-bold leading-none">{predHome}</span>
+          <span className="text-sm font-light text-muted">-</span>
+          <span className="text-2xl font-bold leading-none">{predAway}</span>
         </div>
-
-        <div className="flex items-center gap-3">
-          <div className="text-2xl font-bold tabular-nums text-center">{hasScore ? predHome : "—"}</div>
-          <div className="text-sm font-light text-muted">-</div>
-          <div className="text-2xl font-bold tabular-nums text-center">{hasScore ? predAway : "—"}</div>
-        </div>
-
-        <div className="flex flex-col items-center gap-1 min-w-[5rem]">
-          <TeamLogo {...awayTeam} size="sm" />
-          <span className="text-xs font-medium">{awayTeam.shortName}</span>
-        </div>
-      </div>
+      ) : (
+        <span className="text-lg text-muted">—</span>
+      )}
 
       {showResults && scorePoints != null && (
-        <span className={`text-[10px] font-bold ${scorePoints > 0 ? "text-primary" : "text-danger"}`}>
+        <span
+          className={`text-[10px] font-bold ${
+            scorePoints > 0 ? "text-primary" : "text-danger"
+          }`}
+        >
           {scorePoints > 0 ? `✓ +${scorePoints}` : "✗ 0"}
         </span>
       )}
 
-      <div className="w-full mt-2 grid grid-cols-2 gap-2">
-        <div className="flex flex-col items-start">
-          <ScorerChips
-            scorers={homeScorers.length > 0 ? homeScorers : allScorers.filter((s) => s.player.teamId === homeTeamId)}
-            vertical
-            showResults={showResults}
-            showMisses={showMisses}
-          />
-        </div>
-        <div className="flex flex-col items-end">
-          <ScorerChips
-            scorers={awayScorers.length > 0 ? awayScorers : allScorers.filter((s) => s.player.teamId === awayTeamId)}
-            vertical
-            align="end"
-            showResults={showResults}
-            showMisses={showMisses}
-          />
-        </div>
-      </div>
+      {(homeScorers.length > 0 || awayScorers.length > 0 || allScorers.length > 0) && (
+        (homeScorers.length > 0 || awayScorers.length > 0) ? (
+          <div className="grid w-full grid-cols-2 gap-1.5">
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-1 md:hidden">
+                <TeamLogo {...homeTeam} size="sm" />
+                <span className="truncate text-[10px] font-medium text-muted">
+                  {homeTeam.shortName}
+                </span>
+              </div>
+              <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
+                {homeTeam.shortName}
+              </p>
+              <ScorerChips
+                scorers={homeScorers}
+                showResults={showResults}
+                showMisses={showMisses}
+              />
+            </div>
+            <div className="min-w-0 text-end">
+              <div className="mb-1 flex items-center justify-end gap-1 md:hidden">
+                <span className="truncate text-[10px] font-medium text-muted">
+                  {awayTeam.shortName}
+                </span>
+                <TeamLogo {...awayTeam} size="sm" />
+              </div>
+              <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
+                {awayTeam.shortName}
+              </p>
+              <ScorerChips
+                scorers={awayScorers}
+                align="end"
+                showResults={showResults}
+                showMisses={showMisses}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="w-full">
+            <p className="mb-1 hidden text-[10px] font-medium text-muted md:block text-center">Scorers</p>
+            <div className="flex justify-center">
+              <ScorerChips
+                scorers={allScorers}
+                showResults={showResults}
+                showMisses={showMisses}
+              />
+            </div>
+          </div>
+        )
+      )}
     </div>
   );
 }
@@ -185,42 +210,20 @@ function ScorerChips({
   align = "start",
   showResults = false,
   showMisses = false,
-  vertical = false,
 }: {
   scorers: LeagueMatchPredictionRow["scorerPredictions"];
   align?: "start" | "end";
   showResults?: boolean;
   showMisses?: boolean;
-  vertical?: boolean;
 }) {
   if (scorers.length === 0) {
     return <span className="text-xs text-muted/60">—</span>;
   }
 
-  if (vertical) {
-    return (
-      <ul className={`flex flex-col gap-1 ${align === "end" ? "items-end" : "items-start"}`}>
-        {scorers.map((pick) => {
-          const hit = showResults && (pick.points ?? 0) > 0;
-          const miss = showMisses && (pick.points ?? 0) <= 0;
-          return (
-            <li key={pick.player.id} title={pick.player.name} className={`flex items-center gap-1 text-xs ${hit ? "text-primary" : miss ? "text-muted" : "text-foreground/90"}`}>
-              <span className="font-medium">{shortPlayerName(pick.player.name)}</span>
-              {pick.predictedGoals > 1 && <span className="text-[10px] font-bold text-warning">×{pick.predictedGoals}</span>}
-              {showResults && pick.points != null && (
-                <span className={`text-[10px] font-bold ${pick.points > 0 ? "text-primary" : pick.points < 0 ? "text-danger" : "text-muted"}`}>
-                  {pick.points > 0 ? `+${pick.points}` : pick.points}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    );
-  }
-
   return (
-    <div className={`flex flex-wrap gap-1 ${align === "end" ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`flex flex-wrap gap-1 ${align === "end" ? "justify-end" : "justify-start"}`}
+    >
       {scorers.map((pick) => {
         const hit = showResults && (pick.points ?? 0) > 0;
         const miss = showMisses && (pick.points ?? 0) <= 0;
@@ -236,12 +239,26 @@ function ScorerChips({
                   : "bg-card-border/30 text-foreground/80 ring-card-border/50"
             }`}
           >
-            {hit && <span className="text-[10px] font-bold text-primary">✓</span>}
-            {miss && <span className="text-[10px] text-danger">✗</span>}
+            {hit && (
+              <span className="text-[10px] font-bold text-primary">✓</span>
+            )}
+            {miss && (
+              <span className="text-[10px] text-danger">✗</span>
+            )}
             {shortPlayerName(pick.player.name)}
-            {pick.predictedGoals > 1 && <span className="font-bold text-warning">×{pick.predictedGoals}</span>}
+            {pick.predictedGoals > 1 && (
+              <span className="font-bold text-warning">×{pick.predictedGoals}</span>
+            )}
             {showResults && pick.points != null && (
-              <span className={`text-[10px] font-bold ${pick.points > 0 ? "text-primary" : pick.points < 0 ? "text-danger" : "text-muted"}`}>
+              <span
+                className={`text-[10px] font-bold ${
+                  pick.points > 0
+                    ? "text-primary"
+                    : pick.points < 0
+                      ? "text-danger"
+                      : "text-muted"
+                }`}
+              >
                 {pick.points > 0 ? `+${pick.points}` : pick.points}
               </span>
             )}
@@ -252,7 +269,60 @@ function ScorerChips({
   );
 }
 
+function KnockoutExtras({
+  row,
+  homeTeamId,
+  awayTeamId,
+  homeShortName,
+  awayShortName,
+  t,
+}: {
+  row: LeagueMatchPredictionRow;
+  homeTeamId: string;
+  awayTeamId: string;
+  homeShortName: string;
+  awayShortName: string;
+  t: Messages;
+}) {
+  const finishType = asFinishType(row.prediction?.predictedFinishType);
+  const penaltyTeamId = row.prediction?.predictedPenaltyWinnerTeamId;
+  const penaltyShort =
+    penaltyTeamId === homeTeamId
+      ? homeShortName
+      : penaltyTeamId === awayTeamId
+        ? awayShortName
+        : null;
+
+  if (!finishType && !penaltyShort) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-card-border/60 pt-2">
+      {finishType && (
+        <span className="inline-flex items-center gap-1 rounded-lg bg-accent/10 px-2 py-1 text-[11px] text-accent">
+          <span className="text-muted">{t.matches.finishType}:</span>
+          {t.finishType[finishType]}
+        </span>
+      )}
+      {penaltyShort && (
+        <span className="inline-flex items-center gap-1 rounded-lg bg-card-border/50 px-2 py-1 text-[11px]">
+          <span className="text-muted">{t.matches.penaltyWinner}:</span>
+          <span className="font-medium">{penaltyShort}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
 function LeaguePredictionRow({
+  row,
+  index,
+  isMe,
+  isFinished,
+  matchStatus,
+  isKnockout,
+  matchResult,
+  homeTeamId,
+  awayTeamId,
   homeTeam,
   awayTeam,
   homeShortName,
@@ -352,8 +422,6 @@ function LeaguePredictionRow({
           homeScorers={homeScorers}
           awayScorers={awayScorers}
           allScorers={row.scorerPredictions}
-          homeTeamId={homeTeamId}
-          awayTeamId={awayTeamId}
           scorePoints={showScoreResults ? row.prediction?.points : undefined}
           showResults={showScorerResults}
           showMisses={isFinished}

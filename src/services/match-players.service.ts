@@ -544,7 +544,7 @@ async function ensureExternalPlayersInDatabase(
         photoUrl: external.photoUrl ?? null,
       };
     }),
-    skipDuplicates: true,
+    // skipDuplicates not supported in current Prisma typings here; rely on unique constraints
   });
 
   return prisma.player.findMany({ where: { teamId } });
