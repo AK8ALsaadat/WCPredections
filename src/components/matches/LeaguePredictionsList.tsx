@@ -108,6 +108,7 @@ function PredictionScoreboard({
   predAway,
   homeScorers,
   awayScorers,
+  allScorers,
   scorePoints,
   showResults,
   showMisses,
@@ -118,6 +119,7 @@ function PredictionScoreboard({
   predAway?: number;
   homeScorers: LeagueMatchPredictionRow["scorerPredictions"];
   awayScorers: LeagueMatchPredictionRow["scorerPredictions"];
+  allScorers: LeagueMatchPredictionRow["scorerPredictions"];
   scorePoints?: number | null;
   showResults: boolean;
   showMisses: boolean;
@@ -149,42 +151,55 @@ function PredictionScoreboard({
         </span>
       )}
 
-      {(homeScorers.length > 0 || awayScorers.length > 0) && (
-        <div className="grid w-full grid-cols-2 gap-1.5">
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-1 md:hidden">
-              <TeamLogo {...homeTeam} size="sm" />
-              <span className="truncate text-[10px] font-medium text-muted">
+      {(homeScorers.length > 0 || awayScorers.length > 0 || allScorers.length > 0) && (
+        (homeScorers.length > 0 || awayScorers.length > 0) ? (
+          <div className="grid w-full grid-cols-2 gap-1.5">
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-1 md:hidden">
+                <TeamLogo {...homeTeam} size="sm" />
+                <span className="truncate text-[10px] font-medium text-muted">
+                  {homeTeam.shortName}
+                </span>
+              </div>
+              <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
                 {homeTeam.shortName}
-              </span>
+              </p>
+              <ScorerChips
+                scorers={homeScorers}
+                showResults={showResults}
+                showMisses={showMisses}
+              />
             </div>
-            <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
-              {homeTeam.shortName}
-            </p>
-            <ScorerChips
-              scorers={homeScorers}
-              showResults={showResults}
-              showMisses={showMisses}
-            />
-          </div>
-          <div className="min-w-0 text-end">
-            <div className="mb-1 flex items-center justify-end gap-1 md:hidden">
-              <span className="truncate text-[10px] font-medium text-muted">
+            <div className="min-w-0 text-end">
+              <div className="mb-1 flex items-center justify-end gap-1 md:hidden">
+                <span className="truncate text-[10px] font-medium text-muted">
+                  {awayTeam.shortName}
+                </span>
+                <TeamLogo {...awayTeam} size="sm" />
+              </div>
+              <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
                 {awayTeam.shortName}
-              </span>
-              <TeamLogo {...awayTeam} size="sm" />
+              </p>
+              <ScorerChips
+                scorers={awayScorers}
+                align="end"
+                showResults={showResults}
+                showMisses={showMisses}
+              />
             </div>
-            <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
-              {awayTeam.shortName}
-            </p>
-            <ScorerChips
-              scorers={awayScorers}
-              align="end"
-              showResults={showResults}
-              showMisses={showMisses}
-            />
           </div>
-        </div>
+        ) : (
+          <div className="w-full">
+            <p className="mb-1 hidden text-[10px] font-medium text-muted md:block text-center">Scorers</p>
+            <div className="flex justify-center">
+              <ScorerChips
+                scorers={allScorers}
+                showResults={showResults}
+                showMisses={showMisses}
+              />
+            </div>
+          </div>
+        )
       )}
     </div>
   );
@@ -406,6 +421,7 @@ function LeaguePredictionRow({
           predAway={row.prediction?.predAway}
           homeScorers={homeScorers}
           awayScorers={awayScorers}
+          allScorers={row.scorerPredictions}
           scorePoints={showScoreResults ? row.prediction?.points : undefined}
           showResults={showScorerResults}
           showMisses={isFinished}
