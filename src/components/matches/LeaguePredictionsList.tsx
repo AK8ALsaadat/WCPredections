@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React from "react";
 import type { LeagueMatchPredictionRow } from "@/types";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -81,8 +81,6 @@ export function LeaguePredictionsList({
   currentUserId,
 }: LeaguePredictionsListProps) {
   const { messages: t } = useI18n();
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
-
   if (!rows || rows.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-card-border bg-card/40 px-6 py-12 text-center">
@@ -127,19 +125,16 @@ export function LeaguePredictionsList({
                 <div className="text-center">
                   <div className="text-2xl font-bold tabular-nums">{row.prediction?.predAway != null ? row.prediction.predAway : "—"}</div>
                 </div>
-                <button onClick={() => setOpenIndex(openIndex === idx ? null : idx)} className="ml-4 text-xs text-muted">{openIndex === idx ? (t.pointsBreakdown?.hideDetails ?? 'Hide') : (t.matches?.tapForDetails ?? 'Details')}</button>
               </div>
             </div>
 
-            {openIndex === idx && (
-              <div className="mt-3">
-                <div className="text-xs text-muted mb-2">{t.matches?.scorers ?? 'Scorers'}</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <ScorerChips scorers={row.scorerPredictions.filter((p) => p.player.teamId === homeTeamId)} vertical />
-                  <ScorerChips scorers={row.scorerPredictions.filter((p) => p.player.teamId === awayTeamId)} vertical align="end" />
-                </div>
+            <div className="mt-3">
+              <div className="text-xs text-muted mb-2">{t.matches?.scorers ?? 'Scorers'}</div>
+              <div className="grid grid-cols-2 gap-3">
+                <ScorerChips scorers={row.scorerPredictions.filter((p) => p.player.teamId === homeTeamId)} vertical />
+                <ScorerChips scorers={row.scorerPredictions.filter((p) => p.player.teamId === awayTeamId)} vertical align="end" />
               </div>
-            )}
+            </div>
           </li>
         ))}
       </ul>
