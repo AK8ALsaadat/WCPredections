@@ -60,43 +60,7 @@ function normalizeScore(score: number) {
   if (!Number.isFinite(score)) return 0;
   return Math.min(9, Math.max(0, Math.trunc(score)));
 }
-
-function ScorePicker({
-  teamName,
-  value,
-  onChange,
-}: {
-  teamName: string;
-  value: number;
-  onChange: (score: number) => void;
-}) {
-  return (
-    <fieldset className="min-w-0 rounded-xl border border-card-border bg-background/35 p-3">
-      <legend className="mx-auto px-2 text-center text-sm font-semibold">
-        {teamName}
-      </legend>
-      <div className="mt-1 grid grid-cols-5 gap-1.5" dir="ltr">
-            <label htmlFor={`score-select-${teamName}`} className="sr-only">{teamName} score</label>
-            <select
-              id={`score-select-${teamName}`}
-              aria-label={`${teamName} score`}
-              value={String(value)}
-              onChange={(e) => onChange(Number(e.target.value))}
-              className={cn(
-                "min-w-0 rounded-lg border py-2 text-base font-bold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                "border-card-border bg-card text-foreground"
-              )}
-            >
-              {SCORE_OPTIONS.map((score) => (
-                <option key={score} value={score} className="text-center">
-                  {score}
-                </option>
-              ))}
-            </select>
-      </div>
-    </fieldset>
-  );
-}
+ 
 
 async function fetchLineupForMatch(
   matchId: string,
@@ -846,13 +810,13 @@ export default function PredictPage() {
 
       <Card>
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
             <TeamLogo {...match.homeTeam} />
-            <span className="font-medium">{match.homeTeam.shortName}</span>
+            <span className="font-medium">{match.homeTeam.name}</span>
           </div>
           <span className="text-muted">{t.matches.vs}</span>
           <div className="flex items-center gap-2">
-            <span className="font-medium">{match.awayTeam.shortName}</span>
+            <span className="font-medium">{match.awayTeam.name}</span>
             <TeamLogo {...match.awayTeam} />
           </div>
         </div>
@@ -879,21 +843,42 @@ export default function PredictPage() {
           <CardHeader>
             <CardTitle>{t.predict.scorePrediction}</CardTitle>
           </CardHeader>
-          <div
-            className="grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-4"
-            dir="ltr"
-          >
-            <ScorePicker
-              teamName={match.homeTeam.shortName}
-              value={predHome}
-              onChange={setPredHome}
-            />
+          <div className="flex items-center justify-center gap-3" dir="ltr">
+            <div className="flex items-center gap-2">
+              <TeamLogo {...match.homeTeam} />
+            </div>
+
+            <label htmlFor={`pred-home-${match.id}`} className="sr-only">{`${match.homeTeam.shortName} score`}</label>
+            <select
+              id={`pred-home-${match.id}`}
+              aria-label={`${match.homeTeam.shortName} score`}
+              value={String(predHome)}
+              onChange={(e) => setPredHome(Number(e.target.value))}
+              className="min-w-0 rounded-lg border py-2 px-3 text-base font-bold tabular-nums transition-colors border-card-border bg-card text-foreground"
+            >
+              {SCORE_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+
             <span className="text-center text-2xl font-bold text-muted">-</span>
-            <ScorePicker
-              teamName={match.awayTeam.shortName}
-              value={predAway}
-              onChange={setPredAway}
-            />
+
+            <label htmlFor={`pred-away-${match.id}`} className="sr-only">{`${match.awayTeam.shortName} score`}</label>
+            <select
+              id={`pred-away-${match.id}`}
+              aria-label={`${match.awayTeam.shortName} score`}
+              value={String(predAway)}
+              onChange={(e) => setPredAway(Number(e.target.value))}
+              className="min-w-0 rounded-lg border py-2 px-3 text-base font-bold tabular-nums transition-colors border-card-border bg-card text-foreground"
+            >
+              {SCORE_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+
+            <div className="flex items-center gap-2">
+              <TeamLogo {...match.awayTeam} />
+            </div>
           </div>
           <p className="mt-3 text-center text-sm text-muted">
             {t.predict.scoreFirstHint}
@@ -1184,7 +1169,7 @@ export default function PredictPage() {
                     }`}
                   >
                     <span className="font-medium text-foreground">
-                      {match.homeTeam.shortName}:{" "}
+                      {match.homeTeam.name}:{" "}
                     </span>
                     {budget.homeTotal} / {budget.homeTarget}{" "}
                     {t.predict.goalsUnit}
@@ -1216,7 +1201,7 @@ export default function PredictPage() {
                     }`}
                   >
                     <span className="font-medium text-foreground">
-                      {match.awayTeam.shortName}:{" "}
+                      {match.awayTeam.name}:{" "}
                     </span>
                     {budget.awayTotal} / {budget.awayTarget}{" "}
                     {t.predict.goalsUnit}
