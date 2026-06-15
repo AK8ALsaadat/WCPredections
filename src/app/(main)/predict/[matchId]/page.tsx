@@ -76,26 +76,23 @@ function ScorePicker({
         {teamName}
       </legend>
       <div className="mt-1 grid grid-cols-5 gap-1.5" dir="ltr">
-        {SCORE_OPTIONS.map((score) => {
-          const selected = value === score;
-          return (
-            <button
-              key={score}
-              type="button"
-              aria-pressed={selected}
-              aria-label={`${teamName}: ${score}`}
-              onClick={() => onChange(score)}
+            <label htmlFor={`score-select-${teamName}`} className="sr-only">{teamName} score</label>
+            <select
+              id={`score-select-${teamName}`}
+              aria-label={`${teamName} score`}
+              value={String(value)}
+              onChange={(e) => onChange(Number(e.target.value))}
               className={cn(
                 "min-w-0 rounded-lg border py-2 text-base font-bold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                selected
-                  ? "border-primary bg-primary text-white shadow-md shadow-primary/20"
-                  : "border-card-border bg-card text-foreground hover:border-primary/50 hover:bg-primary/10"
+                "border-card-border bg-card text-foreground"
               )}
             >
-              {score}
-            </button>
-          );
-        })}
+              {SCORE_OPTIONS.map((score) => (
+                <option key={score} value={score} className="text-center">
+                  {score}
+                </option>
+              ))}
+            </select>
       </div>
     </fieldset>
   );
