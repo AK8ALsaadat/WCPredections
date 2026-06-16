@@ -792,48 +792,75 @@ export async function calculateRoundPoints(roundId: string): Promise<void> {
   }
 }
 
-export async function getUserPredictionHistory(userId: string) {
+export async function getUserPredictionHistory(userId: string, limit: number = 100) {
   const [predictions, scorerPredictions, boldScorerBets] = await Promise.all([
     prisma.prediction.findMany({
       where: { userId },
       include: {
         match: {
-          include: {
-            homeTeam: true,
-            awayTeam: true,
-            round: true,
+          select: {
+            id: true,
+            matchTime: true,
+            status: true,
+            homeScore: true,
+            awayScore: true,
+            isKnockout: true,
+            actualFinishType: true,
+            penaltyWinnerTeamId: true,
+            homeTeam: { select: { id: true, name: true, shortName: true } },
+            awayTeam: { select: { id: true, name: true, shortName: true } },
+            round: { select: { id: true, name: true } },
           },
         },
       },
       orderBy: { createdAt: "desc" },
+      take: limit,
     }),
     prisma.scorerPrediction.findMany({
       where: { userId },
       include: {
-        player: true,
+        player: { select: { name: true } },
         match: {
-          include: {
-            homeTeam: true,
-            awayTeam: true,
-            round: true,
+          select: {
+            id: true,
+            matchTime: true,
+            status: true,
+            homeScore: true,
+            awayScore: true,
+            isKnockout: true,
+            actualFinishType: true,
+            penaltyWinnerTeamId: true,
+            homeTeam: { select: { id: true, name: true, shortName: true } },
+            awayTeam: { select: { id: true, name: true, shortName: true } },
+            round: { select: { id: true, name: true } },
           },
         },
       },
       orderBy: { createdAt: "desc" },
+      take: limit,
     }),
     prisma.boldScorerBet.findMany({
       where: { userId },
       include: {
-        player: true,
+        player: { select: { name: true } },
         match: {
-          include: {
-            homeTeam: true,
-            awayTeam: true,
-            round: true,
+          select: {
+            id: true,
+            matchTime: true,
+            status: true,
+            homeScore: true,
+            awayScore: true,
+            isKnockout: true,
+            actualFinishType: true,
+            penaltyWinnerTeamId: true,
+            homeTeam: { select: { id: true, name: true, shortName: true } },
+            awayTeam: { select: { id: true, name: true, shortName: true } },
+            round: { select: { id: true, name: true } },
           },
         },
       },
       orderBy: { createdAt: "desc" },
+      take: limit,
     }),
   ]);
 
