@@ -16,6 +16,7 @@ import {
   readLeaguePredictionsCache,
   writeLeaguePredictionsCache,
 } from "@/lib/league-predictions-prefetch";
+import { getSaudiLossDisplayTeam } from "@/lib/saudi-kuwait-joke";
 import type { LeagueMatchPredictionRow } from "@/types";
 
 type LeaguePredictionsPayload = {
@@ -130,6 +131,18 @@ export default function LeagueMatchPredictionsPage() {
   }
 
   const { match, predictions } = data;
+  const homeTeamDisplay = getSaudiLossDisplayTeam(
+    match.homeTeam,
+    match.homeScore,
+    match.awayScore,
+    true
+  );
+  const awayTeamDisplay = getSaudiLossDisplayTeam(
+    match.awayTeam,
+    match.homeScore,
+    match.awayScore,
+    false
+  );
   const isLive = match.status === "LIVE";
   const isFinished =
     match.status === "FINISHED" &&
@@ -151,8 +164,8 @@ export default function LeagueMatchPredictionsPage() {
         isKnockout: match.isKnockout,
         actualFinishType: asFinishType(match.actualFinishType),
         penaltyWinnerTeamId: match.penaltyWinnerTeamId,
-        homeTeamName: match.homeTeam.name,
-        awayTeamName: match.awayTeam.name,
+        homeTeamName: homeTeamDisplay.name,
+        awayTeamName: awayTeamDisplay.name,
         penaltyWinnerName: match.penaltyWinnerTeam?.name ?? null,
       }
     : null;
@@ -185,9 +198,9 @@ export default function LeagueMatchPredictionsPage() {
           dir="ltr"
         >
           <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
-            <TeamLogo {...match.homeTeam} size="lg" />
+            <TeamLogo {...homeTeamDisplay} size="lg" />
             <span className="truncate text-sm font-bold md:text-base">
-              {match.homeTeam.shortName}
+              {homeTeamDisplay.shortName}
             </span>
           </div>
 
@@ -224,9 +237,9 @@ export default function LeagueMatchPredictionsPage() {
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 text-center">
-            <TeamLogo {...match.awayTeam} size="lg" />
+            <TeamLogo {...awayTeamDisplay} size="lg" />
             <span className="truncate text-sm font-bold md:text-base">
-              {match.awayTeam.shortName}
+              {awayTeamDisplay.shortName}
             </span>
           </div>
         </div>
@@ -274,10 +287,10 @@ export default function LeagueMatchPredictionsPage() {
         rows={predictions}
         homeTeamId={match.homeTeam.id}
         awayTeamId={match.awayTeam.id}
-        homeTeam={match.homeTeam}
-        awayTeam={match.awayTeam}
-        homeShortName={match.homeTeam.shortName}
-        awayShortName={match.awayTeam.shortName}
+        homeTeam={homeTeamDisplay}
+        awayTeam={awayTeamDisplay}
+        homeShortName={homeTeamDisplay.shortName}
+        awayShortName={awayTeamDisplay.shortName}
         isKnockout={match.isKnockout}
         isFinished={isFinished}
         matchStatus={match.status}

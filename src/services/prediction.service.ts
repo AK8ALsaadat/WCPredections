@@ -46,7 +46,7 @@ export async function countDoublesUsedInRound(
   excludePredictionId?: string
 ): Promise<number> {
   const scope = await getUsageRoundScope(matchId);
-  const predictions = await prisma.prediction.findMany({
+  return prisma.prediction.count({
     where: {
       userId,
       isDouble: true,
@@ -54,7 +54,6 @@ export async function countDoublesUsedInRound(
       matchId: { in: scope.matchIds },
     },
   });
-  return predictions.length;
 }
 
 export async function validateDoubleUsage(
@@ -175,26 +174,31 @@ async function validateScorerPicks(
   picks: { playerId: string; goals: number }[]
 ) {
   const playerIds = picks.map((p) => p.playerId);
+  const uniquePlayerIds = [...new Set(playerIds)];
+  if (uniquePlayerIds.length !== playerIds.length) {
+    throw new Error("اختيار لاعب مكرر");
+  }
   const players =
-    playerIds.length === 0
+    uniquePlayerIds.length === 0
       ? []
       : await prisma.player.findMany({
           where: {
-            id: { in: playerIds },
+            id: { in: uniquePlayerIds },
             teamId: { in: [match.homeTeamId, match.awayTeamId] },
           },
         });
 
-  if (players.length !== playerIds.length) {
+  if (players.length !== uniquePlayerIds.length) {
     throw new Error("اختيار لاعب غير صالح");
   }
 
+  const playersById = new Map(players.map((player) => [player.id, player]));
   let homeGoals = 0;
   let awayGoals = 0;
   let homeScorers = 0;
   let awayScorers = 0;
   for (const pick of picks) {
-    const player = players.find((p) => p.id === pick.playerId);
+    const player = playersById.get(pick.playerId);
     if (!player) continue;
     if (player.teamId === match.homeTeamId) {
       homeGoals += pick.goals;
@@ -268,42 +272,21 @@ async function replaceScorerPredictions(
   matchId: string,
   picks: { playerId: string; goals: number }[]
 ) {
-  const existing = await prisma.scorerPrediction.findMany({
+  await prisma.scorerPrediction.deleteMany({
     where: { userId, matchId },
-    select: { playerId: true },
   });
-  const newIds = new Set(picks.map((p) => p.playerId));
-  const toRemove = existing
-    .map((row) => row.playerId)
-    .filter((playerId) => !newIds.has(playerId));
 
-  if (toRemove.length > 0) {
-    await prisma.scorerPrediction.deleteMany({
-      where: { userId, matchId, playerId: { in: toRemove } },
-    });
-  }
+  if (picks.length === 0) return;
 
-  for (const pick of picks) {
-    await prisma.scorerPrediction.upsert({
-      where: {
-        userId_matchId_playerId: {
-          userId,
-          matchId,
-          playerId: pick.playerId,
-        },
-      },
-      create: {
+  await prisma.scorerPrediction.createMany({
+    data: picks.map((pick) => ({
         userId,
         matchId,
         playerId: pick.playerId,
         predictedGoals: pick.goals,
-      },
-      update: {
-        predictedGoals: pick.goals,
         points: 0,
-      },
-    });
-  }
+    })),
+  });
 }
 
 export async function submitScorerPredictions(
@@ -383,12 +366,6 @@ export async function submitMatchPredictionBundle(
   if (existing?.isDouble && !isDouble) {
     throw new Error("ما تقدر تلغي المضاعفة بعد تفعيلها");
   }
-  await validateDoubleUsage(
-    userId,
-    data.matchId,
-    isDouble,
-    existing?.id
-  );
 
   if (match.isKnockout && !data.predictedFinishType) {
     throw new Error("توقع طريقة الإنهاء مطلوب للمباريات الإقصائية");
@@ -504,15 +481,7 @@ export async function submitMatchPredictionBundle(
       predictedPenaltyWinnerTeamId:
         data.predictedPenaltyWinnerTeamId ?? null,
     },
-    include: {
-      match: {
-        include: {
-          homeTeam: true,
-          awayTeam: true,
-          round: true,
-        },
-      },
-    },
+    select: { id: true },
   });
 
   await replaceScorerPredictions(userId, data.matchId, data.picks);
@@ -544,12 +513,7 @@ export async function submitMatchPredictionBundle(
     });
   }
 
-  const scorers = await prisma.scorerPrediction.findMany({
-    where: { userId, matchId: data.matchId },
-    include: { player: true },
-  });
-
-  return { prediction, scorers, boldBet };
+  return { prediction, scorers: data.picks.length, boldBet };
 }
 
 type ScorerPredictionWithPlayer = {
