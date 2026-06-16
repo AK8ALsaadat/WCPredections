@@ -471,8 +471,6 @@ export async function submitMatchPredictionBundle(
     if (!data.boldPlayerId) {
       // cancellation: remove the stored bold bet for this user/round
       await prisma.boldScorerBet.delete({ where: { id: storedBold.id } });
-    } else if (data.boldPlayerId !== storedBold.playerId) {
-      throw new Error("ما تقدر تغيّر لاعب الرهان بعد تفعيله");
     }
   } else if (
     data.boldPlayerId &&

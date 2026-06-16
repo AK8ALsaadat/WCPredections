@@ -758,10 +758,7 @@ export default function PredictPage() {
     boldLimits?.onOtherMatch ??
     match.boldScorerRoundStatus?.onOtherMatch ??
     false;
-  // ✅ منع الـ Double عند تفعيل الـ Bold والعكس
   const matchLockReason = getPredictionLockReason(match.matchTime, match.status);
-  // allow unchecking an already-committed bold (so user can cancel), but
-  // prevent changing after prediction lock or when double is active / limits exhausted
   const boldCheckboxDisabled =
     Boolean(matchLockReason) ||
     (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
@@ -1059,10 +1056,12 @@ export default function PredictPage() {
                     {t.predict.boldScorerBet.enable}
                   </p>
                   <p className="text-sm text-muted">
-                    {boldCommitted
-                      ? t.predict.boldLocked
-                      : isDouble
+                    {isDouble
                       ? t.predict.doubleAndBoldConflict
+                      : boldCommitted
+                      ? t.predict.boldScorerBet.selected(
+                          match.userBoldScorerBet?.player.name ?? ""
+                        )
                       : t.predict.boldScorerBet.hint}
                   </p>
                 </div>
@@ -1076,12 +1075,15 @@ export default function PredictPage() {
                     onChange={(e) => setBoldPlayerId(e.target.value)}
                     options={boldSelectOptions}
                     groups={boldPlayerGroups}
-                    disabled={boldCommitted}
+                    disabled={Boolean(matchLockReason)}
                   />
-                  {boldPlayerId && !boldCommitted && (
+                  {boldPlayerId && !matchLockReason && (
                     <button
                       type="button"
-                      onClick={() => setBoldPlayerId("")}
+                      onClick={() => {
+                        setBoldPlayerId("");
+                        setBoldEnabled(false);
+                      }}
                       className="mt-3 text-sm text-muted hover:text-danger"
                     >
                       {t.predict.boldScorerBet.clearSelection}
