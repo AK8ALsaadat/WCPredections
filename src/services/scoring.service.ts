@@ -55,9 +55,9 @@ export function calculatePerfectPredictionBonus(
   options?: { ignorePositionMultiplier?: boolean }
 ): number {
   if (!isExactScore) return 0;
+  // Bonus only applies if user made scorer picks AND all match exactly
   if (scorerPicks.length === 0) return 0;
 
-  // Check that every player scored their exact predicted goals
   const allExact = scorerPicks.every(p => p.actualGoals === p.predictedGoals);
   return allExact ? PERFECT_PREDICTION_BONUS_POINTS : 0;
 }
@@ -137,6 +137,7 @@ export function calculatePerfectPredictionBonusWithMinute(
   options?: { ignorePositionMultiplier?: boolean }
 ): number {
   if (!isExactScore) return 0;
+  // Bonus only applies if user made scorer picks AND all match exactly
   if (scorerPicks.length === 0) return 0;
 
   // Check that every player scored their exact predicted goals
