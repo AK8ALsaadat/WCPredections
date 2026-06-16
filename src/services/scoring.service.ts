@@ -55,6 +55,7 @@ export function calculatePerfectPredictionBonus(
   options?: { ignorePositionMultiplier?: boolean }
 ): number {
   if (!isExactScore) return 0;
+  if (scorerPicks.length === 0) return 0;
 
   // Check that every player scored their exact predicted goals
   const allExact = scorerPicks.every(p => p.actualGoals === p.predictedGoals);
@@ -136,6 +137,7 @@ export function calculatePerfectPredictionBonusWithMinute(
   options?: { ignorePositionMultiplier?: boolean }
 ): number {
   if (!isExactScore) return 0;
+  if (scorerPicks.length === 0) return 0;
 
   // Check that every player scored their exact predicted goals
   const allExact = scorerPicks.every(p => p.actualGoals === p.predictedGoals);
