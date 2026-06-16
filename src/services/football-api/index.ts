@@ -442,7 +442,7 @@ async function syncMatch(
     match.awayScore !== null &&
     (mapped.status === "LIVE" || isNowFinished);
 
-  if (canRecalculate && shouldSyncScorers && scorerDataComplete) {
+  if (canRecalculate && shouldSyncScorers) {
     try {
       await recalculateMatchScoring(match.id);
       // Broadcast match scoring update to connected clients (real-time UI)

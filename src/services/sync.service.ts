@@ -151,13 +151,6 @@ export async function syncActiveRoundFromApi() {
 
   let pointsRecalculated = 0;
   for (const match of scorableMatches) {
-    const expectedGoals = (match.homeScore ?? 0) + (match.awayScore ?? 0);
-    const knownGoals = match.matchScorers.reduce(
-      (sum, scorer) => sum + scorer.goals,
-      0
-    );
-    if (knownGoals !== expectedGoals) continue;
-
     try {
       await recalculateMatchScoring(match.id);
       pointsRecalculated++;
