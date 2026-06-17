@@ -604,6 +604,11 @@ export default function PredictPage() {
   }
 
   function handleDoubleToggle(checked: boolean) {
+    // Allow unchecking anytime, but prevent enabling if bold is active
+    if (checked && boldEnabled) {
+      setError(t.predict.doubleAndBoldConflict);
+      return;
+    }
     const limits = match?.roundUsageLimits?.doubles;
     if (checked && limits && !limits.canEnable && !limits.onThisMatch) {
       setError(t.predict.doubleExhausted);
@@ -614,6 +619,11 @@ export default function PredictPage() {
   }
 
   function handleBoldToggle(checked: boolean) {
+    // Allow unchecking anytime, but prevent enabling if double is active
+    if (checked && isDouble) {
+      setError(t.predict.doubleAndBoldConflict);
+      return;
+    }
     const limits = match?.roundUsageLimits?.boldScorer;
     if (
       checked &&
@@ -753,15 +763,17 @@ export default function PredictPage() {
     match.boldScorerRoundStatus?.onOtherMatch ??
     false;
   const matchLockReason = getPredictionLockReason(match.matchTime, match.status);
+  // Disable checkboxes only when trying to enable if the other feature is active
+  // Allow unchecking anytime (handlers do the conflict check)
   const boldCheckboxDisabled =
     Boolean(matchLockReason) ||
     (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
-    isDouble; // cannot use double and bold on same match
+    (isDouble && !boldEnabled); // disable enabling only, allow unchecking
   const doubleCheckboxDisabled =
-    doubleLimits != null &&
-    !doubleLimits.canEnable &&
-    !doubleLimits.onThisMatch ||
-    boldEnabled; // cannot use double and bold on same match
+    (doubleLimits != null &&
+      !doubleLimits.canEnable &&
+      !doubleLimits.onThisMatch) ||
+    (boldEnabled && !isDouble); // disable enabling only, allow unchecking
   const boldPlayerGroups =
     lineup && hasPlayers
       ? [
