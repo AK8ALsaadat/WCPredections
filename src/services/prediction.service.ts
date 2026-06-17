@@ -634,90 +634,93 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
         )
       : new Map<string, number>();
 
-  if (finished) {
-    const predictions = await prisma.prediction.findMany({
-      where: { matchId },
-    });
+  const minutesElapsed = (Date.now() - new Date(match.matchTime).getTime()) / (1000 * 60);
+  const shouldAwardBasePoints = finished || minutesElapsed >= PERFECT_PREDICTION_MIN_MINUTE;
 
-    const picksByUser = new Map<string, ScorerPredictionWithPlayer[]>();
-    for (const sp of scorerPredictions) {
-      const list = picksByUser.get(sp.userId) ?? [];
-      list.push(sp);
-      picksByUser.set(sp.userId, list);
-    }
+  const predictions = await prisma.prediction.findMany({
+    where: { matchId },
+  });
 
-    for (const prediction of predictions) {
-      const scorePoints = calculateScorePredictionPoints(
-        prediction.predHome,
-        prediction.predAway,
-        match.homeScore!,
-        match.awayScore!,
-        false
-      );
+  const picksByUser = new Map<string, ScorerPredictionWithPlayer[]>();
+  for (const sp of scorerPredictions) {
+    const list = picksByUser.get(sp.userId) ?? [];
+    list.push(sp);
+    picksByUser.set(sp.userId, list);
+  }
 
-      let bonusPoints = 0;
-      if (scorerGoalsByPlayer) {
-        const isExact = isExactScorePrediction(
+  for (const prediction of predictions) {
+    const scorePoints = shouldAwardBasePoints
+      ? calculateScorePredictionPoints(
           prediction.predHome,
           prediction.predAway,
           match.homeScore!,
-          match.awayScore!
-        );
-        const picks = picksByUser.get(prediction.userId) ?? [];
-        
-        // استخدم الدالة الجديدة التي تتحقق من الدقيقة 75
-        bonusPoints = calculatePerfectPredictionBonusWithMinute(
-          isExact,
-          picks.map((sp) => ({
-            predictedGoals: sp.predictedGoals,
-            actualGoals: resolveScorerGoalsForPlayer(
-              sp.playerId,
-              sp.player,
-              scorerGoalsByPlayer,
-              match.matchScorers
-            ),
-            position: sp.player.position,
-          })),
-          match.matchTime,
-          match.status
-        );
-      }
+          match.awayScore!,
+          false
+        )
+      : 0;
 
-      const finishTypePoints = match.isKnockout
-        ? calculateFinishTypePoints(
-            prediction.predictedFinishType,
-            match.actualFinishType
+    let bonusPoints = 0;
+    if (scorerGoalsByPlayer) {
+      const isExact = isExactScorePrediction(
+        prediction.predHome,
+        prediction.predAway,
+        match.homeScore!,
+        match.awayScore!
+      );
+      const picks = picksByUser.get(prediction.userId) ?? [];
+      
+      // استخدم الدالة الجديدة التي تتحقق من الدقيقة 75
+      bonusPoints = calculatePerfectPredictionBonusWithMinute(
+        isExact,
+        picks.map((sp) => ({
+          predictedGoals: sp.predictedGoals,
+          actualGoals: resolveScorerGoalsForPlayer(
+            sp.playerId,
+            sp.player,
+            scorerGoalsByPlayer,
+            match.matchScorers
+          ),
+          position: sp.player.position,
+        })),
+        match.matchTime,
+        match.status
+      );
+    }
+
+    const finishTypePoints = (shouldAwardBasePoints && match.isKnockout)
+      ? calculateFinishTypePoints(
+          prediction.predictedFinishType,
+          match.actualFinishType
+        )
+      : 0;
+
+    const penaltyWinnerPoints =
+      (shouldAwardBasePoints && match.isKnockout && match.actualFinishType === "PENALTIES")
+        ? calculatePenaltyWinnerPoints(
+            prediction.predictedPenaltyWinnerTeamId,
+            match.penaltyWinnerTeamId
           )
         : 0;
 
-      const penaltyWinnerPoints =
-        match.isKnockout && match.actualFinishType === "PENALTIES"
-          ? calculatePenaltyWinnerPoints(
-              prediction.predictedPenaltyWinnerTeamId,
-              match.penaltyWinnerTeamId
-            )
-          : 0;
+    const baseMatchPoints =
+      scorePoints +
+      bonusPoints +
+      finishTypePoints +
+      penaltyWinnerPoints +
+      (scorerPointsByUser.get(prediction.userId) ?? 0);
 
-      const baseMatchPoints =
-        scorePoints +
-        bonusPoints +
-        finishTypePoints +
-        penaltyWinnerPoints +
-        (scorerPointsByUser.get(prediction.userId) ?? 0);
-
-      await prisma.prediction.update({
-        where: { id: prediction.id },
-        data: {
-          points: scorePoints + bonusPoints,
-          doubleBonus: calculateDoubleBonus(
-            prediction.isDouble,
-            baseMatchPoints
-          ),
-          finishTypePoints,
-          penaltyWinnerPoints,
-        },
-      });
-    }
+    await prisma.prediction.update({
+      where: { id: prediction.id },
+      data: {
+        points: scorePoints + bonusPoints,
+        doubleBonus: calculateDoubleBonus(
+          prediction.isDouble,
+          baseMatchPoints
+        ),
+        finishTypePoints,
+        penaltyWinnerPoints,
+      },
+    });
   }
 
   try {
