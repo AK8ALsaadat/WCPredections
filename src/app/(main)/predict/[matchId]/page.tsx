@@ -766,10 +766,12 @@ export default function PredictPage() {
   // Disable checkboxes only when trying to enable if the other feature is active
   // Allow unchecking anytime (handlers do the conflict check)
   const boldCheckboxDisabled =
+    loading ||
     Boolean(matchLockReason) ||
     (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
     (isDouble && !boldEnabled); // disable enabling only, allow unchecking
   const doubleCheckboxDisabled =
+    loading ||
     (doubleLimits != null &&
       !doubleLimits.canEnable &&
       !doubleLimits.onThisMatch) ||
@@ -1294,6 +1296,7 @@ export default function PredictPage() {
           size="lg"
           loading={submitting}
           disabled={
+            loading ||
             budget.anyExceeded ||
             needsLineupForScorers ||
             (hasAnyGoals && !budget.isComplete)
