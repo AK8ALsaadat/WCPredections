@@ -342,7 +342,7 @@ export function MatchCard({
       )}
 
       {/* حالة المباراة المقفلة بدون توقع */}
-      {!finalPrediction && !canPredict && !hasPrediction && !isFinished && (
+      {isPastMatch && isFinished && !hasPrediction && (
         <div className="mt-3 rounded-lg border border-red-500/50 bg-red-500/10 p-3">
           <p className="text-sm font-semibold text-red-500">
             🔴 {t.matches.notPredicted}

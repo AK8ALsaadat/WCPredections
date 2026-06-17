@@ -115,6 +115,24 @@ export async function submitPrediction(
     existing?.id
   );
 
+  if (isDouble) {
+    const scope = await getUsageRoundScope(data.matchId, match.roundId);
+    const boldOnThisMatch = await prisma.boldScorerBet.findUnique({
+      where: {
+        userId_usageRoundKey: {
+          userId,
+          usageRoundKey: scope.key,
+        },
+      },
+      select: { matchId: true },
+    });
+    if (boldOnThisMatch?.matchId === data.matchId) {
+      throw new Error(
+        "ما تقدر تستخدم المضاعفة والرهان معاً على نفس المباراة"
+      );
+    }
+  }
+
   if (match.isKnockout && !data.predictedFinishType) {
     throw new Error("توقع طريقة الإنهاء مطلوب للمباريات الإقصائية");
   }

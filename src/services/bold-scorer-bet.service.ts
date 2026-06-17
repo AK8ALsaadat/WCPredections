@@ -150,6 +150,16 @@ export async function submitBoldScorerBet(
     }
   }
 
+  const prediction = await prisma.prediction.findUnique({
+    where: { userId_matchId: { userId, matchId } },
+    select: { isDouble: true },
+  });
+  if (prediction?.isDouble) {
+    throw new Error(
+      "ما تقدر تستخدم المضاعفة والرهان معاً على نفس المباراة"
+    );
+  }
+
   const eligibility = await getBoldScorerBetEligibility(userId);
   if (!eligibility.hasMinimumPoints && existing?.matchId !== matchId) {
     throw new Error(
