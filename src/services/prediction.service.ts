@@ -10,7 +10,10 @@ import {
   scorerGoalTarget,
 } from "@/lib/scorer-prediction";
 import type { LeagueMatchPredictionRow } from "@/types";
-import { calculateBoldScorerBetPointsForMatch } from "@/services/bold-scorer-bet.service";
+import {
+  calculateBoldScorerBetPointsForMatch,
+  getBoldScorerBetEligibility,
+} from "@/services/bold-scorer-bet.service";
 import { getUsageRoundScope } from "@/services/usage-round.service";
 import {
   getUserTotalPoints,
@@ -381,6 +384,13 @@ export async function submitMatchPredictionBundle(
   );
 
   if (data.boldPlayerId) {
+    const eligibility = await getBoldScorerBetEligibility(userId);
+    if (!eligibility.hasMinimumPoints) {
+      throw new Error(
+        `تحتاج ${eligibility.minimumPoints} نقاط على الأقل لاستخدام الرهان`
+      );
+    }
+
     const boldPlayer = await prisma.player.findFirst({
       where: {
         id: data.boldPlayerId,

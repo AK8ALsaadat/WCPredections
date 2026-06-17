@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/session";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { Navbar } from "@/components/layout/Navbar";
 import { SportScoreAttribution } from "@/components/layout/SportScoreAttribution";
+import { canShowKnockoutFeatures } from "@/lib/tournament-gates";
 
 export default async function MainLayout({
   children,
@@ -13,6 +14,12 @@ export default async function MainLayout({
   if (!user) redirect("/login");
 
   if (user.hasSeenTutorial === false) redirect("/tutorial");
+  if (
+    user.hasSeenKnockoutTutorial !== true &&
+    (await canShowKnockoutFeatures())
+  ) {
+    redirect("/knockout-tutorial");
+  }
 
   return (
     <div className="min-h-screen">

@@ -7,6 +7,7 @@ export const MAX_SCORERS_PER_TEAM = 3;
 
 /** أقصى عدد لاعبين إجمالي (المنتخبين معاً) يقدر اليوزر يختارهم كهدافين */
 export const MAX_SCORERS_TOTAL = 5;
+export const MAX_GOALS_PER_SCORER = 5;
 
 /** أقصى مجموع أهداف يمكن توزيعه على هدافي منتخب واحد */
 export const MAX_PREDICTED_SCORER_GOALS_PER_TEAM = 5;
@@ -120,7 +121,10 @@ export function maxGoalsForPlayer(
   );
   const teamTotal = isHome ? homeTotal : awayTotal;
   const current = picks[playerId] ?? 1;
-  return Math.max(1, target - (teamTotal - current));
+  return Math.min(
+    MAX_GOALS_PER_SCORER,
+    Math.max(1, target - (teamTotal - current))
+  );
 }
 
 function trimTeamPicks(

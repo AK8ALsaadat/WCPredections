@@ -1,4 +1,4 @@
-import { prisma } from "../src/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 // يفضل مستقبلاً وضع التوكن في ملف .env
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8866001197:AAHY3Ju-isvCM_RYvgqn04kbLsOntWxwThE";

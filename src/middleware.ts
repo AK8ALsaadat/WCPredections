@@ -30,6 +30,8 @@ const protectedPaths = [
 
   "/tutorial",
 
+  "/knockout-tutorial",
+
 ];
 
 
@@ -125,6 +127,8 @@ export const config = {
     "/admin/:path*",
 
     "/tutorial",
+
+    "/knockout-tutorial",
 
     "/login",
 

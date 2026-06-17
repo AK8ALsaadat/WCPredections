@@ -17,6 +17,7 @@ export type UserSession = {
   username: string;
   isAdmin: boolean;
   hasSeenTutorial?: boolean;
+  hasSeenKnockoutTutorial?: boolean;
 };
 
 export type TeamBasic = Pick<Team, "id" | "name" | "shortName" | "logoUrl">;

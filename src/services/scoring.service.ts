@@ -66,7 +66,11 @@ export function calculateFinishTypePoints(
   actual: FinishType | null | undefined
 ): number {
   if (!predicted || !actual) return 0;
-  return predicted === actual ? 1 : 0;
+  if (predicted !== actual) return 0;
+
+  if (actual === "PENALTIES") return 4;
+  if (actual === "EXTRA_TIME") return 2;
+  return 1;
 }
 
 export function calculatePenaltyWinnerPoints(
@@ -243,7 +247,13 @@ export function getPositionPointsMultiplier(position: PlayerPositionType): numbe
     lower.includes("winger")
   ) return 1;
   if (lower.includes("midfielder") || lower.includes("mid")) return 2;
-  if (lower.includes("defender") || lower.includes("defence") || lower.includes("defense")) return 3;
+  if (
+    lower.includes("defender") ||
+    lower.includes("defence") ||
+    lower.includes("defense") ||
+    lower.includes("back") ||
+    lower.includes("sweeper")
+  ) return 3;
   return 1;
 }
 

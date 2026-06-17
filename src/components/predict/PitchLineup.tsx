@@ -1,7 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { layoutFormation, getPlayerLabel } from "@/lib/formation-layout";
+import {
+  getPlayerLabel,
+  layoutFormation,
+  layoutFromGrid,
+} from "@/lib/formation-layout";
 import type { ScorerPicks } from "@/lib/scorer-prediction";
 import type { LineupSource, MatchPlayerView } from "@/services/match-players.service";
 import { useEffect, useMemo, useState } from "react";
@@ -426,12 +430,18 @@ export function PitchLineup({
     [awayPlayers]
   );
   const homeSlots = useMemo(
-    () => layoutFormation(homeLineup, home.formation, "home"),
-    [homeLineup, home.formation]
+    () =>
+      (home.source === "official"
+        ? layoutFromGrid(homeLineup, "home")
+        : null) ?? layoutFormation(homeLineup, home.formation, "home"),
+    [homeLineup, home.formation, home.source]
   );
   const awaySlots = useMemo(
-    () => layoutFormation(awayLineup, away.formation, "away"),
-    [awayLineup, away.formation]
+    () =>
+      (away.source === "official"
+        ? layoutFromGrid(awayLineup, "away")
+        : null) ?? layoutFormation(awayLineup, away.formation, "away"),
+    [awayLineup, away.formation, away.source]
   );
   const playersById = useMemo(
     () =>

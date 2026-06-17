@@ -116,6 +116,16 @@ const COUNTRY_CODES: Record<string, string> = {
   "korea": "kr",
   "الكويت": "kw",
   "kuwait": "kw",
+  "cote d ivoire": "ci",
+  "nigeria": "ng",
+  "chile": "cl",
+  "slovakia": "sk",
+  "slovenia": "si",
+  "romania": "ro",
+  "greece": "gr",
+  "hungary": "hu",
+  "bosnia and herzegovina": "ba",
+  "bosnia & herzegovina": "ba",
   
   // Also add some common team names
   "samir": "sa",

@@ -15,6 +15,43 @@ import {
 } from "@/services/user-points.service";
 
 export { BOLD_SCORER_POINTS };
+export { MIN_POINTS_FOR_BOLD_SCORER_BET };
+
+export async function getBoldScorerBetEligibility(userId: string) {
+  const [predictionAgg, scorerAgg, boldAgg] = await Promise.all([
+    prisma.prediction.aggregate({
+      where: { userId },
+      _sum: {
+        points: true,
+        doubleBonus: true,
+        finishTypePoints: true,
+        penaltyWinnerPoints: true,
+      },
+    }),
+    prisma.scorerPrediction.aggregate({
+      where: { userId },
+      _sum: { points: true },
+    }),
+    prisma.boldScorerBet.aggregate({
+      where: { userId },
+      _sum: { points: true },
+    }),
+  ]);
+
+  const userPoints =
+    (predictionAgg._sum.points ?? 0) +
+    (predictionAgg._sum.doubleBonus ?? 0) +
+    (predictionAgg._sum.finishTypePoints ?? 0) +
+    (predictionAgg._sum.penaltyWinnerPoints ?? 0) +
+    (scorerAgg._sum.points ?? 0) +
+    (boldAgg._sum.points ?? 0);
+
+  return {
+    userPoints,
+    minimumPoints: MIN_POINTS_FOR_BOLD_SCORER_BET,
+    hasMinimumPoints: userPoints >= MIN_POINTS_FOR_BOLD_SCORER_BET,
+  };
+}
 
 export async function getBoldScorerBetForUserRound(
   userId: string,
@@ -111,6 +148,13 @@ export async function submitBoldScorerBet(
         `You need at least ${MIN_POINTS_FOR_BOLD_SCORER_BET} points to use the scorer bet`
       );
     }
+  }
+
+  const eligibility = await getBoldScorerBetEligibility(userId);
+  if (!eligibility.hasMinimumPoints && existing?.matchId !== matchId) {
+    throw new Error(
+      `تحتاج ${eligibility.minimumPoints} نقاط على الأقل لاستخدام الرهان`
+    );
   }
 
   const player = await prisma.player.findFirst({

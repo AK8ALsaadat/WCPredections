@@ -52,6 +52,7 @@ export async function createUser(
       username: true,
       isAdmin: true,
       hasSeenTutorial: true,
+      hasSeenKnockoutTutorial: true,
     },
   });
 
@@ -60,6 +61,7 @@ export async function createUser(
     username: user.username,
     isAdmin: user.isAdmin,
     hasSeenTutorial: user.hasSeenTutorial,
+    hasSeenKnockoutTutorial: user.hasSeenKnockoutTutorial,
   };
 }
 
@@ -76,6 +78,7 @@ export async function updateUserUsername(
       username: true,
       isAdmin: true,
       hasSeenTutorial: true,
+      hasSeenKnockoutTutorial: true,
     },
   });
 
@@ -89,6 +92,7 @@ export async function updateUserUsername(
       username: current.username,
       isAdmin: current.isAdmin,
       hasSeenTutorial: current.hasSeenTutorial,
+      hasSeenKnockoutTutorial: current.hasSeenKnockoutTutorial,
     };
   }
 
@@ -111,6 +115,7 @@ export async function updateUserUsername(
       username: true,
       isAdmin: true,
       hasSeenTutorial: true,
+      hasSeenKnockoutTutorial: true,
     },
   });
 
@@ -119,6 +124,7 @@ export async function updateUserUsername(
     username: user.username,
     isAdmin: user.isAdmin,
     hasSeenTutorial: user.hasSeenTutorial,
+    hasSeenKnockoutTutorial: user.hasSeenKnockoutTutorial,
   };
 }
 
@@ -134,6 +140,7 @@ export async function authenticateUser(
       passwordHash: true,
       isAdmin: true,
       hasSeenTutorial: true,
+      hasSeenKnockoutTutorial: true,
     },
   });
 
@@ -147,6 +154,7 @@ export async function authenticateUser(
     username: user.username,
     isAdmin: user.isAdmin,
     hasSeenTutorial: user.hasSeenTutorial,
+    hasSeenKnockoutTutorial: user.hasSeenKnockoutTutorial,
   };
 }
 

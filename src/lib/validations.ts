@@ -56,7 +56,7 @@ export const predictionSchema = z
 
 export const scorerPickSchema = z.object({
   playerId: z.string().min(1),
-  goals: z.number().int().min(1).max(9),
+  goals: z.number().int().min(1).max(5),
 });
 
 export const scorerPredictionSchema = z.object({

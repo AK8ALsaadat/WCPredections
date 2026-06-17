@@ -14,3 +14,10 @@ export async function markTutorialSeen(userId: string): Promise<void> {
     data: { hasSeenTutorial: true },
   });
 }
+
+export async function markKnockoutTutorialSeen(userId: string): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { hasSeenKnockoutTutorial: true },
+  });
+}

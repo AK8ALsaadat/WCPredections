@@ -154,6 +154,13 @@ function sortFormationLine(
     .map(({ player }) => player);
 }
 
+function horizontalRank(player: MatchPlayerView) {
+  const position = (player.position ?? "").toLowerCase();
+  if (/\bleft\b|\blb\b|\blwb\b|\blw\b/.test(position)) return 0;
+  if (/\bright\b|\brb\b|\brwb\b|\brw\b/.test(position)) return 2;
+  return 1;
+}
+
 function sortStartersByRole(starters: MatchPlayerView[]) {
   const gk = starters.filter(isGoalkeeper);
   const outfield = starters.filter((p) => !isGoalkeeper(p));
@@ -164,6 +171,7 @@ function sortStartersByRole(starters: MatchPlayerView[]) {
     .sort(
       (left, right) =>
         positionRank(left.player) - positionRank(right.player) ||
+        horizontalRank(left.player) - horizontalRank(right.player) ||
         left.index - right.index
     )
     .map(({ player }) => player);
@@ -254,11 +262,11 @@ export function layoutFormation(
   }
 
   const slots: PitchSlot[] = [];
-  const homeLineYs = lines.length === 3 ? [18, 31, 44] : null;
-  const awayLineYs = lines.length === 3 ? [82, 69, 56] : null;
+  const homeLineYs = lines.length === 3 ? [16, 29, 42] : null;
+  const awayLineYs = lines.length === 3 ? [84, 71, 58] : null;
 
   if (side === "home") {
-    slots.push(...spreadRow(gk, 5));
+    slots.push(...spreadRow(gk, 7));
     lines.forEach((players, lineIndex) => {
       const y =
         homeLineYs?.[lineIndex] ??
@@ -276,7 +284,7 @@ export function layoutFormation(
     return slots;
   }
 
-  slots.push(...spreadRow(gk, 95));
+  slots.push(...spreadRow(gk, 93));
   lines.forEach((players, lineIndex) => {
       const y =
         awayLineYs?.[lineIndex] ??

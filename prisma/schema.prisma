@@ -29,6 +29,7 @@ model User {
   isAdmin         Boolean  @default(false) @map("is_admin")
   hasSeenTutorial Boolean  @default(false) @map("has_seen_tutorial")
   hasSeenBoldFiveNotice Boolean @default(false) @map("has_seen_bold_five_notice")
+  hasSeenKnockoutTutorial Boolean @default(false) @map("has_seen_knockout_tutorial")
   createdAt       DateTime @default(now()) @map("created_at")
 
   predictions        Prediction[]
