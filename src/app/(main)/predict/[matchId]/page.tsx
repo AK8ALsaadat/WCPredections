@@ -755,11 +755,13 @@ export default function PredictPage() {
   const matchLockReason = getPredictionLockReason(match.matchTime, match.status);
   const boldCheckboxDisabled =
     Boolean(matchLockReason) ||
-    (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch);
+    (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
+    isDouble; // cannot use double and bold on same match
   const doubleCheckboxDisabled =
     doubleLimits != null &&
     !doubleLimits.canEnable &&
-    !doubleLimits.onThisMatch;
+    !doubleLimits.onThisMatch ||
+    boldEnabled; // cannot use double and bold on same match
   const boldPlayerGroups =
     lineup && hasPlayers
       ? [
@@ -930,6 +932,8 @@ export default function PredictPage() {
                 <p className="text-sm text-muted">
                   {isDouble
                     ? t.predict.doubleEnabled
+                    : boldEnabled
+                    ? t.predict.doubleAndBoldConflict
                     : t.predict.doubleHint}
                 </p>
               </div>
@@ -1045,7 +1049,9 @@ export default function PredictPage() {
                     {t.predict.boldScorerBet.enable}
                   </p>
                   <p className="text-sm text-muted">
-                    {boldEnabled
+                    {isDouble
+                      ? t.predict.doubleAndBoldConflict
+                      : boldEnabled
                       ? t.predict.boldScorerBet.selectingPlayer
                       : t.predict.boldScorerBet.hint}
                   </p>
