@@ -105,10 +105,6 @@ export async function submitPrediction(
 
   const isDouble = data.isDouble ?? false;
 
-  if (existing?.isDouble && !isDouble) {
-    throw new Error("ما تقدر تلغي المضاعفة بعد تفعيلها");
-  }
-
   await validateDoubleUsage(
     userId,
     data.matchId,
@@ -362,10 +358,6 @@ export async function submitMatchPredictionBundle(
   });
 
   const isDouble = data.isDouble ?? false;
-
-  if (existing?.isDouble && !isDouble) {
-    throw new Error("ما تقدر تلغي المضاعفة بعد تفعيلها");
-  }
 
   if (match.isKnockout && !data.predictedFinishType) {
     throw new Error("توقع طريقة الإنهاء مطلوب للمباريات الإقصائية");
