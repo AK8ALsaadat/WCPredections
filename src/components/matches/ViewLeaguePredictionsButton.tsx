@@ -8,12 +8,14 @@ type ViewLeaguePredictionsButtonProps = {
   matchId: string;
   fullWidth?: boolean;
   onClick?: (e: MouseEvent) => void;
+  disabled?: boolean;
 };
 
 export function ViewLeaguePredictionsButton({
   matchId,
   fullWidth = false,
   onClick,
+  disabled = false,
 }: ViewLeaguePredictionsButtonProps) {
   const { messages: t } = useI18n();
 
@@ -21,9 +23,14 @@ export function ViewLeaguePredictionsButton({
     <LeaguePredictionsNavLink
       matchId={matchId}
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-xl border border-primary/35 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent px-4 py-3 transition-all hover:border-primary/60 hover:from-primary/30 hover:shadow-[0_0_24px_rgba(34,197,94,0.15)] ${
+      className={`group relative overflow-hidden rounded-xl border border-primary/35 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent px-4 py-3 transition-all ${
+        disabled
+          ? "cursor-not-allowed opacity-50 hover:border-primary/35 hover:from-primary/20"
+          : "hover:border-primary/60 hover:from-primary/30 hover:shadow-[0_0_24px_rgba(34,197,94,0.15)]"
+      } ${
         fullWidth ? "flex w-full items-center gap-3" : "inline-flex items-center gap-2.5"
       }`}
+      style={disabled ? { pointerEvents: "none" } : {}}
     >
       <span
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-lg ring-1 ring-primary/30 transition-transform group-hover:scale-105"

@@ -214,6 +214,9 @@ export const ar = {
     predictorPlural: "متوقّعين",
     you: "أنت",
     penaltyWinner: "الفائز بركلات الترجيح",
+    notPredicted: "غير متوقعة",
+    notPredictedReason: "ليه ماتوقعت ياضعيف 😅",
+    noPointsForUnpredicted: "ما تحسب لك نقاط",
   },
   pointsBreakdown: {
     exactScore: "نتيجة صحيحة بالضبط",

@@ -341,9 +341,22 @@ export function MatchCard({
         </div>
       )}
 
+      {/* حالة المباراة المقفلة بدون توقع */}
+      {!finalPrediction && !canPredict && !hasPrediction && !isFinished && (
+        <div className="mt-3 rounded-lg border border-red-500/50 bg-red-500/10 p-3">
+          <p className="text-sm font-semibold text-red-500">
+            🔴 {t.matches.notPredicted}
+          </p>
+          <p className="mt-1 text-xs text-red-500/80">
+            {t.matches.notPredictedReason}
+          </p>
+          <p className="mt-2 text-xs text-muted">{t.matches.noPointsForUnpredicted}</p>
+        </div>
+      )}
+
       {!finalPrediction && !canPredict && (
         <div className="mt-4" onClick={(e) => e.stopPropagation()}>
-          <ViewLeaguePredictionsButton matchId={match.id} fullWidth />
+          <ViewLeaguePredictionsButton matchId={match.id} fullWidth disabled={!hasPrediction} />
         </div>
       )}
 
