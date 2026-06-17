@@ -217,6 +217,9 @@ export const en = {
     predictorPlural: "predictors",
     you: "You",
     penaltyWinner: "Penalty shootout winner",
+    notPredicted: "Not predicted",
+    notPredictedReason: "Why didn't you predict it",
+    noPointsForUnpredicted: "No points earned",
   },
   pointsBreakdown: {
     exactScore: "Exact score",
@@ -270,6 +273,7 @@ export const en = {
     scorePrediction: "Score prediction",
     doublePoints: "Double points",
     doubleHint: "Max 2 doubles per round",
+    doubleEnabled: "Double points active",
     doubleCounter: (used: number, max: number) => `Round doubles: ${used}/${max}`,
     doubleRemaining: (n: number) =>
       n === 1 ? "1 double left" : `${n} doubles left`,
@@ -337,6 +341,7 @@ export const en = {
     boldScorerBet: {
       title: "The bet",
       hint: "Once per round — one player. Scores in play +5, doesn't score −5",
+      selectingPlayer: "Selecting player for the bet",
       selectPlayer: "Bet",
       enable: "Enable the bet",
       choosePlayer: "Choose player",

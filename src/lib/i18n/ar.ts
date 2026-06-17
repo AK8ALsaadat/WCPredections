@@ -270,6 +270,7 @@ export const ar = {
     scorePrediction: "توقع النتيجة",
     doublePoints: "مضاعفة النقاط",
     doubleHint: "حد أقصى مباراتين مضاعفة في كل جولة",
+    doubleEnabled: "مضاعفة النقاط مفعّلة",
     doubleCounter: (used: number, max: number) => `مضاعفة الجولة: ${used}/${max}`,
     doubleRemaining: (n: number) =>
       n === 1 ? "متبقي مضاعفة واحدة" : `متبقي ${n} مضاعفات`,
@@ -335,6 +336,7 @@ export const ar = {
     boldScorerBet: {
       title: "الرهان",
       hint: "مرة واحدة كل جولة — لاعب واحد. إذا سجل في الملعب +5، إذا ما سجل −5",
+      selectingPlayer: "جاري اختيار اللاعب للرهان",
       selectPlayer: "الرهان",
       enable: "فعّل الرهان",
       choosePlayer: "اختر اللاعب",

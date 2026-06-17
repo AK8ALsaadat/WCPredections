@@ -604,10 +604,6 @@ export default function PredictPage() {
   }
 
   function handleDoubleToggle(checked: boolean) {
-    if (match?.userPrediction?.isDouble && !checked) {
-      setError(t.predict.doubleLocked);
-      return;
-    }
     const limits = match?.roundUsageLimits?.doubles;
     if (checked && limits && !limits.canEnable && !limits.onThisMatch) {
       setError(t.predict.doubleExhausted);
@@ -752,8 +748,6 @@ export default function PredictPage() {
 
   const doubleLimits = match.roundUsageLimits?.doubles;
   const boldLimits = match.roundUsageLimits?.boldScorer;
-  const doubleCommitted = match.userPrediction?.isDouble === true;
-  const boldCommitted = !!match.userBoldScorerBet?.playerId;
   const boldLockedOnOther =
     boldLimits?.onOtherMatch ??
     match.boldScorerRoundStatus?.onOtherMatch ??
@@ -761,14 +755,11 @@ export default function PredictPage() {
   const matchLockReason = getPredictionLockReason(match.matchTime, match.status);
   const boldCheckboxDisabled =
     Boolean(matchLockReason) ||
-    (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
-    isDouble; // منع البطاقة الجريئة إذا كان الـ Double مفعل
+    (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch);
   const doubleCheckboxDisabled =
-    doubleCommitted ||
-    (doubleLimits != null &&
-      !doubleLimits.canEnable &&
-      !doubleLimits.onThisMatch) ||
-    boldEnabled; // منع الـ Double إذا كانت البطاقة الجريئة مفعلة
+    doubleLimits != null &&
+    !doubleLimits.canEnable &&
+    !doubleLimits.onThisMatch;
   const boldPlayerGroups =
     lineup && hasPlayers
       ? [
@@ -923,7 +914,7 @@ export default function PredictPage() {
                 doubleCheckboxDisabled
                   ? "cursor-not-allowed border-card-border/60 opacity-60"
                   : "cursor-pointer border-orange-400/30 bg-black/10 hover:border-orange-300/60"
-              } ${doubleCommitted ? "border-orange-400/50 bg-orange-500/15" : ""}`}
+              } ${isDouble ? "border-orange-400/50 bg-orange-500/15" : ""}`}
             >
               <input
                 type="checkbox"
@@ -937,10 +928,8 @@ export default function PredictPage() {
                   {t.predict.doublePoints}
                 </p>
                 <p className="text-sm text-muted">
-                  {doubleCommitted
-                    ? t.predict.doubleLocked
-                    : boldEnabled
-                    ? t.predict.doubleAndBoldConflict
+                  {isDouble
+                    ? t.predict.doubleEnabled
                     : t.predict.doubleHint}
                 </p>
               </div>
@@ -1056,12 +1045,8 @@ export default function PredictPage() {
                     {t.predict.boldScorerBet.enable}
                   </p>
                   <p className="text-sm text-muted">
-                    {isDouble
-                      ? t.predict.doubleAndBoldConflict
-                      : boldCommitted
-                      ? t.predict.boldScorerBet.selected(
-                          match.userBoldScorerBet?.player.name ?? ""
-                        )
+                    {boldEnabled
+                      ? t.predict.boldScorerBet.selectingPlayer
                       : t.predict.boldScorerBet.hint}
                   </p>
                 </div>
