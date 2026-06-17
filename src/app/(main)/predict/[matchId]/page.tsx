@@ -766,12 +766,12 @@ export default function PredictPage() {
   // Disable checkboxes only when trying to enable if the other feature is active
   // Allow unchecking anytime (handlers do the conflict check)
   const boldCheckboxDisabled =
-    loading ||
+    loading || !match.roundUsageLimits ||
     Boolean(matchLockReason) ||
     (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
     (isDouble && !boldEnabled); // disable enabling only, allow unchecking
   const doubleCheckboxDisabled =
-    loading ||
+    loading || !match.roundUsageLimits ||
     (doubleLimits != null &&
       !doubleLimits.canEnable &&
       !doubleLimits.onThisMatch) ||
