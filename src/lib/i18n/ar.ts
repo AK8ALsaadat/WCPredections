@@ -215,7 +215,7 @@ export const ar = {
     you: "أنت",
     penaltyWinner: "الفائز بركلات الترجيح",
     notPredicted: "غير متوقعة",
-    notPredictedReason: "ليه ماتوقعت ياضعيف 😅",
+    notPredictedReason: "ليه ماتوقعت ياضعيف",
     noPointsForUnpredicted: "ما تحسب لك نقاط",
   },
   pointsBreakdown: {

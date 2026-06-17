@@ -356,7 +356,7 @@ export function MatchCard({
 
       {!finalPrediction && !canPredict && (
         <div className="mt-4" onClick={(e) => e.stopPropagation()}>
-          <ViewLeaguePredictionsButton matchId={match.id} fullWidth disabled={!hasPrediction} />
+          <ViewLeaguePredictionsButton matchId={match.id} fullWidth />
         </div>
       )}
 
