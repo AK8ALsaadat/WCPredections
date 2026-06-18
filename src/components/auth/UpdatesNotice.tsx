@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 
-const NOTICE_KEY = "wc-predictions-updates-2026-06-18-v6-octopus-clean-sheet-ar";
+const NOTICE_KEY = "wc-predictions-updates-2026-06-18-v7-octopus-mascot-ar";
 
 const OCTOPUS_SAVE_TIERS = [
   { saves: 3, points: 1 },
@@ -39,8 +40,15 @@ export function UpdatesNotice() {
       <div className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/45 bg-card p-6 text-center shadow-2xl shadow-black/50">
         <div className="pointer-events-none absolute inset-x-8 -top-24 h-32 rounded-full bg-cyan-400/20 blur-3xl" />
 
-        <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-200/45 bg-cyan-400/15 text-sm font-black text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.22)] ring-1 ring-cyan-100/25">
-          حارس
+        <div className="relative mx-auto mb-4 h-20 w-20 overflow-hidden rounded-2xl border border-cyan-200/45 bg-cyan-400/15 shadow-[0_0_28px_rgba(34,211,238,0.22)] ring-1 ring-cyan-100/25">
+          <Image
+            src="/octopus/octopus-mascot.png"
+            alt="الأخطبوط"
+            fill
+            priority
+            sizes="80px"
+            className="object-cover"
+          />
         </div>
 
         <h2 id="updates-notice-title" className="relative text-xl font-black">
@@ -48,16 +56,17 @@ export function UpdatesNotice() {
         </h2>
 
         <p className="relative mt-2 text-sm leading-7 text-muted">
-          اختر حارس مرة واحدة كل جولة. النقاط من التصديات الرسمية، ومعها بونص واضح للكلين شيت.
+          اختر أخطبوطك في المباراة. نقاطه تعتمد على التصديات الرسمية، ومع
+          الكلين شيت يأخذ بونص إضافي واضح.
         </p>
 
         <div className="relative mt-4 rounded-xl border border-primary/25 bg-primary/10 px-4 py-3 text-start">
-          <p className="text-sm font-bold text-primary">بونص الكلين شيت</p>
-          <p className="mt-1 text-sm leading-7 text-foreground">
-            إذا منتخب الحارس ما استقبل أي هدف، يأخذ الحارس +3 نقاط إضافية.
+          <p className="text-sm font-bold text-primary">
+            الكلين شيت يعطي +3
           </p>
-          <p className="mt-1 text-xs leading-6 text-muted">
-            0 تصدي لحاله ما يعطي نقاط. الثلاث نقاط تجي فقط إذا الحارس طلع بكلين شيت.
+          <p className="mt-1 text-sm leading-7 text-foreground">
+            إذا انتهت المباراة ومنتخب أخطبوطك ما استقبل أي هدف، تنضاف له +3
+            نقاط فوق نقاط التصديات.
           </p>
         </div>
 
@@ -78,14 +87,17 @@ export function UpdatesNotice() {
           ))}
         </div>
 
-        <div className="relative mt-4 space-y-2 rounded-xl border border-amber-300/25 bg-amber-400/10 px-4 py-3 text-start text-sm leading-7 text-muted">
-          <p>إذا استقبل هدف: ما عاد يقدر ياخذ سقف 10 تصديات.</p>
-          <p>إذا استقبل هدفين: ما عاد يقدر ياخذ سقف 7 تصديات.</p>
-          <p>إذا استقبل 3 أهداف أو أكثر: ما عاد يقدر ياخذ سقف 5 تصديات.</p>
+        <div className="relative mt-4 rounded-xl border border-amber-300/25 bg-amber-400/10 px-4 py-3 text-start text-sm leading-7 text-muted">
+          <p>
+            إذا استقبل منتخب أخطبوطك أهداف، يقل سقف نقاط التصديات: هدف واحد
+            يلغي مستوى 10 تصديات، هدفين يلغي مستوى 7 تصديات، و3 أهداف أو أكثر
+            يلغي مستوى 5 تصديات.
+          </p>
         </div>
 
         <p className="relative mt-4 text-xs leading-6 text-muted">
-          البلنتي أثناء المباراة يحسب إذا تصدى له الحارس. ركلات الترجيح بعد نهاية المباراة ما تدخل في حساب الأخطبوط.
+          التصدي لبلنتي أثناء المباراة يدخل في حساب الأخطبوط. ركلات الترجيح
+          بعد نهاية المباراة ما تدخل في الحساب.
         </p>
 
         <Button className="mt-6 w-full" onClick={close}>
