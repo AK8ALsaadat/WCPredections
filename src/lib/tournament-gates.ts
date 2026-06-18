@@ -4,16 +4,21 @@ import { prisma } from "@/lib/prisma";
 const GROUP_STAGE_GATE_REVALIDATE_SECONDS = 60;
 
 async function computeGroupStageComplete(): Promise<boolean> {
-  const groupMatches = await prisma.match.findMany({
-    where: {
-      isKnockout: false,
-      groupCode: { not: null },
-    },
-    select: { status: true },
-  });
+  const where = {
+    isKnockout: false,
+    groupCode: { not: null },
+  } as const;
+  const [total, unfinished] = await Promise.all([
+    prisma.match.count({ where }),
+    prisma.match.count({
+      where: {
+        ...where,
+        status: { not: "FINISHED" },
+      },
+    }),
+  ]);
 
-  if (groupMatches.length === 0) return false;
-  return groupMatches.every((match) => match.status === "FINISHED");
+  return total > 0 && unfinished === 0;
 }
 
 export function isGroupStageComplete() {
@@ -34,6 +39,7 @@ export async function canShowKnockoutFeatures() {
 export async function filterVisibleMatches<T extends { isKnockout: boolean }>(
   matches: T[]
 ): Promise<T[]> {
+  if (!matches.some((match) => match.isKnockout)) return matches;
   if (await canShowKnockoutFeatures()) return matches;
   return matches.filter((match) => !match.isKnockout);
 }

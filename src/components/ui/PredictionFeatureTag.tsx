@@ -11,9 +11,9 @@ type PredictionFeatureTagProps = HTMLAttributes<HTMLSpanElement> & {
 };
 
 const styles = {
-  bold: "border border-red-400/60 bg-gradient-to-r from-red-950/90 via-red-700/70 to-rose-600/55 text-red-50 shadow-lg shadow-red-950/40 ring-1 ring-inset ring-red-300/15",
-  double: "border border-orange-300/65 bg-gradient-to-r from-amber-950/90 via-orange-600/75 to-amber-400/55 text-orange-50 shadow-lg shadow-orange-950/40 ring-1 ring-inset ring-amber-200/20",
-  octopus: "border border-cyan-300/65 bg-gradient-to-r from-cyan-950/90 via-cyan-700/70 to-teal-500/55 text-cyan-50 shadow-lg shadow-cyan-950/35 ring-1 ring-inset ring-cyan-100/20",
+  bold: "border border-red-400/55 bg-red-950/45 text-red-100",
+  double: "border border-orange-300/55 bg-orange-950/45 text-orange-100",
+  octopus: "border border-cyan-300/55 bg-cyan-950/45 text-cyan-100",
 } as const;
 
 export function PredictionFeatureTag({
@@ -28,14 +28,14 @@ export function PredictionFeatureTag({
     <span
       title={title}
       className={cn(
-        "relative inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black tracking-tight",
+        "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black tracking-tight",
         styles[type],
         className
       )}
       {...props}
     >
       {icon ? (
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/20 text-current ring-1 ring-white/20">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/20 text-current">
           {icon}
         </span>
       ) : null}

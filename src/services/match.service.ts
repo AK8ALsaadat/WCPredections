@@ -557,15 +557,126 @@ async function buildMatchLineup(matchId: string) {
   };
 }
 
-function getSharedMatchLineup(matchId: string) {
+function positionRank(position?: string | null) {
+  const text = (position ?? "").toLowerCase();
+  if (/goal|keeper|\bgk\b|حارس/.test(text)) return 0;
+  if (/def|back|مدافع/.test(text)) return 1;
+  if (/mid|وسط/.test(text)) return 2;
+  if (/for|att|wing|striker|مهاجم/.test(text)) return 3;
+  return 4;
+}
+
+function toFastPlayers(
+  players: {
+    id: string;
+    name: string;
+    position: string | null;
+    shirtNumber: number | null;
+    photoUrl: string | null;
+  }[]
+) {
+  return players
+    .slice()
+    .sort((a, b) => {
+      const rankDiff = positionRank(a.position) - positionRank(b.position);
+      if (rankDiff !== 0) return rankDiff;
+      return a.name.localeCompare(b.name);
+    })
+    .slice(0, 26)
+    .map((player, index) => ({
+      id: player.id,
+      name: player.name,
+      position: player.position,
+      shirtNumber: player.shirtNumber,
+      photoUrl: player.photoUrl,
+      section: index < 11 ? ("lineup" as const) : ("bench" as const),
+      grid: null,
+    }));
+}
+
+async function buildFastMatchLineup(matchId: string) {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      id: true,
+      homeTeam: {
+        select: {
+          name: true,
+          shortName: true,
+          players: {
+            select: {
+              id: true,
+              name: true,
+              position: true,
+              shirtNumber: true,
+              photoUrl: true,
+            },
+            orderBy: { name: "asc" },
+          },
+        },
+      },
+      awayTeam: {
+        select: {
+          name: true,
+          shortName: true,
+          players: {
+            select: {
+              id: true,
+              name: true,
+              position: true,
+              shirtNumber: true,
+              photoUrl: true,
+            },
+            orderBy: { name: "asc" },
+          },
+        },
+      },
+    },
+  });
+
+  if (!match) return null;
+
+  return {
+    homePlayers: toFastPlayers(match.homeTeam.players),
+    awayPlayers: toFastPlayers(match.awayTeam.players),
+    homeFormation: "4-3-3",
+    awayFormation: "4-3-3",
+    homeLineupSource: "estimated" as const,
+    awayLineupSource: "estimated" as const,
+    lineupStatus: "estimated" as const,
+    homeTeamName: match.homeTeam.name,
+    awayTeamName: match.awayTeam.name,
+    homeShortName: match.homeTeam.shortName,
+    awayShortName: match.awayTeam.shortName,
+  };
+}
+
+function getCachedFastMatchLineup(matchId: string) {
   return unstable_cache(
-    () => buildMatchLineup(matchId),
-    ["match-lineup-v12", matchId],
+    () => buildFastMatchLineup(matchId),
+    ["match-lineup-fast-v1", matchId],
     {
       revalidate: MATCH_LINEUP_SHARED_CACHE_SECONDS,
       tags: [`lineup-${matchId}`],
     }
   )();
+}
+
+export function prewarmFastMatchLineups(matchIds: string[]) {
+  const uniqueIds = Array.from(new Set(matchIds)).slice(0, 8);
+  if (uniqueIds.length === 0) return;
+
+  setTimeout(() => {
+    void (async () => {
+      for (const matchId of uniqueIds) {
+        try {
+          await getCachedFastMatchLineup(matchId);
+        } catch {
+          // Background warming is best-effort only.
+        }
+      }
+    })();
+  }, 0);
 }
 
 export function clearMatchLineupMemoryCache(matchId: string) {
@@ -594,7 +705,7 @@ export async function getMatchLineup(
     return hit.data;
   }
 
-  const data = await getSharedMatchLineup(matchId);
+  const data = await getCachedFastMatchLineup(matchId);
 
   if (data) {
     matchLineupCache.set(matchId, {

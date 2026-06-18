@@ -29,7 +29,7 @@ export function MobileBottomNav() {
 
   return (
     <nav
-      className="wc-mobile-nav fixed inset-x-0 bottom-0 z-50 border-t border-card-border bg-background/95 backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-card-border bg-background md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       <div className="grid grid-cols-4">

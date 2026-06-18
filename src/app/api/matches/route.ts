@@ -12,6 +12,7 @@ import {
   getScheduleMatches,
   getUserPinnedTodayMatches,
   enrichMatchesWithUserPredictions,
+  prewarmFastMatchLineups,
 } from "@/services/match.service";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
       
       if (light && !completed) {
         const matches = await enrichMatchesWithUserPredictions(items, user?.userId);
+        prewarmFastMatchLineups(matches.map((match) => match.id));
         return apiSuccess({ matches, pinnedMatches: [], ...meta }, 200, PRIVATE_SHORT_CACHE);
       }
       
@@ -62,6 +64,10 @@ export async function GET(request: Request) {
         user?.userId && page === 1
           ? getUserPinnedTodayMatches(user.userId, roundId)
           : [],
+      ]);
+      prewarmFastMatchLineups([
+        ...matches.map((match) => match.id),
+        ...pinnedMatches.map((match) => match.id),
       ]);
       return apiSuccess({ matches, pinnedMatches, ...meta }, 200, PRIVATE_SHORT_CACHE);
     }
@@ -85,6 +91,7 @@ export async function GET(request: Request) {
     }
 
     const matches = await enrichMatchesWithUserPredictions(raw, user?.userId);
+    prewarmFastMatchLineups(matches.map((match) => match.id));
 
     return apiSuccess(matches, 200, PRIVATE_SHORT_CACHE);
   } catch (error) {

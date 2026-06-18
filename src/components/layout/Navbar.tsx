@@ -52,7 +52,7 @@ export function Navbar({ user }: { user: UserSession }) {
   }
 
   return (
-    <nav className="wc-navbar sticky top-0 z-50 border-b border-card-border bg-background/95 backdrop-blur">
+    <nav className="sticky top-0 z-50 border-b border-card-border bg-background">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
         <Link href="/dashboard" prefetch={false} className="flex items-center gap-2">
           <span className="wc-brand-mark" aria-hidden>WC</span>

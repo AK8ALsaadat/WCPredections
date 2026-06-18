@@ -17,7 +17,10 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
 import { LeaguePredictionsNavLink } from "@/components/matches/LeaguePredictionsNavLink";
-import { seedPredictMatchFromList } from "@/lib/predict-prefetch";
+import {
+  prefetchPredictData,
+  seedPredictMatchFromList,
+} from "@/lib/predict-prefetch";
 import { prefetchMatchDetail } from "@/lib/match-detail-cache";
 import { getSaudiLossDisplayTeam } from "@/lib/saudi-kuwait-joke";
 
@@ -174,17 +177,18 @@ export function MatchCard({
         predictedGoals: sp.predictedGoals,
       })),
     });
+    void prefetchPredictData(match.id, { includeLineup: true });
   }, [showPredictButton, canPredict, match]);
 
   return (
     <Card
       className={`transition-colors ${
         match.userBoldScorerBet
-          ? "border-red-400/70 bg-gradient-to-br from-red-950/75 via-red-900/30 to-rose-500/10 shadow-xl shadow-red-950/30 ring-1 ring-inset ring-red-300/15 hover:border-red-300"
+          ? "border-red-400/60 bg-red-950/25 hover:border-red-300"
           : match.userOctopusBet
-            ? "border-cyan-300/70 bg-gradient-to-br from-cyan-950/75 via-cyan-900/30 to-teal-400/10 shadow-xl shadow-cyan-950/25 ring-1 ring-inset ring-cyan-100/15 hover:border-cyan-200"
+            ? "border-cyan-300/60 bg-cyan-950/25 hover:border-cyan-200"
           : match.userPrediction?.isDouble
-            ? "border-orange-300/70 bg-gradient-to-br from-orange-950/75 via-orange-900/30 to-amber-400/10 shadow-xl shadow-orange-950/30 ring-1 ring-inset ring-orange-200/15 hover:border-orange-200"
+            ? "border-orange-300/60 bg-orange-950/25 hover:border-orange-200"
             : "hover:border-primary/30"
       }`}
     >
