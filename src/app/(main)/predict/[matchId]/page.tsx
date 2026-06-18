@@ -332,7 +332,7 @@ export default function PredictPage() {
         ? {
             title: "الأخطبوط",
             enable: "فعّل الأخطبوط",
-            hint: "مرة واحدة كل جولة. اختر حارساً؛ نقاطه من التصديات الرسمية فقط، وتصديات ركلات الترجيح لا تدخل.",
+            hint: "مرة واحدة كل جولة. اختر حارساً؛ نقاطه من التصديات الرسمية فقط.",
             counter: (used: boolean, max: number) =>
               `الأخطبوط: ${used ? 1 : 0}/${max}`,
             available: "متاحة — اختر حارساً واحداً",
@@ -345,13 +345,13 @@ export default function PredictPage() {
             change: "تقدر تغيّر الحارس من القائمة.",
             conflict: "ما تقدر تستخدم الأخطبوط مع المضاعفة أو الرهان على نفس المباراة",
             noKeepers: "ما فيه حراس متاحين في التشكيلة حالياً",
-            source: "الحساب من API-Football الرسمي فقط: 3 تصديات = +1، 5 = +3، 7 = +5، 10 = +8.",
+            source: "الحساب من API-Football الرسمي فقط: 3 تصديات = +1، 5 = +3، 7 = +5، 10 = +8. البلنتي أثناء المباراة يحسب إذا تصدى له الحارس، لكن ركلات الترجيح بعد النهاية لا تدخل.",
             viewOtherMatch: "شوف المباراة",
           }
         : {
             title: "Octopus",
             enable: "Enable Octopus",
-            hint: "Once per round. Pick a goalkeeper; points use official saves only, excluding shootout saves.",
+            hint: "Once per round. Pick a goalkeeper; points use official saves only.",
             counter: (used: boolean, max: number) =>
               `Octopus: ${used ? 1 : 0}/${max}`,
             available: "Available — pick one goalkeeper",
@@ -364,7 +364,7 @@ export default function PredictPage() {
             change: "You can change the goalkeeper from the list.",
             conflict: "Can't use Octopus with double or the bet on the same match",
             noKeepers: "No goalkeepers are available in the lineup yet",
-            source: "Scoring uses official API-Football saves only: 3 saves = +1, 5 = +3, 7 = +5, 10 = +8.",
+            source: "Scoring uses official API-Football saves only: 3 saves = +1, 5 = +3, 7 = +5, 10 = +8. In-match penalty saves count; post-match shootout saves do not.",
             viewOtherMatch: "View match",
           },
     [locale]

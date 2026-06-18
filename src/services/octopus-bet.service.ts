@@ -2,6 +2,7 @@ import { resolvePlayerInSquad } from "@/lib/player-matching";
 import { goalkeeperPositionWhere, isGoalkeeperPosition } from "@/lib/goalkeeper";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason } from "@/lib/utils";
+import { ApiFootballProvider } from "@/services/football-api/api-football.provider";
 import { getFootballApiProvider } from "@/services/football-api";
 import type {
   ExternalGoalkeeperSave,
@@ -21,11 +22,13 @@ export const OCTOPUS_POINTS = {
 } as const;
 
 type MatchForGoalkeeperStats = {
+  matchTime?: Date | null;
   homeTeam: { id: string; apiTeamId: string | null; name: string };
   awayTeam: { id: string; apiTeamId: string | null; name: string };
 };
 
 const matchForGoalkeeperStatsSelect = {
+  matchTime: true,
   homeTeam: { select: { id: true, apiTeamId: true, name: true } },
   awayTeam: { select: { id: true, apiTeamId: true, name: true } },
 } as const;
@@ -50,17 +53,23 @@ export function calculateOctopusPoints(saves: number | null | undefined) {
 
 async function resolveTeamId(
   match: MatchForGoalkeeperStats,
-  teamApiId: string
+  teamApiId: string,
+  teamName?: string
 ) {
+  const normalizedTeamName = teamName ? slugifyTeamName(teamName) : null;
   if (
     match.homeTeam.apiTeamId === teamApiId ||
-    slugifyTeamName(match.homeTeam.name) === teamApiId
+    slugifyTeamName(match.homeTeam.name) === teamApiId ||
+    (normalizedTeamName != null &&
+      slugifyTeamName(match.homeTeam.name) === normalizedTeamName)
   ) {
     return match.homeTeam.id;
   }
   if (
     match.awayTeam.apiTeamId === teamApiId ||
-    slugifyTeamName(match.awayTeam.name) === teamApiId
+    slugifyTeamName(match.awayTeam.name) === teamApiId ||
+    (normalizedTeamName != null &&
+      slugifyTeamName(match.awayTeam.name) === normalizedTeamName)
   ) {
     return match.awayTeam.id;
   }
@@ -87,7 +96,7 @@ export async function replaceGoalkeeperSaves(
 
   const resolved = new Map<string, { playerId: string; saves: number }>();
 
-  for (const { playerApiId, playerName, teamApiId, saves } of apiStats) {
+  for (const { playerApiId, playerName, teamApiId, teamName, saves } of apiStats) {
     if (saves < 0) continue;
 
     let player = await prisma.player.findFirst({
@@ -96,7 +105,7 @@ export async function replaceGoalkeeperSaves(
     });
 
     if (!player && playerName && teamApiId) {
-      const teamId = await resolveTeamId(match, teamApiId);
+      const teamId = await resolveTeamId(match, teamApiId, teamName);
       if (teamId) {
         const squad = await prisma.player.findMany({
           where: { teamId },
@@ -165,7 +174,23 @@ export async function syncGoalkeeperSavesFromApi(
   });
   if (!match) throw new Error("Match not found");
 
-  const stats = await provider.fetchGoalkeeperSaves(fixtureApiId, options);
+  const providerOptions = {
+    ...options,
+    fixtureDate: match.matchTime?.toISOString().slice(0, 10),
+    homeTeamName: match.homeTeam.name,
+    awayTeamName: match.awayTeam.name,
+  };
+  let stats = await provider.fetchGoalkeeperSaves(fixtureApiId, providerOptions);
+  if (
+    stats.length === 0 &&
+    provider.name !== "api-football" &&
+    process.env.API_FOOTBALL_KEY
+  ) {
+    stats = await new ApiFootballProvider().fetchGoalkeeperSaves(
+      fixtureApiId,
+      providerOptions
+    );
+  }
   if (stats.length === 0) return 0;
   return replaceGoalkeeperSaves(matchId, stats, match);
 }

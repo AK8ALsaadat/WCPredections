@@ -46,7 +46,7 @@ export function predictMatchCacheKey(matchId: string) {
 }
 
 export function predictLineupCacheKey(matchId: string) {
-  return `predict:lineup:v10:${matchId}`;
+  return `predict:lineup:v11:${matchId}`;
 }
 
 function predictDraftCacheKey(matchId: string) {

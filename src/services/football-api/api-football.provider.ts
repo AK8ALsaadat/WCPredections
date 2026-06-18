@@ -4,6 +4,7 @@ import {
   type ParsedFixtureEvent,
 } from "@/lib/fixture-events";
 import { isGoalkeeperPosition } from "@/lib/goalkeeper";
+import { normalizePlayerName } from "@/lib/player-matching";
 import type {
   ExternalMatch,
   ExternalMatchScorer,
@@ -227,13 +228,53 @@ export class ApiFootballProvider implements FootballApiProvider {
     return goalsMapToList(aggregateGoalsFromEvents(events));
   }
 
+  private teamsMatch(
+    apiHome: string | undefined,
+    apiAway: string | undefined,
+    homeTeamName: string,
+    awayTeamName: string
+  ) {
+    const home = normalizePlayerName(homeTeamName);
+    const away = normalizePlayerName(awayTeamName);
+    const apiHomeName = normalizePlayerName(apiHome ?? "");
+    const apiAwayName = normalizePlayerName(apiAway ?? "");
+    return (
+      (apiHomeName === home && apiAwayName === away) ||
+      (apiHomeName === away && apiAwayName === home)
+    );
+  }
+
+  private async resolveFixtureIdByMatchContext(options: SyncOptions) {
+    if (!options.fixtureDate || !options.homeTeamName || !options.awayTeamName) {
+      return null;
+    }
+
+    const fixtures = await this.fetch<
+      {
+        fixture: { id: number; date: string };
+        teams: { home: { name: string }; away: { name: string } };
+      }[]
+    >("/fixtures", { date: options.fixtureDate });
+
+    const match = fixtures.find((row) =>
+      this.teamsMatch(
+        row.teams?.home?.name,
+        row.teams?.away?.name,
+        options.homeTeamName!,
+        options.awayTeamName!
+      )
+    );
+
+    return match?.fixture?.id != null ? String(match.fixture.id) : null;
+  }
+
   async fetchGoalkeeperSaves(
     fixtureApiId: string,
-    _options: SyncOptions
+    options: SyncOptions
   ): Promise<ExternalGoalkeeperSave[]> {
     const response = await this.fetch<
       {
-        team: { id: number };
+        team: { id: number; name: string };
         players: {
           player: { id: number | null; name: string };
           statistics?: {
@@ -244,7 +285,7 @@ export class ApiFootballProvider implements FootballApiProvider {
       }[]
     >("/fixtures/players", { fixture: fixtureApiId });
 
-    return response.flatMap((teamRow) =>
+    const direct = response.flatMap((teamRow) =>
       (teamRow.players ?? []).flatMap((row) => {
         const playerApiId =
           row.player.id != null ? String(row.player.id) : null;
@@ -265,6 +306,50 @@ export class ApiFootballProvider implements FootballApiProvider {
           saves,
           playerName: row.player.name,
           teamApiId: String(teamRow.team.id),
+          teamName: teamRow.team.name,
+        };
+      })
+    );
+    if (direct.length > 0) return direct;
+
+    const resolvedFixtureId = await this.resolveFixtureIdByMatchContext(options);
+    if (!resolvedFixtureId || resolvedFixtureId === fixtureApiId) return direct;
+
+    const resolvedResponse = await this.fetch<
+      {
+        team: { id: number; name: string };
+        players: {
+          player: { id: number | null; name: string };
+          statistics?: {
+            games?: { position?: string | null };
+            goals?: { saves?: number | null };
+          }[];
+        }[];
+      }[]
+    >("/fixtures/players", { fixture: resolvedFixtureId });
+
+    return resolvedResponse.flatMap((teamRow) =>
+      (teamRow.players ?? []).flatMap((row) => {
+        const playerApiId =
+          row.player.id != null ? String(row.player.id) : null;
+        const stats = row.statistics?.[0];
+        const position = (stats?.games?.position ?? "").toLowerCase();
+        const saves = stats?.goals?.saves;
+        if (
+          !playerApiId ||
+          !isGoalkeeperPosition(position) ||
+          saves == null ||
+          saves < 0
+        ) {
+          return [];
+        }
+
+        return {
+          playerApiId,
+          saves,
+          playerName: row.player.name,
+          teamApiId: String(teamRow.team.id),
+          teamName: teamRow.team.name,
         };
       })
     );

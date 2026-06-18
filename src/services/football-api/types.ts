@@ -40,6 +40,9 @@ export type SyncOptions = {
   season?: string;
   dateFrom?: string;
   dateTo?: string;
+  fixtureDate?: string;
+  homeTeamName?: string;
+  awayTeamName?: string;
   /** SportScore: جلب المباريات الحية/الأخيرة فقط (أسرع للـ cron) */
   quickSync?: boolean;
 };
@@ -62,6 +65,7 @@ export type ExternalGoalkeeperSave = {
   saves: number;
   playerName?: string;
   teamApiId?: string;
+  teamName?: string;
 };
 
 export interface FootballApiProvider {

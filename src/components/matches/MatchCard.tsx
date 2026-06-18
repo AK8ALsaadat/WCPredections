@@ -105,11 +105,13 @@ export function MatchCard({
   const isFinished = match.status === "FINISHED";
   const isLive = match.status === "LIVE";
   const hasPrediction = !!match.userPrediction;
-  const hasMatchPoints =
+  const hasAnyUserEntry =
     hasPrediction ||
     (match.userScorerPredictions?.length ?? 0) > 0 ||
     !!match.userBoldScorerBet ||
     !!match.userOctopusBet;
+  const hasMatchPoints =
+    hasAnyUserEntry;
   const stageLabel =
     (match.stageName &&
       t.stageLabels[match.stageName as keyof typeof t.stageLabels]) ||
@@ -370,7 +372,7 @@ export function MatchCard({
       )}
 
       {/* حالة المباراة المقفلة بدون توقع */}
-      {isPastMatch && isFinished && !hasPrediction && (
+      {isPastMatch && isFinished && !hasAnyUserEntry && (
         <div className="mt-3 rounded-lg border border-red-500/50 bg-red-500/10 p-3">
           <p className="text-sm font-semibold text-red-500">
             🔴 {t.matches.notPredicted}

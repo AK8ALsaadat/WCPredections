@@ -1,5 +1,6 @@
 import { cachedFetch } from "@/lib/api-cache";
 import { buildExpectedLineup } from "@/lib/expected-lineup";
+import { goalkeeperPositionWhere } from "@/lib/goalkeeper";
 import {
   isWithinLineupFastRefreshWindow,
   LINEUP_FAST_REFRESH_BEFORE_MS,
@@ -127,6 +128,54 @@ export function mergeTeamViewWithCurrentRoster(
   });
 
   if (additions.length === 0) return view;
+  return {
+    ...view,
+    players: [
+      ...view.players,
+      ...additions.map((player) => ({
+        ...player,
+        section: "bench" as const,
+        grid: null,
+      })),
+    ],
+  };
+}
+
+async function appendDatabaseGoalkeepers(
+  teamId: string,
+  view: TeamPlayersView
+): Promise<TeamPlayersView> {
+  const goalkeepers = await prisma.player.findMany({
+    where: {
+      teamId,
+      ...goalkeeperPositionWhere,
+    },
+    select: {
+      id: true,
+      name: true,
+      position: true,
+      shirtNumber: true,
+      photoUrl: true,
+    },
+    orderBy: [{ shirtNumber: "asc" }, { name: "asc" }],
+  });
+
+  if (goalkeepers.length === 0) return view;
+
+  const knownIds = new Set(view.players.map((player) => player.id));
+  const knownNames = new Set(
+    view.players.map((player) => normalizePlayerName(player.name))
+  );
+  const additions = goalkeepers.filter((player) => {
+    const normalizedName = normalizePlayerName(player.name);
+    if (knownIds.has(player.id) || knownNames.has(normalizedName)) return false;
+    knownIds.add(player.id);
+    knownNames.add(normalizedName);
+    return true;
+  });
+
+  if (additions.length === 0) return view;
+
   return {
     ...view,
     players: [
@@ -1250,7 +1299,11 @@ async function getTeamPlayersForMatch(
     rawView,
     currentRoster
   );
-  return enrichWithApiFootballPhotos(teamName, completedView);
+  const withAllGoalkeepers = await appendDatabaseGoalkeepers(
+    teamId,
+    completedView
+  );
+  return enrichWithApiFootballPhotos(teamName, withAllGoalkeepers);
 }
 
 function resolveLineupStatus(

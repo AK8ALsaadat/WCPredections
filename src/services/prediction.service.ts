@@ -99,28 +99,39 @@ export async function submitPrediction(
     throw new Error(lockReason);
   }
 
-  const existing = await prisma.prediction.findUnique({
-    where: { userId_matchId: { userId, matchId: data.matchId } },
-    select: { id: true, isDouble: true },
-  });
+  const [existing, usageScope] = await Promise.all([
+    prisma.prediction.findUnique({
+      where: { userId_matchId: { userId, matchId: data.matchId } },
+      select: { id: true, isDouble: true },
+    }),
+    getUsageRoundScope(data.matchId),
+  ]);
 
   const isDouble = data.isDouble ?? false;
 
-  await validateDoubleUsage(
-    userId,
-    data.matchId,
-    isDouble,
-    existing?.id
-  );
+  if (isDouble) {
+    const doublesUsed = await prisma.prediction.count({
+      where: {
+        userId,
+        isDouble: true,
+        id: existing?.id ? { not: existing.id } : undefined,
+        matchId: { in: usageScope.matchIds },
+      },
+    });
+    if (doublesUsed >= MAX_DOUBLES_PER_ROUND) {
+      throw new Error(
+        `يمكنك استخدام ${MAX_DOUBLES_PER_ROUND} مضاعفات فقط في كل جولة`
+      );
+    }
+  }
 
   if (isDouble) {
-    const scope = await getUsageRoundScope(data.matchId, match.roundId);
     const [boldOnThisMatch, octopusOnThisMatch] = await Promise.all([
       prisma.boldScorerBet.findUnique({
         where: {
           userId_usageRoundKey: {
             userId,
-            usageRoundKey: scope.key,
+            usageRoundKey: usageScope.key,
           },
         },
         select: { matchId: true },
@@ -129,7 +140,7 @@ export async function submitPrediction(
         where: {
           userId_usageRoundKey: {
             userId,
-            usageRoundKey: scope.key,
+            usageRoundKey: usageScope.key,
           },
         },
         select: { matchId: true },
@@ -140,7 +151,7 @@ export async function submitPrediction(
       octopusOnThisMatch?.matchId === data.matchId
     ) {
       throw new Error(
-        "ما تقدر تستخدم المضاعفة والرهان معاً على نفس المباراة"
+        "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
       );
     }
   }
@@ -386,10 +397,13 @@ export async function submitMatchPredictionBundle(
     throw new Error(lockReason);
   }
 
-  const existing = await prisma.prediction.findUnique({
-    where: { userId_matchId: { userId, matchId: data.matchId } },
-    select: { id: true, isDouble: true },
-  });
+  const [existing, usageScope] = await Promise.all([
+    prisma.prediction.findUnique({
+      where: { userId_matchId: { userId, matchId: data.matchId } },
+      select: { id: true, isDouble: true },
+    }),
+    getUsageRoundScope(data.matchId, match.roundId),
+  ]);
 
   const isDouble = data.isDouble ?? false;
   let predHome = data.predHome;
@@ -468,8 +482,6 @@ export async function submitMatchPredictionBundle(
 
   await validateScorerPicks(match, predHome, predAway, picks);
 
-  const usageScope = await getUsageRoundScope(data.matchId);
-
   if (isDouble) {
     const doublesUsed = await prisma.prediction.count({
       where: {
@@ -486,23 +498,24 @@ export async function submitMatchPredictionBundle(
     }
   }
 
-  const storedBold = await prisma.boldScorerBet.findUnique({
-    where: {
-      userId_usageRoundKey: {
-        userId,
-        usageRoundKey: usageScope.key,
+  const [storedBold, storedOctopus] = await Promise.all([
+    prisma.boldScorerBet.findUnique({
+      where: {
+        userId_usageRoundKey: {
+          userId,
+          usageRoundKey: usageScope.key,
+        },
       },
-    },
-  });
-
-  const storedOctopus = await prisma.octopusGoalkeeperBet.findUnique({
-    where: {
-      userId_usageRoundKey: {
-        userId,
-        usageRoundKey: usageScope.key,
+    }),
+    prisma.octopusGoalkeeperBet.findUnique({
+      where: {
+        userId_usageRoundKey: {
+          userId,
+          usageRoundKey: usageScope.key,
+        },
       },
-    },
-  });
+    }),
+  ]);
 
   // ✅ منع استخدام الـ Double والـ Bold معاً على نفس المباراة
   if (
@@ -513,7 +526,7 @@ export async function submitMatchPredictionBundle(
       storedOctopus?.matchId === data.matchId)
   ) {
     throw new Error(
-      "ما تقدر تستخدم المضاعفة والرهان معاً على نفس المباراة"
+      "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
     );
   }
 

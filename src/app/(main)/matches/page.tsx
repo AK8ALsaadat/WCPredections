@@ -71,7 +71,7 @@ const MATCHES_CACHE_FRESH_MS = 60_000;
 const ROUNDS_CACHE_FRESH_MS = 5 * 60_000;
 
 function matchesCacheKey(roundId: string, page: number, matchType: string) {
-  return `matches:v5:${matchType}:${roundId || "all"}:${page}`;
+  return `matches:v6:${matchType}:${roundId || "all"}:${page}`;
 }
 
 function matchesApiUrl(

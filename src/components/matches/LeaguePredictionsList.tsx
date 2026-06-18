@@ -143,14 +143,44 @@ function PredictionScoreboard({
 
   return (
     <div
-      className="flex w-full min-w-0 flex-col items-center gap-1.5 md:max-w-xs md:justify-self-center"
+      className="flex w-full min-w-0 flex-col items-center gap-2 md:max-w-sm md:justify-self-center"
       dir="ltr"
     >
       {hasScore ? (
-        <div className="flex items-baseline gap-1.5 tabular-nums tracking-tight">
-          <span className="text-2xl font-bold leading-none">{predHome}</span>
-          <span className="text-sm font-light text-muted">-</span>
-          <span className="text-2xl font-bold leading-none">{predAway}</span>
+        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 tabular-nums tracking-tight">
+          <div className="flex min-w-0 flex-col items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              <TeamLogo {...homeTeam} size="sm" />
+              <span className="truncate text-[10px] font-bold text-muted">
+                {homeTeam.shortName}
+              </span>
+            </div>
+            <span className="text-3xl font-black leading-none">{predHome}</span>
+            <ScorerChips
+              scorers={homeScorers}
+              align="center"
+              vertical
+              showResults={showResults}
+              showMisses={showMisses}
+            />
+          </div>
+          <span className="pt-7 text-sm font-light text-muted">-</span>
+          <div className="flex min-w-0 flex-col items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              <TeamLogo {...awayTeam} size="sm" />
+              <span className="truncate text-[10px] font-bold text-muted">
+                {awayTeam.shortName}
+              </span>
+            </div>
+            <span className="text-3xl font-black leading-none">{predAway}</span>
+            <ScorerChips
+              scorers={awayScorers}
+              align="center"
+              vertical
+              showResults={showResults}
+              showMisses={showMisses}
+            />
+          </div>
         </div>
       ) : (
         <span className="text-lg text-muted">—</span>
@@ -166,7 +196,7 @@ function PredictionScoreboard({
         </span>
       )}
 
-      {(homeScorers.length > 0 || awayScorers.length > 0 || allScorers.length > 0) && (
+      {!hasScore && (homeScorers.length > 0 || awayScorers.length > 0 || allScorers.length > 0) && (
         (homeScorers.length > 0 || awayScorers.length > 0) ? (
           <div className="w-full space-y-1.5">
             {[
@@ -216,11 +246,13 @@ function ScorerChips({
   align = "start",
   showResults = false,
   showMisses = false,
+  vertical = false,
 }: {
   scorers: LeagueMatchPredictionRow["scorerPredictions"];
   align?: "start" | "center" | "end";
   showResults?: boolean;
   showMisses?: boolean;
+  vertical?: boolean;
 }) {
   if (scorers.length === 0) {
     return <span className="text-xs text-muted/60">—</span>;
@@ -228,12 +260,16 @@ function ScorerChips({
 
   return (
     <div
-      className={`flex flex-wrap gap-1 ${
-        align === "center"
-          ? "justify-center"
-          : align === "end"
-            ? "justify-end"
-            : "justify-start"
+      className={`flex gap-1 ${
+        vertical
+          ? "w-full max-w-[7.5rem] flex-col items-center"
+          : `flex-wrap ${
+              align === "center"
+                ? "justify-center"
+                : align === "end"
+                  ? "justify-end"
+                  : "justify-start"
+            }`
       }`}
     >
       {scorers.map((pick) => {
@@ -363,6 +399,7 @@ function LeaguePredictionRow({
   const showScoreResults = isFinished && !!matchResult;
   const hasDouble = Boolean(row.prediction?.isDouble);
   const hasBold = Boolean(row.boldScorerBet);
+  const hasOctopus = Boolean(row.octopusGoalkeeperBet);
 
   const homeScorers = row.scorerPredictions.filter(
     (p) => p.player.teamId === homeTeamId
@@ -404,6 +441,8 @@ function LeaguePredictionRow({
           ? "border-orange-300/70 bg-gradient-to-br from-orange-950/80 via-orange-900/45 to-amber-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_35px_rgba(124,45,18,0.28)] ring-1 ring-inset ring-orange-300/50"
           : hasBold
             ? "border-red-400/70 bg-gradient-to-br from-red-950/85 via-red-900/45 to-rose-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_35px_rgba(127,29,29,0.28)] ring-1 ring-inset ring-red-400/50"
+            : hasOctopus
+              ? "border-cyan-300/70 bg-gradient-to-br from-cyan-950/80 via-cyan-900/40 to-teal-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_35px_rgba(8,145,178,0.22)] ring-1 ring-inset ring-cyan-200/40"
             : isMe
               ? "border-primary/35 bg-primary/[0.07] ring-1 ring-inset ring-primary/25"
               : index % 2 === 0
