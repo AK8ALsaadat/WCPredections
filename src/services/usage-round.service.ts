@@ -6,7 +6,7 @@ type UsageMatch = {
   roundId: string;
   homeTeamId: string;
   awayTeamId: string;
-  matchTime: Date;
+  matchTime: Date | string;
   stageName: string | null;
   groupCode: string | null;
   homeTeam?: { name: string };
@@ -29,6 +29,12 @@ function stageKey(stageName: string | null): string {
 
 function isGroupStage(stageName: string | null): boolean {
   return stageKey(stageName).includes("group");
+}
+
+function matchTimeMs(matchTime: Date | string): number {
+  return matchTime instanceof Date
+    ? matchTime.getTime()
+    : new Date(matchTime).getTime();
 }
 
 function normalizedGroupCode(groupCode: string | null): string | null {
@@ -89,14 +95,14 @@ export function buildUsageRoundKey(
     const groupMatches = roundMatches
       .filter((candidate) => normalizedGroupCode(candidate.groupCode) === group)
       .sort((a, b) => {
-        const timeDiff = a.matchTime.getTime() - b.matchTime.getTime();
+        const timeDiff = matchTimeMs(a.matchTime) - matchTimeMs(b.matchTime);
         return timeDiff !== 0 ? timeDiff : a.id.localeCompare(b.id);
       });
 
     const seen = new Map<string, number>();
     let distinctIndex = 0;
     for (const candidate of groupMatches) {
-      const duplicateKey = `${candidate.matchTime.getTime()}:${pairUsageKey(candidate)}`;
+      const duplicateKey = `${matchTimeMs(candidate.matchTime)}:${pairUsageKey(candidate)}`;
       const existingIndex = seen.get(duplicateKey);
       const candidateIndex = existingIndex ?? distinctIndex;
       if (existingIndex == null) {
@@ -113,7 +119,7 @@ export function buildUsageRoundKey(
     roundMatches.filter(
       (candidate) =>
         isGroupMatch(candidate) &&
-        candidate.matchTime < match.matchTime &&
+        matchTimeMs(candidate.matchTime) < matchTimeMs(match.matchTime) &&
         (candidate.homeTeamId === teamId || candidate.awayTeamId === teamId)
     ).length;
 
