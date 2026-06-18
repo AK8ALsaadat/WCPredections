@@ -164,9 +164,10 @@ export function seedPredictMatchFromList(match: ListMatchSeed) {
 /** يحمّل بيانات التوقع مسبقاً — فور ظهور الرابط أو لمسه */
 export function prefetchPredictData(
   matchId: string,
-  options?: { urgent?: boolean }
+  options?: { urgent?: boolean; includeLineup?: boolean }
 ) {
   if (DISABLE_PREFETCH) return Promise.resolve();
+  const includeLineup = options?.includeLineup === true;
   const matchFresh = isClientCacheFresh(
     predictMatchCacheKey(matchId),
     MATCH_FRESH_MS
@@ -181,7 +182,7 @@ export function prefetchPredictData(
     predictLineupCacheKey(matchId),
     lineupFreshMs(cachedLineup, matchCached?.matchTime)
   );
-  if (matchFresh && lineupFresh) return Promise.resolve();
+  if (matchFresh && (!includeLineup || lineupFresh)) return Promise.resolve();
 
   const existing = inflight.get(matchId);
   if (existing) {
@@ -201,7 +202,9 @@ export function prefetchPredictData(
     try {
       await Promise.all([
         matchFresh ? Promise.resolve() : fetchPredictMatch(matchId),
-        lineupFresh ? Promise.resolve() : fetchPredictLineup(matchId),
+        includeLineup && !lineupFresh
+          ? fetchPredictLineup(matchId)
+          : Promise.resolve(),
       ]);
     } finally {
       inflight.delete(matchId);
