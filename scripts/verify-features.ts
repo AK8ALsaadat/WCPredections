@@ -37,6 +37,11 @@ import { asFinishType } from "../src/lib/finish-type";
 import { parseOptionalScore } from "../src/lib/utils";
 import { statsFromLeaderboard } from "../src/services/leaderboard.service";
 import { buildUsageRoundKey } from "../src/services/usage-round.service";
+import {
+  calculateOctopusPoints,
+  getOctopusCleanSheetBonus,
+  getOctopusSaveTierPoints,
+} from "../src/lib/octopus-points";
 import type { LeaderboardEntry } from "../src/types";
 
 let passed = 0;
@@ -361,6 +366,17 @@ ok(
     userBoldScorerBet: { points: -5, player: { name: "سالم" } },
   }) === -5
 );
+
+console.log("\n=== Octopus goalkeeper ===");
+ok("octopus clean sheet bonus = 3", getOctopusCleanSheetBonus(0) === 3);
+ok("octopus no clean sheet bonus when conceded", getOctopusCleanSheetBonus(1) === 0);
+ok("octopus save tier 10 saves = 8", getOctopusSaveTierPoints(10) === 8);
+ok("octopus 0 saves clean sheet = 3", calculateOctopusPoints(0, 0) === 3);
+ok("octopus 3 saves clean sheet = 4", calculateOctopusPoints(3, 0) === 4);
+ok("octopus 10 saves clean sheet = 11", calculateOctopusPoints(10, 0) === 11);
+ok("octopus 10 saves conceded 1 = 5", calculateOctopusPoints(10, 1) === 5);
+ok("octopus 10 saves conceded 2 = 3", calculateOctopusPoints(10, 2) === 3);
+ok("octopus 10 saves conceded 3 = 1", calculateOctopusPoints(10, 3) === 1);
 
 console.log("\n=== توقع الهدافين ===");
 const home = new Set(["p1", "p2"]);

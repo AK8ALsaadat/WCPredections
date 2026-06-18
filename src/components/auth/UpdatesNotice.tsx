@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
-const NOTICE_KEY = "wc-predictions-updates-2026-06-18-v4-global-octopus-time";
+const NOTICE_KEY = "wc-predictions-updates-2026-06-18-v5-octopus-clean-sheet";
 
 const OCTOPUS_POINTS = [
+  { saves: 0, points: 3, bonus: true },
   { saves: 3, points: 1 },
   { saves: 5, points: 3 },
   { saves: 7, points: 5 },
@@ -71,7 +72,7 @@ export function UpdatesNotice() {
           {isAr ? "تحديثات: بطاقة الأخطبوط" : "Updates: Octopus card"}
         </h2>
 
-        <div className="relative mt-4 grid grid-cols-4 gap-2 text-center">
+        <div className="relative mt-4 grid grid-cols-5 gap-2 text-center">
           {OCTOPUS_POINTS.map((item) => (
             <div
               key={item.saves}
@@ -98,6 +99,15 @@ export function UpdatesNotice() {
             {isAr
               ? "كل التوقعات والميزات تقفل قبل بداية المباراة بساعة ونصف، ويظهر نفس الوقت في عدّاد الإغلاق."
               : "Predictions and feature cards close 90 minutes before kickoff, and the countdown shows that same deadline."}
+          </p>
+        </div>
+
+        <div className="relative mt-3 rounded-xl border border-cyan-300/30 bg-cyan-400/10 px-4 py-3 text-start">
+          <p className="text-xs font-bold uppercase tracking-wide text-cyan-100">
+            New Octopus bonus
+          </p>
+          <p className="mt-1 text-sm leading-6 text-foreground">
+            Clean sheet bonus: goalkeeper gets +3 if his team concedes 0 goals.
           </p>
         </div>
 
@@ -130,7 +140,7 @@ export function UpdatesNotice() {
           <p>
             {isAr
               ? "النقاط من تصديات المصدر الرسمي فقط: 3 تصديات +1، 5 +3، 7 +5، 10 +8."
-              : "Points use official source saves only: 3 saves +1, 5 +3, 7 +5, 10 +8."}
+              : "Points use official source saves only: 3 saves +1, 5 +3, 7 +5, 10 +8, plus +3 for a clean sheet."}
           </p>
           <p>
             {isAr

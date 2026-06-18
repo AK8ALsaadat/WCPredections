@@ -3,6 +3,7 @@ export const OCTOPUS_POINTS = {
   five: 3,
   seven: 5,
   ten: 8,
+  cleanSheet: 3,
 } as const;
 
 export function getOctopusConcededCapPoints(
@@ -37,12 +38,19 @@ export function getOctopusSaveTierPoints(saves: number | null | undefined) {
   return 0;
 }
 
+export function getOctopusCleanSheetBonus(
+  goalsConceded: number | null | undefined
+) {
+  return goalsConceded === 0 ? OCTOPUS_POINTS.cleanSheet : 0;
+}
+
 export function calculateOctopusPoints(
   saves: number | null | undefined,
   goalsConceded?: number | null
 ) {
-  return Math.min(
+  const savePoints = Math.min(
     getOctopusSaveTierPoints(saves),
     getOctopusConcededCapPoints(goalsConceded)
   );
+  return savePoints + getOctopusCleanSheetBonus(goalsConceded);
 }

@@ -4,6 +4,7 @@ import type { FinishType } from "@prisma/client";
 import {
   getOctopusConcededCapLabel,
   getOctopusConcededCapPoints,
+  getOctopusCleanSheetBonus,
   getOctopusSaveTierPoints,
 } from "@/lib/octopus-points";
 import { PERFECT_PREDICTION_BONUS_POINTS } from "@/services/scoring.service";
@@ -276,10 +277,14 @@ export function buildMatchPointsBreakdown(
     if (showMisses || octopus.points !== 0) {
       const saveTierPoints = getOctopusSaveTierPoints(octopus.saves);
       const concededCap = getOctopusConcededCapPoints(octopus.goalsConceded);
+      const cleanSheetBonus = getOctopusCleanSheetBonus(
+        octopus.goalsConceded
+      );
       const cappedByGoals =
         Number.isFinite(concededCap) && saveTierPoints > concededCap;
       const octopusDetails = [
         `Saves tier before conceded-goals cap: +${saveTierPoints}`,
+        cleanSheetBonus > 0 ? `Clean sheet bonus: +${cleanSheetBonus}` : null,
         octopus.saves != null
           ? `${octopus.saves} تصديات رسمية`
           : "تصديات الحارس الرسمية",
