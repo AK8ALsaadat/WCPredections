@@ -178,6 +178,23 @@ export async function submitBoldScorerBet(
     throw new Error("اختيار لاعب غير صالح للبطاقة الجريئة");
   }
 
+  const scorerPick = await prisma.scorerPrediction.findUnique({
+    where: {
+      userId_matchId_playerId: {
+        userId,
+        matchId,
+        playerId,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!scorerPick) {
+    throw new Error(
+      "لازم لاعب الرهان يكون من الهدافين اللي اخترتهم في نفس التوقع"
+    );
+  }
+
   if (existing && existing.matchId !== matchId) {
     throw new Error(
       "استخدمت الرهان في مباراة ثانية هالجولة — مرة واحدة بس"

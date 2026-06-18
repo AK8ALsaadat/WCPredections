@@ -46,6 +46,7 @@ import {
   MAX_SCORERS_TOTAL,
   picksToArray,
   pruneScorerPicksToBudget,
+  scorerGoalTarget,
   type ScorerPicks,
 } from "@/lib/scorer-prediction";
 import type {
@@ -649,6 +650,69 @@ export default function PredictPage() {
     if (!checked) setBoldPlayerId("");
   }
 
+  function handleBoldPlayerChange(playerId: string) {
+    if (!playerId) {
+      setBoldPlayerId("");
+      return;
+    }
+
+    const isHome = teamSets.home.has(playerId);
+    const isAway = teamSets.away.has(playerId);
+    if (!isHome && !isAway) return;
+
+    const target = scorerGoalTarget(isHome ? predHome : predAway);
+    if (target <= 0) {
+      setError(t.predict.scorersExceeded);
+      return;
+    }
+
+    setError("");
+    setBoldEnabled(true);
+
+    if (!(playerId in scorerPicks)) {
+      const teamPlayerIds = isHome ? teamSets.home : teamSets.away;
+      const teamPickIds = Object.keys(scorerPicks).filter((id) =>
+        teamPlayerIds.has(id)
+      );
+      const replaceId =
+        boldPlayerId && teamPlayerIds.has(boldPlayerId)
+          ? boldPlayerId
+          : teamPickIds[teamPickIds.length - 1];
+
+      if (
+        canAddScorer(
+          scorerPicks,
+          playerId,
+          teamSets.home,
+          teamSets.away,
+          predHome,
+          predAway
+        )
+      ) {
+        setScorerPicks((prev) => ({ ...prev, [playerId]: 1 }));
+      } else if (replaceId) {
+        setScorerPicks((prev) => {
+          const next = { ...prev };
+          const goals = next[replaceId] ?? 1;
+          delete next[replaceId];
+          next[playerId] = goals;
+          return pruneScorerPicksToBudget(
+            next,
+            teamSets.home,
+            teamSets.away,
+            predHome,
+            predAway
+          );
+        });
+      } else {
+        setError(t.predict.scorersIncomplete);
+        return;
+      }
+    }
+
+    setBoldPlayerId(playerId);
+  }
+
   async function handleClearBoldBet() {
     setError("");
     setSuccess("");
@@ -1180,7 +1244,7 @@ export default function PredictPage() {
                   <Select
                     label={t.predict.boldScorerBet.choosePlayer}
                     value={boldPlayerId}
-                    onChange={(e) => setBoldPlayerId(e.target.value)}
+                    onChange={(e) => handleBoldPlayerChange(e.target.value)}
                     options={boldSelectOptions}
                     groups={boldPlayerGroups}
                     disabled={Boolean(matchLockReason)}

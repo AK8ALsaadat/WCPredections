@@ -421,6 +421,15 @@ export async function submitMatchPredictionBundle(
   }
 
   // Sequential writes — interactive $transaction breaks on Supabase PgBouncer (pooler).
+  if (
+    data.boldPlayerId &&
+    !data.picks.some((pick) => pick.playerId === data.boldPlayerId)
+  ) {
+    throw new Error(
+      "لازم لاعب الرهان يكون من الهدافين اللي اخترتهم في نفس التوقع"
+    );
+  }
+
   const usageScope = await getUsageRoundScope(data.matchId);
 
   if (isDouble) {
