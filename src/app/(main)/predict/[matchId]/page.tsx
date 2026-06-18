@@ -1293,6 +1293,7 @@ export default function PredictPage() {
   const octopusSelectOptions = [
     { value: "", label: octopusCopy.choose },
   ];
+  const matchVisualDir = locale === "ar" ? "rtl" : "ltr";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -1300,15 +1301,18 @@ export default function PredictPage() {
         {t.matches.back}
       </Link>
 
-      <Card>
-        <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
+      <Card className="border-primary/25 bg-gradient-to-b from-primary/10 via-card/95 to-card">
+        <div
+          className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3"
+          dir={matchVisualDir}
+        >
+          <div className="flex min-w-0 items-center gap-2">
             <TeamLogo {...match.homeTeam} />
-            <span className="font-medium">{match.homeTeam.name}</span>
+            <span className="truncate font-medium">{match.homeTeam.name}</span>
           </div>
           <span className="text-muted">{t.matches.vs}</span>
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{match.awayTeam.name}</span>
+          <div className="flex min-w-0 items-center justify-end gap-2">
+            <span className="truncate font-medium">{match.awayTeam.name}</span>
             <TeamLogo {...match.awayTeam} />
           </div>
         </div>
@@ -1335,7 +1339,10 @@ export default function PredictPage() {
           <CardHeader>
             <CardTitle>{t.predict.scorePrediction}</CardTitle>
           </CardHeader>
-          <div className="flex items-center justify-center gap-3" dir="ltr">
+          <div
+            className="grid grid-cols-[minmax(0,auto)_auto_auto_auto_minmax(0,auto)] items-center justify-center gap-3"
+            dir={matchVisualDir}
+          >
             <div className="flex items-center gap-2">
               <TeamLogo {...match.homeTeam} />
             </div>
