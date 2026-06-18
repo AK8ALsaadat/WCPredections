@@ -69,10 +69,16 @@ export const boldScorerBetSchema = z.object({
   playerId: z.string().min(1).nullable(),
 });
 
+export const octopusGoalkeeperBetSchema = z.object({
+  matchId: z.string().min(1),
+  playerId: z.string().min(1).nullable(),
+});
+
 export const fullPredictionBundleSchema = predictionSchema.and(
   z.object({
     picks: z.array(scorerPickSchema).max(15).optional().default([]),
     boldPlayerId: z.string().min(1).nullable().optional().default(null),
+    octopusPlayerId: z.string().min(1).nullable().optional().default(null),
   })
 );
 

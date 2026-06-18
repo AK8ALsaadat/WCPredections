@@ -41,8 +41,9 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
   const where = hasMatchFilter ? { match: matchWhere(filter) } : undefined;
 
   const boldWhere = hasMatchFilter ? { match: matchWhere(filter) } : undefined;
+  const octopusWhere = hasMatchFilter ? { match: matchWhere(filter) } : undefined;
 
-  const [allUsers, predictionGroups, scorerGroups, boldGroups] =
+  const [allUsers, predictionGroups, scorerGroups, boldGroups, octopusGroups] =
     await Promise.all([
       prisma.user.findMany({
         select: { id: true, username: true },
@@ -66,6 +67,11 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
       prisma.boldScorerBet.groupBy({
         by: ["userId"],
         where: boldWhere,
+        _sum: { points: true },
+      }),
+      prisma.octopusGoalkeeperBet.groupBy({
+        by: ["userId"],
+        where: octopusWhere,
         _sum: { points: true },
       }),
     ]);
@@ -96,6 +102,14 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
   }
 
   for (const g of boldGroups) {
+    const pts = g._sum.points ?? 0;
+    const existing = pointsMap.get(g.userId);
+    if (existing) {
+      existing.points += pts;
+    }
+  }
+
+  for (const g of octopusGroups) {
     const pts = g._sum.points ?? 0;
     const existing = pointsMap.get(g.userId);
     if (existing) {

@@ -68,6 +68,11 @@ type ProfileData = {
       player: { name: string };
       match: ProfileMatch;
     }[];
+    octopusBets: {
+      points: number;
+      player: { name: string };
+      match: ProfileMatch;
+    }[];
   };
 };
 

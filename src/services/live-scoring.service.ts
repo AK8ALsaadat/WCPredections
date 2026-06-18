@@ -163,6 +163,7 @@ async function syncLiveMatches() {
         { predictions: { some: {} } },
         { scorerPredictions: { some: {} } },
         { boldScorerBets: { some: {} } },
+        { octopusBets: { some: {} } },
       ],
     },
     select: { id: true },

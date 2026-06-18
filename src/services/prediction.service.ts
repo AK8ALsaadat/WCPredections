@@ -1,6 +1,7 @@
 import type { FinishType } from "@prisma/client";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { resolveScorerGoalsForPlayer } from "@/lib/player-matching";
+import { goalkeeperPositionWhere } from "@/lib/goalkeeper";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason, isPredictionAllowed } from "@/lib/utils";
 import {
@@ -14,6 +15,7 @@ import {
   calculateBoldScorerBetPointsForMatch,
   getBoldScorerBetEligibility,
 } from "@/services/bold-scorer-bet.service";
+import { calculateOctopusPointsForMatch } from "@/services/octopus-bet.service";
 import { getUsageRoundScope } from "@/services/usage-round.service";
 import {
   calculateDoubleBonus,
@@ -113,16 +115,30 @@ export async function submitPrediction(
 
   if (isDouble) {
     const scope = await getUsageRoundScope(data.matchId, match.roundId);
-    const boldOnThisMatch = await prisma.boldScorerBet.findUnique({
-      where: {
-        userId_usageRoundKey: {
-          userId,
-          usageRoundKey: scope.key,
+    const [boldOnThisMatch, octopusOnThisMatch] = await Promise.all([
+      prisma.boldScorerBet.findUnique({
+        where: {
+          userId_usageRoundKey: {
+            userId,
+            usageRoundKey: scope.key,
+          },
         },
-      },
-      select: { matchId: true },
-    });
-    if (boldOnThisMatch?.matchId === data.matchId) {
+        select: { matchId: true },
+      }),
+      prisma.octopusGoalkeeperBet.findUnique({
+        where: {
+          userId_usageRoundKey: {
+            userId,
+            usageRoundKey: scope.key,
+          },
+        },
+        select: { matchId: true },
+      }),
+    ]);
+    if (
+      boldOnThisMatch?.matchId === data.matchId ||
+      octopusOnThisMatch?.matchId === data.matchId
+    ) {
       throw new Error(
         "ما تقدر تستخدم المضاعفة والرهان معاً على نفس المباراة"
       );
@@ -354,6 +370,7 @@ export async function submitMatchPredictionBundle(
     predictedPenaltyWinnerTeamId?: string | null;
     picks: { playerId: string; goals: number }[];
     boldPlayerId: string | null;
+    octopusPlayerId?: string | null;
   }
 ) {
   const match = await prisma.match.findUniqueOrThrow({
@@ -379,6 +396,7 @@ export async function submitMatchPredictionBundle(
   let predAway = data.predAway;
   let picks = data.picks.map((pick) => ({ ...pick }));
   let boldPlayer: { id: string; teamId: string } | null = null;
+  let octopusPlayer: { id: string; teamId: string } | null = null;
 
   if (match.isKnockout && !data.predictedFinishType) {
     throw new Error("توقع طريقة الإنهاء مطلوب للمباريات الإقصائية");
@@ -434,6 +452,20 @@ export async function submitMatchPredictionBundle(
     }
   }
 
+  if (data.octopusPlayerId) {
+    octopusPlayer = await prisma.player.findFirst({
+      where: {
+        id: data.octopusPlayerId,
+        teamId: { in: [match.homeTeamId, match.awayTeamId] },
+        ...goalkeeperPositionWhere,
+      },
+      select: { id: true, teamId: true },
+    });
+    if (!octopusPlayer) {
+      throw new Error("اختيار الحارس غير صالح للأخطبوط");
+    }
+  }
+
   await validateScorerPicks(match, predHome, predAway, picks);
 
   const usageScope = await getUsageRoundScope(data.matchId);
@@ -463,11 +495,40 @@ export async function submitMatchPredictionBundle(
     },
   });
 
+  const storedOctopus = await prisma.octopusGoalkeeperBet.findUnique({
+    where: {
+      userId_usageRoundKey: {
+        userId,
+        usageRoundKey: usageScope.key,
+      },
+    },
+  });
+
   // ✅ منع استخدام الـ Double والـ Bold معاً على نفس المباراة
-  if (isDouble && data.boldPlayerId) {
+  if (
+    isDouble &&
+    (data.boldPlayerId ||
+      data.octopusPlayerId ||
+      storedBold?.matchId === data.matchId ||
+      storedOctopus?.matchId === data.matchId)
+  ) {
     throw new Error(
       "ما تقدر تستخدم المضاعفة والرهان معاً على نفس المباراة"
     );
+  }
+
+  if (
+    data.boldPlayerId &&
+    (data.octopusPlayerId || storedOctopus?.matchId === data.matchId)
+  ) {
+    throw new Error("ما تقدر تستخدم الرهان والأخطبوط معاً على نفس المباراة");
+  }
+
+  if (
+    data.octopusPlayerId &&
+    (data.boldPlayerId || storedBold?.matchId === data.matchId)
+  ) {
+    throw new Error("ما تقدر تستخدم الأخطبوط مع الرهان على نفس المباراة");
   }
 
   if (storedBold?.matchId === data.matchId) {
@@ -483,6 +544,20 @@ export async function submitMatchPredictionBundle(
     throw new Error(
       "استخدمت الرهان في مباراة ثانية هالجولة — مرة واحدة بس"
     );
+  }
+
+  if (storedOctopus?.matchId === data.matchId) {
+    if (!data.octopusPlayerId) {
+      await prisma.octopusGoalkeeperBet.delete({
+        where: { id: storedOctopus.id },
+      });
+    }
+  } else if (
+    data.octopusPlayerId &&
+    storedOctopus &&
+    storedOctopus.matchId !== data.matchId
+  ) {
+    throw new Error("استخدمت الأخطبوط في مباراة ثانية هالجولة — مرة واحدة بس");
   }
 
   const prediction = await prisma.prediction.upsert({
@@ -539,7 +614,34 @@ export async function submitMatchPredictionBundle(
     });
   }
 
-  return { prediction, scorers: picks.length, boldBet };
+  let octopusBet = null;
+  if (data.octopusPlayerId) {
+    octopusBet = await prisma.octopusGoalkeeperBet.upsert({
+      where: {
+        userId_usageRoundKey: {
+          userId,
+          usageRoundKey: usageScope.key,
+        },
+      },
+      create: {
+        userId,
+        roundId: match.roundId,
+        usageRoundKey: usageScope.key,
+        matchId: data.matchId,
+        playerId: data.octopusPlayerId,
+      },
+      update: {
+        matchId: data.matchId,
+        playerId: data.octopusPlayerId,
+        points: 0,
+      },
+      include: {
+        player: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  return { prediction, scorers: picks.length, boldBet, octopusBet };
 }
 
 type ScorerPredictionWithPlayer = {
@@ -749,6 +851,8 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
     });
   }
 
+  await calculateOctopusPointsForMatch(matchId);
+
   try {
     revalidateTag("leaderboard-overall");
     revalidateTag(`leaderboard-round-${match.roundId}`);
@@ -784,7 +888,7 @@ export async function calculateRoundPoints(roundId: string): Promise<void> {
 }
 
 export async function getUserPredictionHistory(userId: string) {
-  const [predictions, scorerPredictions, boldScorerBets] = await Promise.all([
+  const [predictions, scorerPredictions, boldScorerBets, octopusBets] = await Promise.all([
     prisma.prediction.findMany({
       where: { userId },
       include: {
@@ -826,9 +930,23 @@ export async function getUserPredictionHistory(userId: string) {
       },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.octopusGoalkeeperBet.findMany({
+      where: { userId },
+      include: {
+        player: true,
+        match: {
+          include: {
+            homeTeam: true,
+            awayTeam: true,
+            round: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
-  return { predictions, scorerPredictions, boldScorerBets };
+  return { predictions, scorerPredictions, boldScorerBets, octopusBets };
 }
 
 async function fetchLeagueMatchPredictions(matchId: string) {
@@ -858,7 +976,8 @@ async function fetchLeagueMatchPredictions(matchId: string) {
     throw new Error("Predictions still open");
   }
 
-  const [predictions, scorerPredictions, boldBets] = await Promise.all([
+  const [predictions, scorerPredictions, boldBets, octopusBets] =
+    await Promise.all([
     prisma.prediction.findMany({
       where: { matchId },
       select: {
@@ -885,16 +1004,25 @@ async function fetchLeagueMatchPredictions(matchId: string) {
         player: { select: { id: true, name: true, teamId: true, position: true } },
       },
     }),
-    prisma.boldScorerBet.findMany({
-      where: { matchId },
-      select: {
-        userId: true,
-        points: true,
-        user: { select: { username: true } },
-        player: { select: { id: true, name: true } },
-      },
-    }),
-  ]);
+      prisma.boldScorerBet.findMany({
+        where: { matchId },
+        select: {
+          userId: true,
+          points: true,
+          user: { select: { username: true } },
+          player: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.octopusGoalkeeperBet.findMany({
+        where: { matchId },
+        select: {
+          userId: true,
+          points: true,
+          user: { select: { username: true } },
+          player: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
 
   const rows = new Map<string, LeagueMatchPredictionRow>();
 
@@ -915,6 +1043,7 @@ async function fetchLeagueMatchPredictions(matchId: string) {
       },
       scorerPredictions: [],
       boldScorerBet: null,
+      octopusGoalkeeperBet: null,
     });
   }
 
@@ -925,6 +1054,7 @@ async function fetchLeagueMatchPredictions(matchId: string) {
       prediction: null,
       scorerPredictions: [],
       boldScorerBet: null,
+      octopusGoalkeeperBet: null,
     };
     existing.scorerPredictions.push({
       player: scorer.player,
@@ -941,12 +1071,29 @@ async function fetchLeagueMatchPredictions(matchId: string) {
       prediction: null,
       scorerPredictions: [],
       boldScorerBet: null,
+      octopusGoalkeeperBet: null,
     };
     existing.boldScorerBet = {
       player: bold.player,
       points: bold.points,
     };
     rows.set(bold.userId, existing);
+  }
+
+  for (const octopus of octopusBets) {
+    const existing = rows.get(octopus.userId) ?? {
+      userId: octopus.userId,
+      username: octopus.user.username,
+      prediction: null,
+      scorerPredictions: [],
+      boldScorerBet: null,
+      octopusGoalkeeperBet: null,
+    };
+    existing.octopusGoalkeeperBet = {
+      player: octopus.player,
+      points: octopus.points,
+    };
+    rows.set(octopus.userId, existing);
   }
 
   const entries = Array.from(rows.values()).sort((a, b) => {
@@ -957,14 +1104,16 @@ async function fetchLeagueMatchPredictions(matchId: string) {
         (a.prediction?.finishTypePoints ?? 0) +
         (a.prediction?.penaltyWinnerPoints ?? 0) +
         a.scorerPredictions.reduce((s, p) => s + (p.points ?? 0), 0) +
-        (a.boldScorerBet?.points ?? 0);
+        (a.boldScorerBet?.points ?? 0) +
+        (a.octopusGoalkeeperBet?.points ?? 0);
       const totalB =
         (b.prediction?.points ?? 0) +
         (b.prediction?.doubleBonus ?? 0) +
         (b.prediction?.finishTypePoints ?? 0) +
         (b.prediction?.penaltyWinnerPoints ?? 0) +
         b.scorerPredictions.reduce((s, p) => s + (p.points ?? 0), 0) +
-        (b.boldScorerBet?.points ?? 0);
+        (b.boldScorerBet?.points ?? 0) +
+        (b.octopusGoalkeeperBet?.points ?? 0);
       if (totalB !== totalA) return totalB - totalA;
     }
     return a.username.localeCompare(b.username);

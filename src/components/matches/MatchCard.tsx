@@ -56,6 +56,10 @@ type MatchCardProps = {
       points: number;
       player: { name: string };
     } | null;
+    userOctopusBet?: {
+      points: number;
+      player: { name: string };
+    } | null;
   };
   showPredictButton?: boolean;
   isPastMatch?: boolean;
@@ -104,7 +108,8 @@ export function MatchCard({
   const hasMatchPoints =
     hasPrediction ||
     (match.userScorerPredictions?.length ?? 0) > 0 ||
-    !!match.userBoldScorerBet;
+    !!match.userBoldScorerBet ||
+    !!match.userOctopusBet;
   const stageLabel =
     (match.stageName &&
       t.stageLabels[match.stageName as keyof typeof t.stageLabels]) ||
@@ -171,6 +176,8 @@ export function MatchCard({
       className={`transition-colors ${
         match.userBoldScorerBet
           ? "border-red-400/70 bg-gradient-to-br from-red-950/75 via-red-900/30 to-rose-500/10 shadow-xl shadow-red-950/30 ring-1 ring-inset ring-red-300/15 hover:border-red-300"
+          : match.userOctopusBet
+            ? "border-cyan-300/70 bg-gradient-to-br from-cyan-950/75 via-cyan-900/30 to-teal-400/10 shadow-xl shadow-cyan-950/25 ring-1 ring-inset ring-cyan-100/15 hover:border-cyan-200"
           : match.userPrediction?.isDouble
             ? "border-orange-300/70 bg-gradient-to-br from-orange-950/75 via-orange-900/30 to-amber-400/10 shadow-xl shadow-orange-950/30 ring-1 ring-inset ring-orange-200/15 hover:border-orange-200"
             : "hover:border-primary/30"
@@ -272,6 +279,14 @@ export function MatchCard({
                 type="bold"
                 icon="✦"
                 label={t.matches.featureBold}
+                className="mt-1"
+              />
+            )}
+            {match.userOctopusBet && !isFinished && (
+              <PredictionFeatureTag
+                type="octopus"
+                icon="GK"
+                label={locale === "ar" ? "الأخطبوط" : "Octopus"}
                 className="mt-1"
               />
             )}
@@ -426,6 +441,14 @@ export function MatchCard({
                   ? {
                       points: match.userBoldScorerBet.points,
                       player: { name: match.userBoldScorerBet.player.name },
+                    }
+                  : null
+              }
+              userOctopusBet={
+                match.userOctopusBet
+                  ? {
+                      points: match.userOctopusBet.points,
+                      player: { name: match.userOctopusBet.player.name },
                     }
                   : null
               }

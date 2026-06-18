@@ -37,7 +37,8 @@ export function MatchPointsBreakdown({
   if (
     !input.userPrediction &&
     (input.userScorerPredictions?.length ?? 0) === 0 &&
-    !input.userBoldScorerBet
+    !input.userBoldScorerBet &&
+    !input.userOctopusBet
   ) {
     return null;
   }

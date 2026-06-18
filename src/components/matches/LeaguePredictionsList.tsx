@@ -53,9 +53,15 @@ function FeatureBadges({
   const finishType = asFinishType(row.prediction?.predictedFinishType);
   const hasPenalty = Boolean(row.prediction?.predictedPenaltyWinnerTeamId);
   const hasBold = Boolean(row.boldScorerBet);
+  const hasOctopus = Boolean(row.octopusGoalkeeperBet);
   const hasDouble = Boolean(row.prediction?.isDouble);
 
-  if (!hasDouble && !hasBold && !(isKnockout && (finishType || hasPenalty))) {
+  if (
+    !hasDouble &&
+    !hasBold &&
+    !hasOctopus &&
+    !(isKnockout && (finishType || hasPenalty))
+  ) {
     return null;
   }
 
@@ -74,6 +80,15 @@ function FeatureBadges({
           icon="✦"
           title={`${t.matches.featureBold}: ${row.boldScorerBet!.player.name}`}
           label={shortPlayerName(row.boldScorerBet!.player.name)}
+          className="max-w-[5.5rem]"
+        />
+      )}
+      {hasOctopus && (
+        <PredictionFeatureTag
+          type="octopus"
+          icon="GK"
+          title={`Octopus: ${row.octopusGoalkeeperBet!.player.name}`}
+          label={shortPlayerName(row.octopusGoalkeeperBet!.player.name)}
           className="max-w-[5.5rem]"
         />
       )}

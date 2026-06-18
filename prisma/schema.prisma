@@ -30,11 +30,13 @@ model User {
   hasSeenTutorial Boolean  @default(false) @map("has_seen_tutorial")
   hasSeenBoldFiveNotice Boolean @default(false) @map("has_seen_bold_five_notice")
   hasSeenKnockoutTutorial Boolean @default(false) @map("has_seen_knockout_tutorial")
+  hasSeenOctopusNotice Boolean @default(false) @map("has_seen_octopus_notice")
   createdAt       DateTime @default(now()) @map("created_at")
 
   predictions        Prediction[]
   scorerPredictions  ScorerPrediction[]
   boldScorerBets     BoldScorerBet[]
+  octopusBets        OctopusGoalkeeperBet[]
 
   @@map("users")
 }
@@ -48,6 +50,7 @@ model Round {
 
   matches        Match[]
   boldScorerBets BoldScorerBet[]
+  octopusBets    OctopusGoalkeeperBet[]
 
   @@map("rounds")
 }
@@ -81,6 +84,8 @@ model Player {
   scorerPredictions ScorerPrediction[]
   matchScorers      MatchScorer[]
   boldScorerBets    BoldScorerBet[]
+  goalkeeperStats   MatchGoalkeeperStat[]
+  octopusBets       OctopusGoalkeeperBet[]
 
   @@unique([teamId, apiPlayerId])
   @@map("players")
@@ -112,6 +117,8 @@ model Match {
   scorerPredictions   ScorerPrediction[]
   matchScorers        MatchScorer[]
   boldScorerBets      BoldScorerBet[]
+  goalkeeperStats     MatchGoalkeeperStat[]
+  octopusBets         OctopusGoalkeeperBet[]
 
   @@index([roundId])
   @@index([status, matchTime])
@@ -178,6 +185,22 @@ model MatchScorer {
 }
 
 /** البطاقة الجريئة — تراهن على هداف مرة واحدة كل جولة */
+model MatchGoalkeeperStat {
+  id        String   @id @default(cuid())
+  matchId   String   @map("match_id")
+  playerId  String   @map("player_id")
+  saves     Int      @default(0)
+  source    String   @default("api-football")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+  @@index([matchId])
+  @@map("match_goalkeeper_stats")
+}
+
 model BoldScorerBet {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
@@ -197,4 +220,25 @@ model BoldScorerBet {
   @@index([matchId])
   @@index([userId])
   @@map("bold_scorer_bets")
+}
+
+model OctopusGoalkeeperBet {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  roundId   String   @map("round_id")
+  usageRoundKey String @map("usage_round_key")
+  matchId   String   @map("match_id")
+  playerId  String   @map("player_id")
+  points    Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  round  Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, usageRoundKey])
+  @@index([matchId])
+  @@index([userId])
+  @@map("octopus_goalkeeper_bets")
 }

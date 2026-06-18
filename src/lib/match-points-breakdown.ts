@@ -76,6 +76,10 @@ export type MatchPointsBreakdownInput = {
     points: number;
     player: { name: string };
   } | null;
+  userOctopusBet?: {
+    points: number;
+    player: { name: string };
+  } | null;
 };
 
 /** بونص +3 إذا كانت النتيجة دقيقة وكل توقعات الهدافين صحيحة بالكامل */
@@ -260,6 +264,19 @@ export function buildMatchPointsBreakdown(
     }
   }
 
+  if (input.userOctopusBet) {
+    const octopus = input.userOctopusBet;
+    if (showMisses || octopus.points !== 0) {
+      lines.push({
+        id: "octopus-goalkeeper",
+        label: `الأخطبوط: ${octopus.player.name}`,
+        detail: "تصديات الحارس الرسمية",
+        points: octopus.points,
+        correct: octopus.points > 0,
+      });
+    }
+  }
+
   if (!scorersOnly && (input.userPrediction?.doubleBonus ?? 0) > 0) {
     lines.push({
       id: "double-bonus",
@@ -272,7 +289,8 @@ export function buildMatchPointsBreakdown(
 
   const total = scorersOnly
     ? (input.userScorerPredictions?.reduce((s, sp) => s + sp.points, 0) ?? 0) +
-      (input.userBoldScorerBet?.points ?? 0)
+      (input.userBoldScorerBet?.points ?? 0) +
+      (input.userOctopusBet?.points ?? 0)
     : getMatchTotalUserPoints(input);
 
   return { total, lines };
@@ -288,7 +306,8 @@ export function getMatchTotalUserPoints(input: MatchPointsBreakdownInput) {
   const scorerTotal =
     input.userScorerPredictions?.reduce((s, sp) => s + sp.points, 0) ?? 0;
   const boldTotal = input.userBoldScorerBet?.points ?? 0;
-  return scoreTotal + scorerTotal + boldTotal;
+  const octopusTotal = input.userOctopusBet?.points ?? 0;
+  return scoreTotal + scorerTotal + boldTotal + octopusTotal;
 }
 
 export type LeagueMatchResultContext = {
@@ -317,6 +336,9 @@ export function buildLeaguePendingBreakdown(
       player: { name: string };
     }[];
     boldScorerBet: {
+      player: { name: string };
+    } | null;
+    octopusGoalkeeperBet?: {
       player: { name: string };
     } | null;
   },
@@ -394,6 +416,15 @@ export function buildLeaguePendingBreakdown(
     });
   }
 
+  if (row.octopusGoalkeeperBet) {
+    lines.push({
+      id: "octopus-goalkeeper",
+      label: `الأخطبوط: ${row.octopusGoalkeeperBet.player.name}`,
+      detail: "تصديات الحارس الرسمية",
+      points: 0,
+    });
+  }
+
   return { total: 0, lines };
 }
 
@@ -416,6 +447,10 @@ export function leagueRowToBreakdownInput(
       player: { name: string };
     }[];
     boldScorerBet: {
+      points?: number;
+      player: { name: string };
+    } | null;
+    octopusGoalkeeperBet?: {
       points?: number;
       player: { name: string };
     } | null;
@@ -455,6 +490,12 @@ export function leagueRowToBreakdownInput(
       ? {
           points: row.boldScorerBet.points ?? 0,
           player: { name: row.boldScorerBet.player.name },
+        }
+      : null,
+    userOctopusBet: row.octopusGoalkeeperBet
+      ? {
+          points: row.octopusGoalkeeperBet.points ?? 0,
+          player: { name: row.octopusGoalkeeperBet.player.name },
         }
       : null,
   };

@@ -3,9 +3,11 @@ import {
   goalsMapToList,
   type ParsedFixtureEvent,
 } from "@/lib/fixture-events";
+import { isGoalkeeperPosition } from "@/lib/goalkeeper";
 import type {
   ExternalMatch,
   ExternalMatchScorer,
+  ExternalGoalkeeperSave,
   ExternalPlayer,
   ExternalTeam,
   FootballApiProvider,
@@ -223,5 +225,48 @@ export class ApiFootballProvider implements FootballApiProvider {
     }));
 
     return goalsMapToList(aggregateGoalsFromEvents(events));
+  }
+
+  async fetchGoalkeeperSaves(
+    fixtureApiId: string,
+    _options: SyncOptions
+  ): Promise<ExternalGoalkeeperSave[]> {
+    const response = await this.fetch<
+      {
+        team: { id: number };
+        players: {
+          player: { id: number | null; name: string };
+          statistics?: {
+            games?: { position?: string | null };
+            goals?: { saves?: number | null };
+          }[];
+        }[];
+      }[]
+    >("/fixtures/players", { fixture: fixtureApiId });
+
+    return response.flatMap((teamRow) =>
+      (teamRow.players ?? []).flatMap((row) => {
+        const playerApiId =
+          row.player.id != null ? String(row.player.id) : null;
+        const stats = row.statistics?.[0];
+        const position = (stats?.games?.position ?? "").toLowerCase();
+        const saves = stats?.goals?.saves;
+        if (
+          !playerApiId ||
+          !isGoalkeeperPosition(position) ||
+          saves == null ||
+          saves < 0
+        ) {
+          return [];
+        }
+
+        return {
+          playerApiId,
+          saves,
+          playerName: row.player.name,
+          teamApiId: String(teamRow.team.id),
+        };
+      })
+    );
   }
 }

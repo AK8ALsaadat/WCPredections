@@ -60,6 +60,10 @@ export type LeagueMatchPredictionRow = {
     player: { id: string; name: string };
     points?: number;
   } | null;
+  octopusGoalkeeperBet: {
+    player: { id: string; name: string };
+    points?: number;
+  } | null;
 };
 
 export type LeaderboardEntry = {

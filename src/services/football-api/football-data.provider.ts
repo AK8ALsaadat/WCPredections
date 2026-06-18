@@ -1,6 +1,7 @@
 import type {
   ExternalMatch,
   ExternalMatchScorer,
+  ExternalGoalkeeperSave,
   ExternalPlayer,
   ExternalTeam,
   FootballApiProvider,
@@ -194,5 +195,12 @@ export class FootballDataProvider implements FootballApiProvider {
       playerApiId,
       goals: count,
     }));
+  }
+
+  async fetchGoalkeeperSaves(
+    _fixtureApiId: string,
+    _options: SyncOptions
+  ): Promise<ExternalGoalkeeperSave[]> {
+    return [];
   }
 }

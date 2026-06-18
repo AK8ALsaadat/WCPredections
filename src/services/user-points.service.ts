@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 export const MIN_POINTS_FOR_BOLD_SCORER_BET = 5;
 
 export async function getUserTotalPoints(userId: string): Promise<number> {
-  const [predictionAgg, scorerAgg, boldAgg] = await Promise.all([
+  const [predictionAgg, scorerAgg, boldAgg, octopusAgg] = await Promise.all([
     prisma.prediction.aggregate({
       where: { userId },
       _sum: {
@@ -21,6 +21,10 @@ export async function getUserTotalPoints(userId: string): Promise<number> {
       where: { userId },
       _sum: { points: true },
     }),
+    prisma.octopusGoalkeeperBet.aggregate({
+      where: { userId },
+      _sum: { points: true },
+    }),
   ]);
 
   return (
@@ -29,6 +33,7 @@ export async function getUserTotalPoints(userId: string): Promise<number> {
     (predictionAgg._sum.finishTypePoints ?? 0) +
     (predictionAgg._sum.penaltyWinnerPoints ?? 0) +
     (scorerAgg._sum.points ?? 0) +
-    (boldAgg._sum.points ?? 0)
+    (boldAgg._sum.points ?? 0) +
+    (octopusAgg._sum.points ?? 0)
   );
 }

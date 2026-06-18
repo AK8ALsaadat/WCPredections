@@ -37,6 +37,10 @@ export type MatchHistoryEntry = {
     points: number;
     player: { name: string };
   } | null;
+  octopus: {
+    points: number;
+    player: { name: string };
+  } | null;
 };
 
 type RawHistory = {
@@ -63,6 +67,11 @@ type RawHistory = {
     player: { name: string };
     match: HistoryMatch;
   }[];
+  octopusBets: {
+    points: number;
+    player: { name: string };
+    match: HistoryMatch;
+  }[];
 };
 
 export function buildMatchHistoryEntries(history: RawHistory): MatchHistoryEntry[] {
@@ -74,6 +83,7 @@ export function buildMatchHistoryEntries(history: RawHistory): MatchHistoryEntry
       prediction,
       scorers: [],
       bold: null,
+      octopus: null,
     });
   }
 
@@ -83,6 +93,7 @@ export function buildMatchHistoryEntries(history: RawHistory): MatchHistoryEntry
       prediction: null,
       scorers: [],
       bold: null,
+      octopus: null,
     };
     existing.scorers.push(scorer);
     byMatch.set(scorer.match.id, existing);
@@ -94,9 +105,22 @@ export function buildMatchHistoryEntries(history: RawHistory): MatchHistoryEntry
       prediction: null,
       scorers: [],
       bold: null,
+      octopus: null,
     };
     existing.bold = bold;
     byMatch.set(bold.match.id, existing);
+  }
+
+  for (const octopus of history.octopusBets ?? []) {
+    const existing = byMatch.get(octopus.match.id) ?? {
+      match: octopus.match,
+      prediction: null,
+      scorers: [],
+      bold: null,
+      octopus: null,
+    };
+    existing.octopus = octopus;
+    byMatch.set(octopus.match.id, existing);
   }
 
   const statusPriority: Record<string, number> = {
@@ -184,6 +208,12 @@ export function entryToBreakdownInput(
       ? {
           points: entry.bold.points,
           player: { name: entry.bold.player.name },
+        }
+      : null,
+    userOctopusBet: entry.octopus
+      ? {
+          points: entry.octopus.points,
+          player: { name: entry.octopus.player.name },
         }
       : null,
   };

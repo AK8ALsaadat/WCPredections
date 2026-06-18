@@ -57,6 +57,13 @@ export type ExternalMatchScorer = {
   minute?: number | null;
 };
 
+export type ExternalGoalkeeperSave = {
+  playerApiId: string;
+  saves: number;
+  playerName?: string;
+  teamApiId?: string;
+};
+
 export interface FootballApiProvider {
   name: string;
   fetchTeams(options: SyncOptions): Promise<ExternalTeam[]>;
@@ -66,4 +73,8 @@ export interface FootballApiProvider {
     fixtureApiId: string,
     options: SyncOptions
   ): Promise<ExternalMatchScorer[]>;
+  fetchGoalkeeperSaves(
+    fixtureApiId: string,
+    options: SyncOptions
+  ): Promise<ExternalGoalkeeperSave[]>;
 }

@@ -6,6 +6,7 @@ import {
   layoutFormation,
   layoutFromGrid,
 } from "@/lib/formation-layout";
+import { isGoalkeeperPosition } from "@/lib/goalkeeper";
 import type { ScorerPicks } from "@/lib/scorer-prediction";
 import type { LineupSource, MatchPlayerView } from "@/services/match-players.service";
 import { useEffect, useMemo, useState } from "react";
@@ -28,6 +29,7 @@ type PitchLineupProps = {
   lineupStatus: LineupSource;
   scorerPicks: ScorerPicks;
   boldPlayerId?: string | null;
+  octopusPlayerId?: string | null;
   canSelectPlayer?: (playerId: string) => boolean;
   maxGoalsForPlayer?: (playerId: string) => number;
   onToggle: (playerId: string) => void;
@@ -102,7 +104,7 @@ function GoalsStepper({
 }
 
 function isGoalkeeper(player: MatchPlayerView) {
-  return (player.position ?? "").toLowerCase().includes("goal");
+  return isGoalkeeperPosition(player.position);
 }
 
 function positionFallback(position?: string | null) {
@@ -119,11 +121,13 @@ function PlayerPortrait({
   sizeClass,
   enabled,
   isBold = false,
+  isOctopus = false,
 }: {
   player: MatchPlayerView;
   sizeClass: string;
   enabled: boolean;
   isBold?: boolean;
+  isOctopus?: boolean;
 }) {
   const photoUrl =
     player.photoUrl ??
@@ -151,7 +155,7 @@ function PlayerPortrait({
       onError={() => setFailed(true)}
       className={`absolute inset-0 object-cover object-top transition-opacity duration-150 ${sizeClass} ${
         loaded ? "opacity-100" : "opacity-0"
-      } ${isBold ? "saturate-125" : ""}`}
+      } ${isBold || isOctopus ? "saturate-125" : ""}`}
     />
   );
 }
@@ -181,6 +185,7 @@ function PlayerDot({
   style,
   showPhotos,
   isBold = false,
+  isOctopus = false,
 }: {
   player: MatchPlayerView;
   goals: number;
@@ -190,6 +195,7 @@ function PlayerDot({
   style: React.CSSProperties;
   showPhotos: boolean;
   isBold?: boolean;
+  isOctopus?: boolean;
 }) {
   const gk = isGoalkeeper(player);
 
@@ -203,13 +209,21 @@ function PlayerDot({
         !selected && !selectable
           ? "cursor-not-allowed opacity-45"
           : "hover:scale-105"
-      } ${selected ? "scale-105" : ""} ${isBold ? "scale-110" : ""}`}
+      } ${selected ? "scale-105" : ""} ${
+        isBold || isOctopus ? "scale-110" : ""
+      }`}
     >
-      <span className={`relative ${isBold ? "bold-player-glow rounded-full" : ""}`}>
+      <span
+        className={`relative ${
+          isBold || isOctopus ? "bold-player-glow rounded-full" : ""
+        }`}
+      >
         <span
           className={`relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold shadow-lg sm:h-11 sm:w-11 sm:text-xs ${
             isBold
               ? "bg-gradient-to-br from-amber-200 via-orange-400 to-red-500 text-white ring-2 ring-amber-100 shadow-[0_0_24px_rgba(249,115,22,0.8)]"
+              : isOctopus
+                ? "bg-gradient-to-br from-cyan-100 via-cyan-300 to-teal-500 text-cyan-950 ring-2 ring-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.75)]"
               : selected
               ? "bg-primary text-white ring-2 ring-white"
               : gk
@@ -225,11 +239,17 @@ function PlayerDot({
             sizeClass="h-[130%] w-full origin-top scale-110"
             enabled={showPhotos}
             isBold={isBold}
+            isOctopus={isOctopus}
           />
         </span>
         {isBold && (
           <span className="absolute -right-2 -top-2 rounded-full border border-amber-100/80 bg-black/70 px-1.5 py-0.5 text-[10px] font-black text-amber-200 shadow-[0_0_14px_rgba(251,191,36,0.7)]">
             ✦
+          </span>
+        )}
+        {isOctopus && (
+          <span className="absolute -right-2 -top-2 rounded-full border border-cyan-100/80 bg-cyan-950/80 px-1.5 py-0.5 text-[9px] font-black text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.65)]">
+            GK
           </span>
         )}
         <span className="absolute -bottom-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-white/70 bg-emerald-950 px-0.5 text-[8px] font-black text-white sm:h-5 sm:min-w-5 sm:px-1 sm:text-[9px]">
@@ -261,6 +281,7 @@ function BenchRow({
   label,
   showPhotos,
   boldPlayerId,
+  octopusPlayerId,
 }: {
   players: MatchPlayerView[];
   scorerPicks: ScorerPicks;
@@ -269,6 +290,7 @@ function BenchRow({
   label: string;
   showPhotos: boolean;
   boldPlayerId?: string | null;
+  octopusPlayerId?: string | null;
 }) {
   if (players.length === 0) return null;
 
@@ -286,6 +308,7 @@ function BenchRow({
             onToggle={() => onToggle(player.id)}
             showPhotos={showPhotos}
             isBold={player.id === boldPlayerId}
+            isOctopus={player.id === octopusPlayerId}
           />
         ))}
       </div>
@@ -301,6 +324,7 @@ function BenchPlayerTile({
   onToggle,
   showPhotos,
   isBold = false,
+  isOctopus = false,
 }: {
   player: MatchPlayerView;
   selected: boolean;
@@ -309,6 +333,7 @@ function BenchPlayerTile({
   onToggle: () => void;
   showPhotos: boolean;
   isBold?: boolean;
+  isOctopus?: boolean;
 }) {
   return (
     <button
@@ -318,6 +343,8 @@ function BenchPlayerTile({
       className={`flex items-center gap-2 rounded-full border py-1 pl-3 pr-1 text-xs transition-colors ${
         isBold
           ? "border-amber-300/80 bg-gradient-to-l from-amber-500/25 to-red-500/15 text-amber-100 shadow-[0_0_18px_rgba(245,158,11,0.28)]"
+          : isOctopus
+            ? "border-cyan-200/80 bg-gradient-to-l from-cyan-400/25 to-teal-500/15 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.28)]"
           : selected
           ? "border-primary bg-primary/15 text-primary"
           : selectable
@@ -327,7 +354,11 @@ function BenchPlayerTile({
     >
       <span className="relative h-8 w-8 shrink-0">
         <span className={`relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold ${
-          isBold ? "bg-gradient-to-br from-amber-200 via-orange-400 to-red-500 ring-2 ring-amber-100" : "bg-card-border"
+          isBold
+            ? "bg-gradient-to-br from-amber-200 via-orange-400 to-red-500 ring-2 ring-amber-100"
+            : isOctopus
+              ? "bg-gradient-to-br from-cyan-100 via-cyan-300 to-teal-500 ring-2 ring-cyan-100"
+              : "bg-card-border"
         }`}>
           <span className="font-black text-sm text-emerald-900">
             {player.shirtNumber ?? positionFallback(player.position)}
@@ -337,8 +368,14 @@ function BenchPlayerTile({
             sizeClass="h-[130%] w-full origin-top scale-110"
             enabled={showPhotos}
             isBold={isBold}
+            isOctopus={isOctopus}
           />
         </span>
+        {isOctopus && (
+          <span className="absolute -right-1 -top-1 rounded-full border border-cyan-100/80 bg-cyan-950 px-1 text-[8px] font-black text-cyan-100">
+            GK
+          </span>
+        )}
         <span className="absolute -bottom-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-card bg-emerald-950 px-0.5 text-[8px] font-black text-white">
           {player.shirtNumber ?? positionFallback(player.position)}
         </span>
@@ -416,6 +453,7 @@ export function PitchLineup({
   away,
   scorerPicks,
   boldPlayerId,
+  octopusPlayerId,
   canSelectPlayer,
   maxGoalsForPlayer,
   onToggle,
@@ -536,6 +574,7 @@ export function PitchLineup({
               style={{ left: `${x}%`, top: `${y}%` }}
               showPhotos={showPhotos}
               isBold={player.id === boldPlayerId}
+              isOctopus={player.id === octopusPlayerId}
             />
           ))}
 
@@ -553,6 +592,7 @@ export function PitchLineup({
               style={{ left: `${x}%`, top: `${y}%` }}
               showPhotos={showPhotos}
               isBold={player.id === boldPlayerId}
+              isOctopus={player.id === octopusPlayerId}
             />
           ))}
         </div>
@@ -566,6 +606,7 @@ export function PitchLineup({
           onToggle={onToggle}
           showPhotos={showPhotos}
           boldPlayerId={boldPlayerId}
+          octopusPlayerId={octopusPlayerId}
           label={`${labels.bench} — ${home.teamName}`}
         />
         <BenchRow
@@ -575,6 +616,7 @@ export function PitchLineup({
           onToggle={onToggle}
           showPhotos={showPhotos}
           boldPlayerId={boldPlayerId}
+          octopusPlayerId={octopusPlayerId}
           label={`${labels.bench} — ${away.teamName}`}
         />
       </div>

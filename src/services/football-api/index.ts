@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { applyRemappedMatchState } from "@/lib/wc-dates";
 import { advanceKnockoutTeams } from "@/services/knockout-advancement.service";
 import { syncMatchScorersFromApi } from "@/services/match-scorers.service";
+import { syncGoalkeeperSavesFromApi } from "@/services/octopus-bet.service";
 import { recalculateMatchScoring } from "@/services/prediction.service";
 import { publish } from '@/lib/broadcaster';
 import { ApiFootballProvider } from "./api-football.provider";
@@ -410,6 +411,12 @@ async function syncMatch(
   if (shouldSyncScorers) {
     try {
       await syncMatchScorersFromApi(
+        match.id,
+        mapped.apiId,
+        options,
+        sourceProvider
+      );
+      await syncGoalkeeperSavesFromApi(
         match.id,
         mapped.apiId,
         options,

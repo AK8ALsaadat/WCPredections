@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { HTMLAttributes } from "react";
 
 type PredictionFeatureTagProps = HTMLAttributes<HTMLSpanElement> & {
-  type: "bold" | "double";
+  type: "bold" | "double" | "octopus";
   label: string;
   title?: string;
   icon?: string;
@@ -13,6 +13,7 @@ type PredictionFeatureTagProps = HTMLAttributes<HTMLSpanElement> & {
 const styles = {
   bold: "border border-red-400/60 bg-gradient-to-r from-red-950/90 via-red-700/70 to-rose-600/55 text-red-50 shadow-lg shadow-red-950/40 ring-1 ring-inset ring-red-300/15",
   double: "border border-orange-300/65 bg-gradient-to-r from-amber-950/90 via-orange-600/75 to-amber-400/55 text-orange-50 shadow-lg shadow-orange-950/40 ring-1 ring-inset ring-amber-200/20",
+  octopus: "border border-cyan-300/65 bg-gradient-to-r from-cyan-950/90 via-cyan-700/70 to-teal-500/55 text-cyan-50 shadow-lg shadow-cyan-950/35 ring-1 ring-inset ring-cyan-100/20",
 } as const;
 
 export function PredictionFeatureTag({

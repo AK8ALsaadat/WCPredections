@@ -18,7 +18,7 @@ export { BOLD_SCORER_POINTS };
 export { MIN_POINTS_FOR_BOLD_SCORER_BET };
 
 export async function getBoldScorerBetEligibility(userId: string) {
-  const [predictionAgg, scorerAgg, boldAgg] = await Promise.all([
+  const [predictionAgg, scorerAgg, boldAgg, octopusAgg] = await Promise.all([
     prisma.prediction.aggregate({
       where: { userId },
       _sum: {
@@ -36,6 +36,10 @@ export async function getBoldScorerBetEligibility(userId: string) {
       where: { userId },
       _sum: { points: true },
     }),
+    prisma.octopusGoalkeeperBet.aggregate({
+      where: { userId },
+      _sum: { points: true },
+    }),
   ]);
 
   const userPoints =
@@ -44,7 +48,8 @@ export async function getBoldScorerBetEligibility(userId: string) {
     (predictionAgg._sum.finishTypePoints ?? 0) +
     (predictionAgg._sum.penaltyWinnerPoints ?? 0) +
     (scorerAgg._sum.points ?? 0) +
-    (boldAgg._sum.points ?? 0);
+    (boldAgg._sum.points ?? 0) +
+    (octopusAgg._sum.points ?? 0);
 
   return {
     userPoints,
@@ -150,13 +155,27 @@ export async function submitBoldScorerBet(
     }
   }
 
-  const prediction = await prisma.prediction.findUnique({
-    where: { userId_matchId: { userId, matchId } },
-    select: { isDouble: true },
-  });
+  const [prediction, octopusBet] = await Promise.all([
+    prisma.prediction.findUnique({
+      where: { userId_matchId: { userId, matchId } },
+      select: { isDouble: true },
+    }),
+    prisma.octopusGoalkeeperBet.findUnique({
+      where: {
+        userId_usageRoundKey: { userId, usageRoundKey: scope.key },
+      },
+      select: { matchId: true },
+    }),
+  ]);
   if (prediction?.isDouble) {
     throw new Error(
       "ما تقدر تستخدم المضاعفة والرهان معاً على نفس المباراة"
+    );
+  }
+
+  if (octopusBet?.matchId === matchId) {
+    throw new Error(
+      "Ù…Ø§ ØªÙ‚Ø¯Ø± ØªØ³ØªØ®Ø¯Ù… Ø§Ù„Ø±Ù‡Ø§Ù† ÙˆØ§Ù„Ø£Ø®Ø·Ø¨ÙˆØ· Ù…Ø¹Ø§Ù‹ Ø¹Ù„Ù‰ Ù†ÙØ³ Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©"
     );
   }
 

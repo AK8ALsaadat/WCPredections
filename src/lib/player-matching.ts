@@ -68,10 +68,10 @@ type SquadPlayer = {
   apiPlayerId?: string | null;
 };
 
-export function resolvePlayerInSquad(
-  squad: SquadPlayer[],
+export function resolvePlayerInSquad<T extends SquadPlayer>(
+  squad: T[],
   options: { apiPlayerId?: string; playerName?: string }
-): SquadPlayer | null {
+): T | null {
   if (options.apiPlayerId) {
     const byApi = squad.find((p) => p.apiPlayerId === options.apiPlayerId);
     if (byApi) return byApi;
@@ -80,7 +80,7 @@ export function resolvePlayerInSquad(
   if (!options.playerName?.trim()) return null;
 
   const byFull = new Map(squad.map((p) => [normalizePlayerName(p.name), p]));
-  const byLast = new Map<string, SquadPlayer[]>();
+  const byLast = new Map<string, T[]>();
   for (const player of squad) {
     const key = lastNameKey(player.name);
     const list = byLast.get(key) ?? [];

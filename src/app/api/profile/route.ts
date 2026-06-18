@@ -34,6 +34,9 @@ export async function GET() {
     for (const bet of history.boldScorerBets) {
       roundPoints[bet.roundId] = (roundPoints[bet.roundId] ?? 0) + bet.points;
     }
+    for (const bet of history.octopusBets) {
+      roundPoints[bet.roundId] = (roundPoints[bet.roundId] ?? 0) + bet.points;
+    }
     const totalPoints = Object.values(roundPoints).reduce(
       (sum, points) => sum + points,
       0

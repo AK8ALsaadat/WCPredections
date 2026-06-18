@@ -37,6 +37,7 @@ import {
 } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { mergeLineupData } from "@/lib/lineup-state";
+import { isGoalkeeperPosition } from "@/lib/goalkeeper";
 import {
   buildPlayerTeamSets,
   canAddScorer,
@@ -100,7 +101,18 @@ type MatchData = {
     points: number;
     player: { name: string };
   } | null;
+  userOctopusBet?: {
+    playerId: string;
+    points: number;
+    player: { name: string };
+  } | null;
   boldScorerRoundStatus?: {
+    used: boolean;
+    onThisMatch: boolean;
+    onOtherMatch: boolean;
+    otherMatchId: string | null;
+  } | null;
+  octopusRoundStatus?: {
     used: boolean;
     onThisMatch: boolean;
     onOtherMatch: boolean;
@@ -124,6 +136,17 @@ type MatchData = {
       hasMinimumPoints: boolean;
       minimumPoints: number;
       userPoints: number;
+      otherMatchId: string | null;
+      playerName: string | null;
+      playerId?: string | null;
+      points?: number;
+    };
+    octopus: {
+      used: boolean;
+      max: number;
+      onThisMatch: boolean;
+      onOtherMatch: boolean;
+      canUse: boolean;
       otherMatchId: string | null;
       playerName: string | null;
       playerId?: string | null;
@@ -155,6 +178,8 @@ type FormState = {
   scorerPicks: ScorerPicks;
   boldPlayerId: string;
   boldEnabled: boolean;
+  octopusPlayerId: string;
+  octopusEnabled: boolean;
 };
 
 const EMPTY_FORM: FormState = {
@@ -166,6 +191,8 @@ const EMPTY_FORM: FormState = {
   scorerPicks: {},
   boldPlayerId: "",
   boldEnabled: false,
+  octopusPlayerId: "",
+  octopusEnabled: false,
 };
 
 function formStateFromMatch(m: MatchData | null): FormState {
@@ -188,6 +215,10 @@ function formStateFromMatch(m: MatchData | null): FormState {
     state.boldPlayerId = m.userBoldScorerBet.playerId;
     state.boldEnabled = true;
   }
+  if (m.userOctopusBet?.playerId) {
+    state.octopusPlayerId = m.userOctopusBet.playerId;
+    state.octopusEnabled = true;
+  }
   return state;
 }
 
@@ -200,6 +231,8 @@ function applyFormState(state: FormState, setters: {
   setScorerPicks: (v: ScorerPicks) => void;
   setBoldPlayerId: (v: string) => void;
   setBoldEnabled: (v: boolean) => void;
+  setOctopusPlayerId: (v: string) => void;
+  setOctopusEnabled: (v: boolean) => void;
 }) {
   setters.setPredHome(normalizeScore(state.predHome));
   setters.setPredAway(normalizeScore(state.predAway));
@@ -209,6 +242,8 @@ function applyFormState(state: FormState, setters: {
   setters.setScorerPicks(state.scorerPicks);
   setters.setBoldPlayerId(state.boldPlayerId);
   setters.setBoldEnabled(state.boldEnabled);
+  setters.setOctopusPlayerId(state.octopusPlayerId ?? "");
+  setters.setOctopusEnabled(Boolean(state.octopusEnabled));
 }
 
 function applySavedPrediction(m: MatchData, setters: {
@@ -220,6 +255,8 @@ function applySavedPrediction(m: MatchData, setters: {
   setScorerPicks: (v: ScorerPicks) => void;
   setBoldPlayerId: (v: string) => void;
   setBoldEnabled: (v: boolean) => void;
+  setOctopusPlayerId: (v: string) => void;
+  setOctopusEnabled: (v: boolean) => void;
 }) {
   applyFormState(formStateFromMatch(m), setters);
 }
@@ -260,6 +297,12 @@ export default function PredictPage() {
   );
   const [boldEnabled, setBoldEnabled] = useState(initialForm.boldEnabled);
   const [boldPlayerId, setBoldPlayerId] = useState(initialForm.boldPlayerId);
+  const [octopusEnabled, setOctopusEnabled] = useState(
+    Boolean(initialForm.octopusEnabled)
+  );
+  const [octopusPlayerId, setOctopusPlayerId] = useState(
+    initialForm.octopusPlayerId ?? ""
+  );
   const [formReady, setFormReady] = useState(
     () => initialDraft != null || initialCachedMatch != null
   );
@@ -283,6 +326,49 @@ export default function PredictPage() {
   );
 
   const hasAnyGoals = predHome > 0 || predAway > 0;
+  const octopusCopy = useMemo(
+    () =>
+      locale === "ar"
+        ? {
+            title: "الأخطبوط",
+            enable: "فعّل الأخطبوط",
+            hint: "مرة واحدة كل جولة. اختر حارساً؛ نقاطه من التصديات الرسمية فقط، وتصديات ركلات الترجيح لا تدخل.",
+            counter: (used: boolean, max: number) =>
+              `الأخطبوط: ${used ? 1 : 0}/${max}`,
+            available: "متاحة — اختر حارساً واحداً",
+            usedHere: (name: string) => `مستخدمة هالمباراة: ${name}`,
+            usedElsewhere: "استخدمت الأخطبوط في مباراة ثانية هالجولة",
+            choose: "اختر الحارس",
+            chooseRequired: "اختر حارساً للأخطبوط",
+            selecting: "جاري اختيار الحارس للأخطبوط",
+            clear: "إزالة الحارس",
+            change: "تقدر تغيّر الحارس من القائمة.",
+            conflict: "ما تقدر تستخدم الأخطبوط مع المضاعفة أو الرهان على نفس المباراة",
+            noKeepers: "ما فيه حراس متاحين في التشكيلة حالياً",
+            source: "الحساب من API-Football الرسمي فقط: 3 تصديات = +1، 5 = +3، 7 = +5، 10 = +8.",
+            viewOtherMatch: "شوف المباراة",
+          }
+        : {
+            title: "Octopus",
+            enable: "Enable Octopus",
+            hint: "Once per round. Pick a goalkeeper; points use official saves only, excluding shootout saves.",
+            counter: (used: boolean, max: number) =>
+              `Octopus: ${used ? 1 : 0}/${max}`,
+            available: "Available — pick one goalkeeper",
+            usedHere: (name: string) => `Used this match: ${name}`,
+            usedElsewhere: "You used Octopus on another match this round",
+            choose: "Choose goalkeeper",
+            chooseRequired: "Pick a goalkeeper for Octopus",
+            selecting: "Selecting goalkeeper for Octopus",
+            clear: "Remove goalkeeper",
+            change: "You can change the goalkeeper from the list.",
+            conflict: "Can't use Octopus with double or the bet on the same match",
+            noKeepers: "No goalkeepers are available in the lineup yet",
+            source: "Scoring uses official API-Football saves only: 3 saves = +1, 5 = +3, 7 = +5, 10 = +8.",
+            viewOtherMatch: "View match",
+          },
+    [locale]
+  );
 
   useEffect(() => {
     setScorerPicks((prev) => {
@@ -312,6 +398,24 @@ export default function PredictPage() {
   }, [lineup, teamSets, boldPlayerId, match?.userBoldScorerBet?.playerId]);
 
   useEffect(() => {
+    if (!lineup || !octopusPlayerId) return;
+    const keeperStillAvailable = [
+      ...lineup.homePlayers,
+      ...lineup.awayPlayers,
+    ].some(
+      (player) =>
+        player.id === octopusPlayerId && isGoalkeeperPosition(player.position)
+    );
+    if (
+      !keeperStillAvailable &&
+      octopusPlayerId !== match?.userOctopusBet?.playerId
+    ) {
+      setOctopusPlayerId("");
+      if (!match?.userOctopusBet?.playerId) setOctopusEnabled(false);
+    }
+  }, [lineup, octopusPlayerId, match?.userOctopusBet?.playerId]);
+
+  useEffect(() => {
     const cachedMatch = readPredictMatchCache<MatchData>(matchId);
     const cachedLineup = readPredictLineupCache<LineupData>(matchId);
     const draft = readPredictDraft<FormState>(matchId);
@@ -333,6 +437,8 @@ export default function PredictPage() {
         setScorerPicks,
         setBoldPlayerId,
         setBoldEnabled,
+        setOctopusPlayerId,
+        setOctopusEnabled,
       });
       setFormReady(true);
     } else {
@@ -344,6 +450,8 @@ export default function PredictPage() {
       setScorerPicks({});
       setBoldPlayerId("");
       setBoldEnabled(false);
+      setOctopusPlayerId("");
+      setOctopusEnabled(false);
       setFormReady(false);
     }
   }, [matchId]);
@@ -363,6 +471,8 @@ export default function PredictPage() {
       scorerPicks,
       boldPlayerId,
       boldEnabled,
+      octopusPlayerId,
+      octopusEnabled,
     });
   }, [
     matchId,
@@ -375,6 +485,8 @@ export default function PredictPage() {
     scorerPicks,
     boldPlayerId,
     boldEnabled,
+    octopusPlayerId,
+    octopusEnabled,
   ]);
 
   useEffect(() => {
@@ -460,6 +572,8 @@ export default function PredictPage() {
             setScorerPicks,
             setBoldPlayerId,
             setBoldEnabled,
+            setOctopusPlayerId,
+            setOctopusEnabled,
           });
         } else {
           applySavedPrediction(payload, {
@@ -471,6 +585,8 @@ export default function PredictPage() {
             setScorerPicks,
             setBoldPlayerId,
             setBoldEnabled,
+            setOctopusPlayerId,
+            setOctopusEnabled,
           });
         }
         setFormReady(true);
@@ -607,9 +723,11 @@ export default function PredictPage() {
   }
 
   function handleDoubleToggle(checked: boolean) {
-    // Allow unchecking anytime, but prevent enabling if bold is active
-    if (checked && boldEnabled) {
-      setError(t.predict.doubleAndBoldConflict);
+    // Allow unchecking anytime, but prevent enabling if another feature is active.
+    if (checked && (boldEnabled || octopusEnabled)) {
+      setError(
+        octopusEnabled ? octopusCopy.conflict : t.predict.doubleAndBoldConflict
+      );
       return;
     }
     const limits = match?.roundUsageLimits?.doubles;
@@ -622,9 +740,13 @@ export default function PredictPage() {
   }
 
   function handleBoldToggle(checked: boolean) {
-    // Allow unchecking anytime, but prevent enabling if double is active
+    // Allow unchecking anytime, but prevent enabling if another feature is active.
     if (checked && isDouble) {
       setError(t.predict.doubleAndBoldConflict);
+      return;
+    }
+    if (checked && octopusEnabled) {
+      setError(octopusCopy.conflict);
       return;
     }
     const limits = match?.roundUsageLimits?.boldScorer;
@@ -651,6 +773,11 @@ export default function PredictPage() {
   }
 
   function handleBoldPlayerChange(playerId: string) {
+    if (octopusEnabled) {
+      setError(octopusCopy.conflict);
+      return;
+    }
+
     if (!playerId) {
       setBoldPlayerId("");
       return;
@@ -729,6 +856,115 @@ export default function PredictPage() {
     }
 
     setBoldPlayerId(playerId);
+  }
+
+  function handleOctopusToggle(checked: boolean) {
+    if (checked && (isDouble || boldEnabled)) {
+      setError(octopusCopy.conflict);
+      return;
+    }
+    const limits = match?.roundUsageLimits?.octopus;
+    if (checked && limits && !limits.canUse && !limits.onThisMatch) {
+      setError(octopusCopy.usedElsewhere);
+      return;
+    }
+    setError("");
+    setOctopusEnabled(checked);
+    if (!checked) setOctopusPlayerId("");
+  }
+
+  function handleOctopusPlayerChange(playerId: string) {
+    if (!playerId) {
+      setOctopusPlayerId("");
+      return;
+    }
+    if (isDouble || boldEnabled) {
+      setError(octopusCopy.conflict);
+      return;
+    }
+
+    const player = [
+      ...(lineup?.homePlayers ?? []),
+      ...(lineup?.awayPlayers ?? []),
+    ].find((candidate) => candidate.id === playerId);
+    if (!player || !isGoalkeeperPosition(player.position)) return;
+
+    setError("");
+    setOctopusEnabled(true);
+    setOctopusPlayerId(playerId);
+  }
+
+  async function handleClearOctopusBet() {
+    setError("");
+    setSuccess("");
+
+    const savedOnThisMatch =
+      match?.roundUsageLimits?.octopus?.onThisMatch ||
+      match?.octopusRoundStatus?.onThisMatch ||
+      Boolean(match?.userOctopusBet?.playerId);
+
+    if (!savedOnThisMatch) {
+      setOctopusPlayerId("");
+      setOctopusEnabled(false);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await clientFetch("/api/octopus-bet", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matchId, playerId: null }),
+      });
+      if (!res) throw new Error(t.errors.loadFailed);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+
+      setOctopusPlayerId("");
+      setOctopusEnabled(false);
+      setMatch((previous) => {
+        if (!previous) return previous;
+        const octopus = previous.roundUsageLimits?.octopus;
+        const roundUsageLimits =
+          previous.roundUsageLimits && octopus
+            ? {
+                ...previous.roundUsageLimits,
+                octopus: {
+                  ...octopus,
+                  used: false,
+                  onThisMatch: false,
+                  onOtherMatch: false,
+                  canUse: true,
+                  otherMatchId: null,
+                  playerName: null,
+                  playerId: null,
+                  points: 0,
+                },
+              }
+            : previous.roundUsageLimits;
+        return {
+          ...previous,
+          userOctopusBet: null,
+          octopusRoundStatus: previous.octopusRoundStatus
+            ? {
+                ...previous.octopusRoundStatus,
+                used: false,
+                onThisMatch: false,
+                onOtherMatch: false,
+                otherMatchId: null,
+              }
+            : previous.octopusRoundStatus,
+          roundUsageLimits,
+        };
+      });
+      invalidatePredictCaches(matchId);
+      invalidateMatchesListCaches();
+      setSuccess(t.matches.predictionSubmitted);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.errors.loadFailed);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleClearBoldBet() {
@@ -839,6 +1075,34 @@ export default function PredictPage() {
       return;
     }
 
+    if (octopusEnabled && !octopusPlayerId) {
+      setError(octopusCopy.chooseRequired);
+      return;
+    }
+
+    if (isDouble && (boldEnabled || octopusEnabled)) {
+      setError(
+        octopusEnabled ? octopusCopy.conflict : t.predict.doubleAndBoldConflict
+      );
+      return;
+    }
+
+    if (boldEnabled && octopusEnabled) {
+      setError(octopusCopy.conflict);
+      return;
+    }
+
+    const octopusLimits = match?.roundUsageLimits?.octopus;
+    if (
+      octopusEnabled &&
+      octopusLimits &&
+      !octopusLimits.canUse &&
+      !octopusLimits.onThisMatch
+    ) {
+      setError(octopusCopy.usedElsewhere);
+      return;
+    }
+
     if (match?.isKnockout && !finishType) {
       setError(t.predict.selectFinish);
       return;
@@ -868,6 +1132,7 @@ export default function PredictPage() {
           predictedPenaltyWinnerTeamId: penaltyWinner || null,
           picks: picksToArray(scorerPicks),
           boldPlayerId: boldEnabled ? boldPlayerId || null : null,
+          octopusPlayerId: octopusEnabled ? octopusPlayerId || null : null,
         }),
       });
 
@@ -915,6 +1180,7 @@ export default function PredictPage() {
 
   const doubleLimits = match.roundUsageLimits?.doubles;
   const boldLimits = match.roundUsageLimits?.boldScorer;
+  const octopusLimits = match.roundUsageLimits?.octopus;
   const boldOnThisMatch =
     Boolean(boldLimits?.onThisMatch) ||
     Boolean(match.boldScorerRoundStatus?.onThisMatch) ||
@@ -923,21 +1189,40 @@ export default function PredictPage() {
     boldLimits?.onOtherMatch ??
     match.boldScorerRoundStatus?.onOtherMatch ??
     false;
+  const octopusOnThisMatch =
+    Boolean(octopusLimits?.onThisMatch) ||
+    Boolean(match.octopusRoundStatus?.onThisMatch) ||
+    Boolean(match.userOctopusBet?.playerId);
+  const octopusLockedOnOther =
+    octopusLimits?.onOtherMatch ??
+    match.octopusRoundStatus?.onOtherMatch ??
+    false;
   const matchLockReason = getPredictionLockReason(match.matchTime, match.status);
   const boldCheckboxLockedBySelection = boldEnabled && Boolean(boldPlayerId);
+  const octopusCheckboxLockedBySelection =
+    octopusEnabled && Boolean(octopusPlayerId);
   // Once a bold player is selected, changing/removing happens from the player controls.
   const boldCheckboxDisabled =
     loading || !match.roundUsageLimits ||
     Boolean(matchLockReason) ||
     boldCheckboxLockedBySelection ||
     (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
-    (isDouble && !boldEnabled);
+    (isDouble && !boldEnabled) ||
+    (octopusEnabled && !boldEnabled);
+  const octopusCheckboxDisabled =
+    loading || !match.roundUsageLimits ||
+    Boolean(matchLockReason) ||
+    octopusCheckboxLockedBySelection ||
+    (octopusLimits != null &&
+      !octopusLimits.canUse &&
+      !octopusLimits.onThisMatch) ||
+    ((isDouble || boldEnabled) && !octopusEnabled);
   const doubleCheckboxDisabled =
     loading || !match.roundUsageLimits ||
     (doubleLimits != null &&
       !doubleLimits.canEnable &&
       !doubleLimits.onThisMatch) ||
-    (boldEnabled && !isDouble); // disable enabling only, allow unchecking
+    ((boldEnabled || octopusEnabled) && !isDouble); // disable enabling only, allow unchecking
   const predictedScorerIds = new Set(Object.keys(scorerPicks));
   const hasPredictedScorers = predictedScorerIds.size > 0;
   const toBoldPlayerOption = (player: MatchPlayerView) => ({
@@ -973,6 +1258,36 @@ export default function PredictPage() {
 
   const boldSelectOptions = [
     { value: "", label: t.predict.boldScorerBet.choosePlayer },
+  ];
+  const toGoalkeeperOption = (player: MatchPlayerView) => ({
+    value: player.id,
+    label:
+      player.section === "bench"
+        ? `${player.name} (${t.predict.scorerBench})`
+        : player.name,
+  });
+  const octopusGoalkeeperGroups =
+    lineup && hasPlayers
+      ? [
+          {
+            label: match.homeTeam.name,
+            options: lineup.homePlayers
+              .filter((player) => isGoalkeeperPosition(player.position))
+              .map(toGoalkeeperOption),
+          },
+          {
+            label: match.awayTeam.name,
+            options: lineup.awayPlayers
+              .filter((player) => isGoalkeeperPosition(player.position))
+              .map(toGoalkeeperOption),
+          },
+        ].filter((group) => group.options.length > 0)
+      : undefined;
+  const hasOctopusGoalkeeperOptions =
+    (octopusGoalkeeperGroups?.some((group) => group.options.length > 0) ??
+      false);
+  const octopusSelectOptions = [
+    { value: "", label: octopusCopy.choose },
   ];
 
   return (
@@ -1300,6 +1615,189 @@ export default function PredictPage() {
           )}
         </Card>
 
+        <Card className="border-cyan-300/40 bg-gradient-to-br from-cyan-950/45 via-card to-teal-500/10 shadow-xl shadow-cyan-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-cyan-100">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-200/40 bg-cyan-400/15 text-sm font-black text-cyan-100">
+                GK
+              </span>
+              {octopusCopy.title}
+            </CardTitle>
+          </CardHeader>
+
+          {octopusLimits && (
+            <div
+              className={cn(
+                "mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm",
+                octopusLimits.used
+                  ? "border-cyan-300/45 bg-cyan-400/10 text-cyan-100"
+                  : "border-primary/30 bg-primary/10 text-primary"
+              )}
+            >
+              <span className="font-semibold">
+                {octopusCopy.counter(octopusLimits.used, octopusLimits.max)}
+              </span>
+              <span>
+                {octopusLimits.onThisMatch && octopusLimits.playerName
+                  ? octopusCopy.usedHere(octopusLimits.playerName)
+                  : octopusLimits.onOtherMatch
+                    ? octopusCopy.usedElsewhere
+                    : octopusCopy.available}
+              </span>
+            </div>
+          )}
+
+          {octopusOnThisMatch && (
+            <div className="mb-4 rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>
+                  {octopusLimits?.playerName || match.userOctopusBet?.player.name
+                    ? octopusCopy.usedHere(
+                        octopusLimits?.playerName ??
+                          match.userOctopusBet?.player.name ??
+                          ""
+                      )
+                    : octopusCopy.selecting}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearOctopusBet}
+                  disabled={submitting || Boolean(matchLockReason)}
+                  className="rounded-lg border border-cyan-200/40 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {octopusCopy.clear}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {lineupLoading ? (
+            <p className="py-4 text-center text-sm text-muted">
+              {t.predict.lineupLoading}
+            </p>
+          ) : !hasPlayers ? (
+            <p className="py-4 text-center text-sm text-muted">
+              {t.predict.lineupUnavailable}
+            </p>
+          ) : octopusLockedOnOther ? (
+            <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+              <p>{octopusCopy.usedElsewhere}</p>
+              {(octopusLimits?.otherMatchId ||
+                match.octopusRoundStatus?.otherMatchId) && (
+                <Link
+                  href={`/matches/${
+                    octopusLimits?.otherMatchId ??
+                    match.octopusRoundStatus?.otherMatchId
+                  }`}
+                  className="mt-2 inline-block font-medium text-primary hover:underline"
+                >
+                  {octopusCopy.viewOtherMatch}
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <label
+                className={cn(
+                  "flex items-center gap-3 rounded-lg border p-4 transition-all",
+                  octopusCheckboxDisabled
+                    ? "cursor-not-allowed border-card-border/60 opacity-60"
+                    : "cursor-pointer",
+                  octopusEnabled
+                    ? "border-cyan-300/60 bg-cyan-400/10 shadow-[0_0_12px_rgba(34,211,238,0.14)]"
+                    : "border-card-border bg-card hover:border-cyan-300/40"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={octopusEnabled}
+                  disabled={octopusCheckboxDisabled}
+                  onChange={(e) => handleOctopusToggle(e.target.checked)}
+                  className="sr-only"
+                />
+                <span
+                  className={cn(
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-all",
+                    octopusEnabled
+                      ? "border-cyan-200 bg-cyan-300 text-cyan-950"
+                      : "border-muted/40 bg-background"
+                  )}
+                  aria-hidden
+                >
+                  {octopusEnabled && (
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  )}
+                </span>
+                <div>
+                  <p
+                    className={cn(
+                      "font-medium",
+                      octopusEnabled ? "text-cyan-100" : "text-foreground"
+                    )}
+                  >
+                    {octopusCopy.enable}
+                  </p>
+                  <p className="text-sm text-muted">
+                    {isDouble || boldEnabled
+                      ? octopusCopy.conflict
+                      : octopusEnabled
+                        ? octopusCopy.selecting
+                        : octopusCopy.hint}
+                  </p>
+                </div>
+              </label>
+
+              {octopusEnabled && (
+                <div className="rounded-lg border border-cyan-300/25 bg-background/80 p-4">
+                  {octopusPlayerId && !matchLockReason && (
+                    <p className="mb-2 text-sm text-muted">
+                      {octopusCopy.change}
+                    </p>
+                  )}
+                  {hasOctopusGoalkeeperOptions ? (
+                    <Select
+                      label={octopusCopy.choose}
+                      value={octopusPlayerId}
+                      onChange={(e) =>
+                        handleOctopusPlayerChange(e.target.value)
+                      }
+                      options={octopusSelectOptions}
+                      groups={octopusGoalkeeperGroups}
+                      disabled={Boolean(matchLockReason)}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted">{octopusCopy.noKeepers}</p>
+                  )}
+                  <p className="mt-3 text-xs leading-5 text-muted">
+                    {octopusCopy.source}
+                  </p>
+                  {octopusPlayerId && !matchLockReason && (
+                    <button
+                      type="button"
+                      onClick={handleClearOctopusBet}
+                      className="mt-3 text-sm text-muted hover:text-danger"
+                    >
+                      {octopusCopy.clear}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
         {match.isKnockout && (
           <Card>
             <CardHeader>
@@ -1461,6 +1959,7 @@ export default function PredictPage() {
                 lineupStatus={lineup.lineupStatus ?? "estimated"}
                 scorerPicks={scorerPicks}
                 boldPlayerId={boldPlayerId}
+                octopusPlayerId={octopusPlayerId}
                 canSelectPlayer={canSelectScorer}
                 maxGoalsForPlayer={getMaxGoalsForPlayer}
                 onToggle={toggleScorer}
