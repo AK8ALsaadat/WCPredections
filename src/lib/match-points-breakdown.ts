@@ -283,8 +283,8 @@ export function buildMatchPointsBreakdown(
       const cappedByGoals =
         Number.isFinite(concededCap) && saveTierPoints > concededCap;
       const octopusDetails = [
-        `Saves tier before conceded-goals cap: +${saveTierPoints}`,
-        cleanSheetBonus > 0 ? `Clean sheet bonus: +${cleanSheetBonus}` : null,
+        `نقاط التصديات قبل سقف الأهداف: +${saveTierPoints}`,
+        cleanSheetBonus > 0 ? `بونص الكلين شيت: +${cleanSheetBonus}` : null,
         octopus.saves != null
           ? `${octopus.saves} تصديات رسمية`
           : "تصديات الحارس الرسمية",
@@ -293,7 +293,7 @@ export function buildMatchPointsBreakdown(
           : null,
         getOctopusConcededCapLabel(octopus.goalsConceded),
         cappedByGoals
-          ? `Conceded-goals cap reduced final Octopus points to +${octopus.points}`
+          ? `سقف الأهداف قلل نقاط الأخطبوط إلى +${octopus.points}`
           : null,
       ].filter(Boolean);
       lines.push({
