@@ -1,7 +1,11 @@
 import { getMatchResult } from "@/lib/utils";
 import type { Messages } from "@/lib/i18n/ar";
 import type { FinishType } from "@prisma/client";
-import { getOctopusConcededCapLabel } from "@/lib/octopus-points";
+import {
+  getOctopusConcededCapLabel,
+  getOctopusConcededCapPoints,
+  getOctopusSaveTierPoints,
+} from "@/lib/octopus-points";
 import { PERFECT_PREDICTION_BONUS_POINTS } from "@/services/scoring.service";
 
 /** تحويل موضع اللاعب الإنجليزي إلى عربي مع عدد النقاط */
@@ -270,7 +274,12 @@ export function buildMatchPointsBreakdown(
   if (input.userOctopusBet) {
     const octopus = input.userOctopusBet;
     if (showMisses || octopus.points !== 0) {
+      const saveTierPoints = getOctopusSaveTierPoints(octopus.saves);
+      const concededCap = getOctopusConcededCapPoints(octopus.goalsConceded);
+      const cappedByGoals =
+        Number.isFinite(concededCap) && saveTierPoints > concededCap;
       const octopusDetails = [
+        `Saves tier before conceded-goals cap: +${saveTierPoints}`,
         octopus.saves != null
           ? `${octopus.saves} تصديات رسمية`
           : "تصديات الحارس الرسمية",
@@ -278,6 +287,9 @@ export function buildMatchPointsBreakdown(
           ? `منتخبه استقبل ${octopus.goalsConceded}`
           : null,
         getOctopusConcededCapLabel(octopus.goalsConceded),
+        cappedByGoals
+          ? `Conceded-goals cap reduced final Octopus points to +${octopus.points}`
+          : null,
       ].filter(Boolean);
       lines.push({
         id: "octopus-goalkeeper",

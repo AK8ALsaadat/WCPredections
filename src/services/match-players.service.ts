@@ -1,6 +1,6 @@
 import { cachedFetch } from "@/lib/api-cache";
 import { buildExpectedLineup } from "@/lib/expected-lineup";
-import { goalkeeperPositionWhere } from "@/lib/goalkeeper";
+import { goalkeeperPositionWhere, isGoalkeeperPosition } from "@/lib/goalkeeper";
 import {
   isWithinLineupFastRefreshWindow,
   LINEUP_FAST_REFRESH_BEFORE_MS,
@@ -22,6 +22,7 @@ import {
   playerNamesMatch,
   resolvePlayerInSquad,
 } from "@/lib/player-matching";
+import { normalizeTeamIdentity } from "@/lib/team-identity";
 
 const EXPECTED_LINEUP_CACHE_MS = 60 * 60 * 1000;
 const TEAM_PLAYERS_CACHE_MS = 30 * 60 * 1000;
@@ -143,43 +144,160 @@ export function mergeTeamViewWithCurrentRoster(
 
 async function appendDatabaseGoalkeepers(
   teamId: string,
+  teamName: string,
+  shortName: string | null | undefined,
   view: TeamPlayersView
 ): Promise<TeamPlayersView> {
+  const goalkeeperAliasKey = (name: string) => {
+    const normalized = normalizePlayerName(name);
+    const parts = normalized.split(/\s+/).filter(Boolean);
+    const family = parts[parts.length - 1] ?? normalized;
+    const initial = parts[0]?.[0] ?? "";
+    return `${initial}:${family}`;
+  };
+  const dedupeGoalkeeperPlayers = (players: MatchPlayerView[]) => {
+    const seen = new Set<string>();
+    return players.filter((player) => {
+      if (!isGoalkeeperPosition(player.position)) return true;
+      const key = goalkeeperAliasKey(player.name);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+  const dedupedView = {
+    ...view,
+    players: dedupeGoalkeeperPlayers(view.players),
+  };
+  const currentIdentity = normalizeTeamIdentity(teamName);
+  const currentShortIdentity = shortName ? normalizeTeamIdentity(shortName) : "";
+  const candidateTeams = await prisma.team.findMany({
+    select: { id: true, name: true, shortName: true },
+  });
+  const candidateTeamIds = candidateTeams
+    .filter((team) => {
+      if (team.id === teamId) return true;
+      const nameIdentity = normalizeTeamIdentity(team.name);
+      const shortIdentity = normalizeTeamIdentity(team.shortName);
+      return (
+        nameIdentity === currentIdentity ||
+        shortIdentity === currentIdentity ||
+        (currentShortIdentity.length > 0 &&
+          (nameIdentity === currentShortIdentity ||
+            shortIdentity === currentShortIdentity))
+      );
+    })
+    .map((team) => team.id);
+
   const goalkeepers = await prisma.player.findMany({
     where: {
-      teamId,
+      teamId: { in: candidateTeamIds.length > 0 ? candidateTeamIds : [teamId] },
       ...goalkeeperPositionWhere,
     },
     select: {
       id: true,
+      teamId: true,
       name: true,
       position: true,
       shirtNumber: true,
+      apiPlayerId: true,
       photoUrl: true,
     },
     orderBy: [{ shirtNumber: "asc" }, { name: "asc" }],
   });
 
-  if (goalkeepers.length === 0) return view;
+  if (goalkeepers.length === 0) return dedupedView;
 
-  const knownIds = new Set(view.players.map((player) => player.id));
-  const knownNames = new Set(
-    view.players.map((player) => normalizePlayerName(player.name))
+  const normalizedExistingGoalkeepers = new Set(
+    goalkeepers
+      .filter((player) => player.teamId === teamId)
+      .map((player) => normalizePlayerName(player.name))
   );
-  const additions = goalkeepers.filter((player) => {
+  const existingGoalkeeperAliases = new Set([
+    ...dedupedView.players.map((player) => goalkeeperAliasKey(player.name)),
+    ...goalkeepers
+      .filter((player) => player.teamId === teamId)
+      .map((player) => goalkeeperAliasKey(player.name)),
+  ]);
+  const aliasGoalkeepersToCopy = goalkeepers.filter(
+    (player) =>
+      player.teamId !== teamId &&
+      !normalizedExistingGoalkeepers.has(normalizePlayerName(player.name)) &&
+      !existingGoalkeeperAliases.has(goalkeeperAliasKey(player.name))
+  );
+
+  const copiedGoalkeepers =
+    aliasGoalkeepersToCopy.length === 0
+      ? []
+      : await prisma.$transaction(
+          aliasGoalkeepersToCopy.map((player) =>
+            prisma.player.upsert({
+              where: {
+                teamId_apiPlayerId: {
+                  teamId,
+                  apiPlayerId:
+                    player.apiPlayerId ??
+                    `alias-gk:${normalizePlayerName(player.name).replace(/\s+/g, "-")}`,
+                },
+              },
+              create: {
+                teamId,
+                apiPlayerId:
+                  player.apiPlayerId ??
+                  `alias-gk:${normalizePlayerName(player.name).replace(/\s+/g, "-")}`,
+                name: player.name,
+                position: player.position ?? "Goalkeeper",
+                shirtNumber: player.shirtNumber,
+                photoUrl: player.photoUrl,
+              },
+              update: {
+                name: player.name,
+                position: player.position ?? "Goalkeeper",
+                shirtNumber: player.shirtNumber,
+                photoUrl: player.photoUrl,
+              },
+              select: {
+                id: true,
+                teamId: true,
+                name: true,
+                position: true,
+                shirtNumber: true,
+                photoUrl: true,
+              },
+            })
+          )
+        );
+
+  const knownIds = new Set(dedupedView.players.map((player) => player.id));
+  const knownNames = new Set(
+    dedupedView.players.map((player) => normalizePlayerName(player.name))
+  );
+  const knownAliases = new Set(
+    dedupedView.players.map((player) => goalkeeperAliasKey(player.name))
+  );
+  const additions = [
+    ...goalkeepers.filter((player) => player.teamId === teamId),
+    ...copiedGoalkeepers,
+  ].filter((player) => {
     const normalizedName = normalizePlayerName(player.name);
-    if (knownIds.has(player.id) || knownNames.has(normalizedName)) return false;
+    const alias = goalkeeperAliasKey(player.name);
+    if (
+      knownIds.has(player.id) ||
+      knownNames.has(normalizedName) ||
+      knownAliases.has(alias)
+    ) return false;
     knownIds.add(player.id);
     knownNames.add(normalizedName);
+    knownAliases.add(alias);
     return true;
   });
 
-  if (additions.length === 0) return view;
+  if (additions.length === 0) return dedupedView;
 
   return {
-    ...view,
+    ...dedupedView,
     players: [
-      ...view.players,
+      ...dedupedView.players,
       ...additions.map((player) => ({
         ...player,
         section: "bench" as const,
@@ -1279,6 +1397,7 @@ async function getTeamPlayersForMatch(
   teamId: string,
   apiTeamId: string | null,
   teamName: string,
+  teamShortName?: string | null,
   apiTeamData?: ApiTeamPlayers,
   targetMatchId = "unknown",
   targetMatchTime = new Date()
@@ -1301,6 +1420,8 @@ async function getTeamPlayersForMatch(
   );
   const withAllGoalkeepers = await appendDatabaseGoalkeepers(
     teamId,
+    teamName,
+    teamShortName,
     completedView
   );
   return enrichWithApiFootballPhotos(teamName, withAllGoalkeepers);
@@ -1324,8 +1445,8 @@ async function loadProbableBothTeams(match: {
   matchTime?: Date | null;
   homeTeamId: string;
   awayTeamId: string;
-  homeTeam: { apiTeamId: string | null; name: string };
-  awayTeam: { apiTeamId: string | null; name: string };
+  homeTeam: { apiTeamId: string | null; name: string; shortName?: string | null };
+  awayTeam: { apiTeamId: string | null; name: string; shortName?: string | null };
 }) {
   const empty: TeamPlayersView = {
     players: [],
@@ -1339,6 +1460,7 @@ async function loadProbableBothTeams(match: {
       match.homeTeamId,
       match.homeTeam.apiTeamId,
       match.homeTeam.name,
+      match.homeTeam.shortName,
       undefined,
       match.id,
       targetMatchTime
@@ -1347,6 +1469,7 @@ async function loadProbableBothTeams(match: {
       match.awayTeamId,
       match.awayTeam.apiTeamId,
       match.awayTeam.name,
+      match.awayTeam.shortName,
       undefined,
       match.id,
       targetMatchTime
@@ -1366,8 +1489,8 @@ export async function getMatchPlayersFromApi(match: {
   matchTime?: Date | null;
   homeTeamId: string;
   awayTeamId: string;
-  homeTeam: { apiTeamId: string | null; name: string };
-  awayTeam: { apiTeamId: string | null; name: string };
+  homeTeam: { apiTeamId: string | null; name: string; shortName?: string | null };
+  awayTeam: { apiTeamId: string | null; name: string; shortName?: string | null };
 }) {
   if (process.env.FOOTBALL_API_PROVIDER !== "football-data") {
     return loadProbableBothTeams(match);
@@ -1399,6 +1522,7 @@ export async function getMatchPlayersFromApi(match: {
         match.homeTeamId,
         match.homeTeam.apiTeamId,
         match.homeTeam.name,
+        match.homeTeam.shortName,
         apiMatch.homeTeam,
         match.id,
         match.matchTime ?? new Date()
@@ -1407,6 +1531,7 @@ export async function getMatchPlayersFromApi(match: {
         match.awayTeamId,
         match.awayTeam.apiTeamId,
         match.awayTeam.name,
+        match.awayTeam.shortName,
         apiMatch.awayTeam,
         match.id,
         match.matchTime ?? new Date()

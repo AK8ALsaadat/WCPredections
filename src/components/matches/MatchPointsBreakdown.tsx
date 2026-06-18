@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   buildMatchPointsBreakdown,
-  getMatchTotalUserPoints,
   type MatchPointsBreakdownInput,
 } from "@/lib/match-points-breakdown";
 import { PointsBreakdownLines } from "@/components/matches/PointsBreakdownLines";

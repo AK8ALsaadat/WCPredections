@@ -19,7 +19,7 @@ export async function GET(
 
     return apiSuccess({ ...data, currentUserId: user.userId }, 200, {
       headers: {
-        "Cache-Control": "private, no-cache",
+        "Cache-Control": "private, max-age=15, stale-while-revalidate=45",
       },
     });
   } catch (error) {

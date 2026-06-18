@@ -1,6 +1,7 @@
 import {
   isClientCacheFresh,
   readClientCache,
+  removeClientCache,
   writeClientCache,
 } from "@/lib/client-page-cache";
 import { clientFetch } from "@/lib/client-fetch";
@@ -48,13 +49,16 @@ export function writeLeaguePredictionsCache<T>(matchId: string, data: T) {
 }
 
 async function fetchLeaguePredictions(matchId: string) {
-  const response = await clientFetch(`/api/matches/${matchId}/predictions`, {
-    cache: "no-store",
-  });
+  const response = await clientFetch(`/api/matches/${matchId}/predictions`);
   const data = response ? await response.json() : null;
   if (data?.success) {
     writeLeaguePredictionsCache(matchId, data.data);
   }
+}
+
+export function invalidateLeaguePredictionsCache(matchId: string) {
+  removeClientCache(leaguePredictionsCacheKey(matchId));
+  inflight.delete(matchId);
 }
 
 export function prefetchLeaguePredictions(

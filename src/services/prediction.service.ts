@@ -310,15 +310,16 @@ async function validateScorerPicks(
 async function replaceScorerPredictions(
   userId: string,
   matchId: string,
-  picks: { playerId: string; goals: number }[]
+  picks: { playerId: string; goals: number }[],
+  client: Pick<typeof prisma, "scorerPrediction"> = prisma
 ) {
-  await prisma.scorerPrediction.deleteMany({
+  await client.scorerPrediction.deleteMany({
     where: { userId, matchId },
   });
 
   if (picks.length === 0) return;
 
-  await prisma.scorerPrediction.createMany({
+  await client.scorerPrediction.createMany({
     data: picks.map((pick) => ({
         userId,
         matchId,
@@ -544,12 +545,8 @@ export async function submitMatchPredictionBundle(
     throw new Error("ما تقدر تستخدم الأخطبوط مع الرهان على نفس المباراة");
   }
 
-  if (storedBold?.matchId === data.matchId) {
-    if (!data.boldPlayerId) {
-      // cancellation: remove the stored bold bet for this user/round
-      await prisma.boldScorerBet.delete({ where: { id: storedBold.id } });
-    }
-  } else if (
+  if (
+    storedBold?.matchId !== data.matchId &&
     data.boldPlayerId &&
     storedBold &&
     storedBold.matchId !== data.matchId
@@ -559,13 +556,8 @@ export async function submitMatchPredictionBundle(
     );
   }
 
-  if (storedOctopus?.matchId === data.matchId) {
-    if (!data.octopusPlayerId) {
-      await prisma.octopusGoalkeeperBet.delete({
-        where: { id: storedOctopus.id },
-      });
-    }
-  } else if (
+  if (
+    storedOctopus?.matchId !== data.matchId &&
     data.octopusPlayerId &&
     storedOctopus &&
     storedOctopus.matchId !== data.matchId
@@ -573,88 +565,97 @@ export async function submitMatchPredictionBundle(
     throw new Error("استخدمت الأخطبوط في مباراة ثانية هالجولة — مرة واحدة بس");
   }
 
-  const prediction = await prisma.prediction.upsert({
-    where: {
-      userId_matchId: { userId, matchId: data.matchId },
-    },
-    create: {
-      userId,
-      matchId: data.matchId,
-      predHome,
-      predAway,
-      isDouble,
-      predictedFinishType: data.predictedFinishType ?? null,
-      predictedPenaltyWinnerTeamId:
-        data.predictedPenaltyWinnerTeamId ?? null,
-    },
-    update: {
-      predHome,
-      predAway,
-      isDouble,
-      predictedFinishType: data.predictedFinishType ?? null,
-      predictedPenaltyWinnerTeamId:
-        data.predictedPenaltyWinnerTeamId ?? null,
-    },
-    select: { id: true },
+  return prisma.$transaction(async (tx) => {
+    if (storedBold?.matchId === data.matchId && !data.boldPlayerId) {
+      await tx.boldScorerBet.delete({ where: { id: storedBold.id } });
+    }
+    if (storedOctopus?.matchId === data.matchId && !data.octopusPlayerId) {
+      await tx.octopusGoalkeeperBet.delete({
+        where: { id: storedOctopus.id },
+      });
+    }
+
+    const prediction = await tx.prediction.upsert({
+      where: {
+        userId_matchId: { userId, matchId: data.matchId },
+      },
+      create: {
+        userId,
+        matchId: data.matchId,
+        predHome,
+        predAway,
+        isDouble,
+        predictedFinishType: data.predictedFinishType ?? null,
+        predictedPenaltyWinnerTeamId:
+          data.predictedPenaltyWinnerTeamId ?? null,
+      },
+      update: {
+        predHome,
+        predAway,
+        isDouble,
+        predictedFinishType: data.predictedFinishType ?? null,
+        predictedPenaltyWinnerTeamId:
+          data.predictedPenaltyWinnerTeamId ?? null,
+      },
+      select: { id: true },
+    });
+
+    await replaceScorerPredictions(userId, data.matchId, picks, tx);
+
+    const boldBet = data.boldPlayerId
+      ? await tx.boldScorerBet.upsert({
+          where: {
+            userId_usageRoundKey: {
+              userId,
+              usageRoundKey: usageScope.key,
+            },
+          },
+          create: {
+            userId,
+            roundId: match.roundId,
+            usageRoundKey: usageScope.key,
+            matchId: data.matchId,
+            playerId: data.boldPlayerId,
+          },
+          update: {
+            matchId: data.matchId,
+            playerId: data.boldPlayerId,
+            points: 0,
+          },
+          include: {
+            player: { select: { id: true, name: true } },
+          },
+        })
+      : null;
+
+    const octopusBet = data.octopusPlayerId
+      ? await tx.octopusGoalkeeperBet.upsert({
+          where: {
+            userId_usageRoundKey: {
+              userId,
+              usageRoundKey: usageScope.key,
+            },
+          },
+          create: {
+            userId,
+            roundId: match.roundId,
+            usageRoundKey: usageScope.key,
+            matchId: data.matchId,
+            playerId: data.octopusPlayerId,
+          },
+          update: {
+            matchId: data.matchId,
+            playerId: data.octopusPlayerId,
+            points: 0,
+          },
+          include: {
+            player: { select: { id: true, name: true } },
+          },
+        })
+      : null;
+
+    return { prediction, scorers: picks.length, boldBet, octopusBet };
   });
-
-  await replaceScorerPredictions(userId, data.matchId, picks);
-
-  let boldBet = null;
-  if (data.boldPlayerId) {
-    boldBet = await prisma.boldScorerBet.upsert({
-      where: {
-        userId_usageRoundKey: {
-          userId,
-          usageRoundKey: usageScope.key,
-        },
-      },
-      create: {
-        userId,
-        roundId: match.roundId,
-        usageRoundKey: usageScope.key,
-        matchId: data.matchId,
-        playerId: data.boldPlayerId,
-      },
-      update: {
-        matchId: data.matchId,
-        playerId: data.boldPlayerId,
-        points: 0,
-      },
-      include: {
-        player: { select: { id: true, name: true } },
-      },
-    });
-  }
-
-  let octopusBet = null;
-  if (data.octopusPlayerId) {
-    octopusBet = await prisma.octopusGoalkeeperBet.upsert({
-      where: {
-        userId_usageRoundKey: {
-          userId,
-          usageRoundKey: usageScope.key,
-        },
-      },
-      create: {
-        userId,
-        roundId: match.roundId,
-        usageRoundKey: usageScope.key,
-        matchId: data.matchId,
-        playerId: data.octopusPlayerId,
-      },
-      update: {
-        matchId: data.matchId,
-        playerId: data.octopusPlayerId,
-        points: 0,
-      },
-      include: {
-        player: { select: { id: true, name: true } },
-      },
-    });
-  }
-
-  return { prediction, scorers: picks.length, boldBet, octopusBet };
 }
 
 type ScorerPredictionWithPlayer = {

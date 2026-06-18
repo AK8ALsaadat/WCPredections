@@ -26,6 +26,7 @@ import {
   writePredictLineupCache,
   writePredictMatchCache,
 } from "@/lib/predict-prefetch";
+import { invalidateLeaguePredictionsCache } from "@/lib/league-predictions-prefetch";
 import {
   cn,
   formatDate,
@@ -958,6 +959,7 @@ export default function PredictPage() {
         };
       });
       invalidatePredictCaches(matchId);
+      invalidateLeaguePredictionsCache(matchId);
       invalidateMatchesListCaches();
       setSuccess(t.matches.predictionSubmitted);
     } catch (err) {
@@ -1031,6 +1033,7 @@ export default function PredictPage() {
         };
       });
       invalidatePredictCaches(matchId);
+      invalidateLeaguePredictionsCache(matchId);
       invalidateMatchesListCaches();
       setSuccess(t.matches.predictionSubmitted);
     } catch (err) {
@@ -1143,6 +1146,7 @@ export default function PredictPage() {
       }
 
       invalidatePredictCaches(matchId);
+      invalidateLeaguePredictionsCache(matchId);
       clearPredictDraft(matchId);
       invalidateMatchesListCaches();
       setSuccess(t.matches.predictionSubmitted);

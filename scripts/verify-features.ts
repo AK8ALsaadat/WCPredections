@@ -91,7 +91,15 @@ ok(
 console.log("\n=== نقاط الإقصائي ===");
 ok(
   "طريقة الإنهاء صح = 1",
-  calculateFinishTypePoints("PENALTIES", "PENALTIES") === 1
+  calculateFinishTypePoints("PENALTIES", "PENALTIES") === 4
+);
+ok(
+  "finish type extra time = 2",
+  calculateFinishTypePoints("EXTRA_TIME", "EXTRA_TIME") === 2
+);
+ok(
+  "finish type ninety minutes = 1",
+  calculateFinishTypePoints("NINETY_MINUTES", "NINETY_MINUTES") === 1
 );
 ok(
   "طريقة الإنهاء خطأ = 0",

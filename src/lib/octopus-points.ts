@@ -28,16 +28,21 @@ export function getOctopusConcededCapLabel(
   return "استقبال هدف ألغى فرصة 10 تصديات (+8)";
 }
 
+export function getOctopusSaveTierPoints(saves: number | null | undefined) {
+  const count = saves ?? 0;
+  if (count >= 10) return OCTOPUS_POINTS.ten;
+  if (count >= 7) return OCTOPUS_POINTS.seven;
+  if (count >= 5) return OCTOPUS_POINTS.five;
+  if (count >= 3) return OCTOPUS_POINTS.three;
+  return 0;
+}
+
 export function calculateOctopusPoints(
   saves: number | null | undefined,
   goalsConceded?: number | null
 ) {
-  const count = saves ?? 0;
-  let points = 0;
-  if (count >= 10) points = OCTOPUS_POINTS.ten;
-  else if (count >= 7) points = OCTOPUS_POINTS.seven;
-  else if (count >= 5) points = OCTOPUS_POINTS.five;
-  else if (count >= 3) points = OCTOPUS_POINTS.three;
-
-  return Math.min(points, getOctopusConcededCapPoints(goalsConceded));
+  return Math.min(
+    getOctopusSaveTierPoints(saves),
+    getOctopusConcededCapPoints(goalsConceded)
+  );
 }

@@ -68,9 +68,7 @@ export default function LeagueMatchPredictionsPage() {
       if (!force && isLeaguePredictionsCacheFresh(matchId)) return;
     }
 
-    const predRes = await clientFetch(`/api/matches/${matchId}/predictions`, {
-      cache: "no-store",
-    });
+    const predRes = await clientFetch(`/api/matches/${matchId}/predictions`);
     const predData = predRes ? await predRes.json() : null;
 
     if (predData?.success) {

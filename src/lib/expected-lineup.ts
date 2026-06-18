@@ -1,3 +1,5 @@
+import { isGoalkeeperPosition } from "@/lib/goalkeeper";
+
 type SquadPlayer = {
   id: number;
   name: string;
@@ -11,7 +13,7 @@ type PositionBucket = "gk" | "def" | "mid" | "att" | "other";
 
 function getPositionBucket(position?: string | null): PositionBucket {
   const p = (position ?? "").toLowerCase();
-  if (p.includes("goal")) return "gk";
+  if (isGoalkeeperPosition(p)) return "gk";
   if (p.includes("defen") || p.includes("back")) return "def";
   if (p.includes("mid")) return "mid";
   if (
