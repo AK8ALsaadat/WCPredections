@@ -345,7 +345,7 @@ export default function PredictPage() {
             change: "تقدر تغيّر الحارس من القائمة.",
             conflict: "ما تقدر تستخدم الأخطبوط مع المضاعفة أو الرهان على نفس المباراة",
             noKeepers: "ما فيه حراس متاحين في التشكيلة حالياً",
-            source: "الحساب من API-Football الرسمي فقط: 3 تصديات = +1، 5 = +3، 7 = +5، 10 = +8. البلنتي أثناء المباراة يحسب إذا تصدى له الحارس، لكن ركلات الترجيح بعد النهاية لا تدخل.",
+            source: "الحساب من API-Football الرسمي فقط: 3 تصديات = +1، 5 = +3، 7 = +5، 10 = +8. إذا منتخب الحارس استقبل هدفًا تروح فرصة سقف 10 تصديات، هدفين تروح فرصة 7، و3 أهداف فأكثر تروح فرصة 5. البلنتي أثناء المباراة يحسب إذا تصدى له الحارس، لكن ركلات الترجيح بعد النهاية لا تدخل.",
             viewOtherMatch: "شوف المباراة",
           }
         : {
@@ -364,7 +364,7 @@ export default function PredictPage() {
             change: "You can change the goalkeeper from the list.",
             conflict: "Can't use Octopus with double or the bet on the same match",
             noKeepers: "No goalkeepers are available in the lineup yet",
-            source: "Scoring uses official API-Football saves only: 3 saves = +1, 5 = +3, 7 = +5, 10 = +8. In-match penalty saves count; post-match shootout saves do not.",
+            source: "Scoring uses official API-Football saves only: 3 saves = +1, 5 = +3, 7 = +5, 10 = +8. If the goalkeeper's team concedes 1 goal, the 10-save tier is gone; 2 removes the 7-save tier; 3+ removes the 5-save tier. In-match penalty saves count; post-match shootout saves do not.",
             viewOtherMatch: "View match",
           },
     [locale]

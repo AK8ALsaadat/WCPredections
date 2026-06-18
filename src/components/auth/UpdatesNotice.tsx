@@ -4,13 +4,31 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
-const NOTICE_KEY = "wc-predictions-updates-2026-06-18-v2-octopus";
+const NOTICE_KEY = "wc-predictions-updates-2026-06-18-v3-octopus-goals-cap";
 
 const OCTOPUS_POINTS = [
   { saves: 3, points: 1 },
   { saves: 5, points: 3 },
   { saves: 7, points: 5 },
   { saves: 10, points: 8 },
+];
+
+const OCTOPUS_CAPS = [
+  {
+    goals: 1,
+    ar: "هدف على منتخب الحارس: تروح فرصة سقف 10 تصديات",
+    en: "1 goal conceded: the 10-save tier is gone",
+  },
+  {
+    goals: 2,
+    ar: "هدفين على منتخب الحارس: تروح فرصة سقف 7 تصديات",
+    en: "2 goals conceded: the 7-save tier is gone",
+  },
+  {
+    goals: 3,
+    ar: "3 أهداف فأكثر: تروح فرصة سقف 5 تصديات",
+    en: "3+ goals conceded: the 5-save tier is gone",
+  },
 ];
 
 export function UpdatesNotice() {
@@ -72,6 +90,26 @@ export function UpdatesNotice() {
           ))}
         </div>
 
+        <div
+          className="relative mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3"
+          dir={isAr ? "rtl" : "ltr"}
+        >
+          {OCTOPUS_CAPS.map((item) => (
+            <div
+              key={item.goals}
+              className="rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-start"
+            >
+              <p className="text-base font-black tabular-nums text-amber-100">
+                {item.goals}
+                {item.goals === 3 ? "+" : ""}
+              </p>
+              <p className="text-[11px] leading-5 text-muted">
+                {isAr ? item.ar : item.en}
+              </p>
+            </div>
+          ))}
+        </div>
+
         <div className="relative mt-4 space-y-2 text-sm leading-7 text-muted">
           <p>
             {isAr
@@ -82,6 +120,11 @@ export function UpdatesNotice() {
             {isAr
               ? "النقاط من تصديات المصدر الرسمي فقط: 3 تصديات +1، 5 +3، 7 +5، 10 +8."
               : "Points use official source saves only: 3 saves +1, 5 +3, 7 +5, 10 +8."}
+          </p>
+          <p>
+            {isAr
+              ? "بعدها يطبق سقف أهداف منتخب الحارس: إذا استقبل هدفًا ما عاد يقدر ياخذ سقف 10 تصديات، هدفين تلغي سقف 7، و3 أهداف فأكثر تلغي سقف 5. النقاط النهائية تكون الأقل بين التصديات والسقف."
+              : "Then the goalkeeper's team goals-conceded cap applies: 1 conceded removes the 10-save tier, 2 removes the 7-save tier, and 3+ removes the 5-save tier. Final points are the lower of saves points and that cap."}
           </p>
           <p>
             {isAr

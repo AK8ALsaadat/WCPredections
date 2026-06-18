@@ -270,7 +270,7 @@ export function buildMatchPointsBreakdown(
       lines.push({
         id: "octopus-goalkeeper",
         label: `الأخطبوط: ${octopus.player.name}`,
-        detail: "تصديات الحارس الرسمية",
+        detail: "تصديات الحارس الرسمية مع سقف أهداف منتخب الحارس",
         points: octopus.points,
         correct: octopus.points > 0,
       });

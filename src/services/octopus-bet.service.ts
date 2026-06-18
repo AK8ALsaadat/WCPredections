@@ -42,13 +42,28 @@ function slugifyTeamName(text: string) {
     .replace(/^-|-$/g, "");
 }
 
-export function calculateOctopusPoints(saves: number | null | undefined) {
+export function getOctopusConcededCapPoints(
+  goalsConceded: number | null | undefined
+) {
+  if (goalsConceded == null) return Number.POSITIVE_INFINITY;
+  if (goalsConceded >= 3) return OCTOPUS_POINTS.three;
+  if (goalsConceded === 2) return OCTOPUS_POINTS.five;
+  if (goalsConceded === 1) return OCTOPUS_POINTS.seven;
+  return Number.POSITIVE_INFINITY;
+}
+
+export function calculateOctopusPoints(
+  saves: number | null | undefined,
+  goalsConceded?: number | null
+) {
   const count = saves ?? 0;
-  if (count >= 10) return OCTOPUS_POINTS.ten;
-  if (count >= 7) return OCTOPUS_POINTS.seven;
-  if (count >= 5) return OCTOPUS_POINTS.five;
-  if (count >= 3) return OCTOPUS_POINTS.three;
-  return 0;
+  let points = 0;
+  if (count >= 10) points = OCTOPUS_POINTS.ten;
+  else if (count >= 7) points = OCTOPUS_POINTS.seven;
+  else if (count >= 5) points = OCTOPUS_POINTS.five;
+  else if (count >= 3) points = OCTOPUS_POINTS.three;
+
+  return Math.min(points, getOctopusConcededCapPoints(goalsConceded));
 }
 
 async function resolveTeamId(
@@ -199,10 +214,17 @@ export async function calculateOctopusPointsForMatch(matchId: string) {
   const [match, bets, stats] = await Promise.all([
     prisma.match.findUnique({
       where: { id: matchId },
-      select: { status: true },
+      select: {
+        status: true,
+        homeTeamId: true,
+        awayTeamId: true,
+        homeScore: true,
+        awayScore: true,
+      },
     }),
     prisma.octopusGoalkeeperBet.findMany({
       where: { matchId },
+      include: { player: { select: { teamId: true } } },
     }),
     prisma.matchGoalkeeperStat.findMany({
       where: { matchId },
@@ -212,6 +234,10 @@ export async function calculateOctopusPointsForMatch(matchId: string) {
 
   if (!match || bets.length === 0) return;
   const savesByPlayer = new Map(stats.map((row) => [row.playerId, row.saves]));
+  const goalsConcededByTeam = new Map<string, number | null>([
+    [match.homeTeamId, match.awayScore],
+    [match.awayTeamId, match.homeScore],
+  ]);
 
   await Promise.all(
     bets.map((bet) =>
@@ -220,7 +246,10 @@ export async function calculateOctopusPointsForMatch(matchId: string) {
         data: {
           points:
             match.status === "FINISHED" || savesByPlayer.has(bet.playerId)
-              ? calculateOctopusPoints(savesByPlayer.get(bet.playerId))
+              ? calculateOctopusPoints(
+                  savesByPlayer.get(bet.playerId),
+                  goalsConcededByTeam.get(bet.player.teamId)
+                )
               : 0,
         },
       })
