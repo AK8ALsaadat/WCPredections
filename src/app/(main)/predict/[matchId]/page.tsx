@@ -662,6 +662,19 @@ export default function PredictPage() {
 
     const target = scorerGoalTarget(isHome ? predHome : predAway);
     if (target <= 0) {
+      if (predHome === 0 && predAway === 0) {
+        if (isHome) {
+          setPredHome(1);
+        } else {
+          setPredAway(1);
+        }
+        setScorerPicks({ [playerId]: 1 });
+        setBoldPlayerId(playerId);
+        setBoldEnabled(true);
+        setError("");
+        return;
+      }
+
       setError(t.predict.scorersExceeded);
       return;
     }
@@ -678,6 +691,11 @@ export default function PredictPage() {
         boldPlayerId && teamPlayerIds.has(boldPlayerId)
           ? boldPlayerId
           : teamPickIds[teamPickIds.length - 1];
+
+      if (Object.keys(scorerPicks).length > 0) {
+        setError(t.predict.scorersIncomplete);
+        return;
+      }
 
       if (
         canAddScorer(
@@ -919,30 +937,37 @@ export default function PredictPage() {
       !doubleLimits.canEnable &&
       !doubleLimits.onThisMatch) ||
     (boldEnabled && !isDouble); // disable enabling only, allow unchecking
+  const predictedScorerIds = new Set(Object.keys(scorerPicks));
+  const hasPredictedScorers = predictedScorerIds.size > 0;
+  const toBoldPlayerOption = (player: MatchPlayerView) => ({
+    value: player.id,
+    label:
+      player.section === "bench"
+        ? `${player.name} (${t.predict.scorerBench})`
+        : player.name,
+  });
   const boldPlayerGroups =
     lineup && hasPlayers
       ? [
           {
             label: match.homeTeam.name,
-            options: lineup.homePlayers.map((player) => ({
-              value: player.id,
-              label:
-                player.section === "bench"
-                  ? `${player.name} (${t.predict.scorerBench})`
-                  : player.name,
-            })),
+            options: lineup.homePlayers
+              .filter(
+                (player) =>
+                  !hasPredictedScorers || predictedScorerIds.has(player.id)
+              )
+              .map(toBoldPlayerOption),
           },
           {
             label: match.awayTeam.name,
-            options: lineup.awayPlayers.map((player) => ({
-              value: player.id,
-              label:
-                player.section === "bench"
-                  ? `${player.name} (${t.predict.scorerBench})`
-                  : player.name,
-            })),
+            options: lineup.awayPlayers
+              .filter(
+                (player) =>
+                  !hasPredictedScorers || predictedScorerIds.has(player.id)
+              )
+              .map(toBoldPlayerOption),
           },
-        ]
+        ].filter((group) => group.options.length > 0)
       : undefined;
 
   const boldSelectOptions = [
@@ -1241,6 +1266,13 @@ export default function PredictPage() {
 
               {boldEnabled && (
                 <div className="rounded-lg border border-primary/25 bg-background/80 p-4">
+                  {boldPlayerId && !matchLockReason && (
+                    <p className="mb-2 text-sm text-muted">
+                      {locale === "ar"
+                        ? "تقدر تغيّر لاعب الرهان من القائمة."
+                        : "You can change the bold player from the list."}
+                    </p>
+                  )}
                   <Select
                     label={t.predict.boldScorerBet.choosePlayer}
                     value={boldPlayerId}

@@ -16,10 +16,6 @@ import {
 } from "@/services/bold-scorer-bet.service";
 import { getUsageRoundScope } from "@/services/usage-round.service";
 import {
-  getUserTotalPoints,
-  MIN_POINTS_FOR_BOLD_SCORER_BET,
-} from "@/services/user-points.service";
-import {
   calculateDoubleBonus,
   calculateFinishTypePoints,
   calculatePenaltyWinnerPoints,
@@ -379,6 +375,10 @@ export async function submitMatchPredictionBundle(
   });
 
   const isDouble = data.isDouble ?? false;
+  let predHome = data.predHome;
+  let predAway = data.predAway;
+  let picks = data.picks.map((pick) => ({ ...pick }));
+  let boldPlayer: { id: string; teamId: string } | null = null;
 
   if (match.isKnockout && !data.predictedFinishType) {
     throw new Error("توقع طريقة الإنهاء مطلوب للمباريات الإقصائية");
@@ -394,13 +394,6 @@ export async function submitMatchPredictionBundle(
     }
   }
 
-  await validateScorerPicks(
-    match,
-    data.predHome,
-    data.predAway,
-    data.picks
-  );
-
   if (data.boldPlayerId) {
     const eligibility = await getBoldScorerBetEligibility(userId);
     if (!eligibility.hasMinimumPoints) {
@@ -409,26 +402,39 @@ export async function submitMatchPredictionBundle(
       );
     }
 
-    const boldPlayer = await prisma.player.findFirst({
+    boldPlayer = await prisma.player.findFirst({
       where: {
         id: data.boldPlayerId,
         teamId: { in: [match.homeTeamId, match.awayTeamId] },
       },
+      select: { id: true, teamId: true },
     });
     if (!boldPlayer) {
       throw new Error("اختيار لاعب غير صالح للبطاقة الجريئة");
     }
   }
 
-  // Sequential writes — interactive $transaction breaks on Supabase PgBouncer (pooler).
-  if (
-    data.boldPlayerId &&
-    !data.picks.some((pick) => pick.playerId === data.boldPlayerId)
-  ) {
-    throw new Error(
-      "لازم لاعب الرهان يكون من الهدافين اللي اخترتهم في نفس التوقع"
+  if (data.boldPlayerId) {
+    const boldAlreadyPicked = picks.some(
+      (pick) => pick.playerId === data.boldPlayerId
     );
+    if (!boldAlreadyPicked) {
+      if (boldPlayer && picks.length === 0 && predHome === 0 && predAway === 0) {
+        if (boldPlayer.teamId === match.homeTeamId) {
+          predHome = 1;
+        } else {
+          predAway = 1;
+        }
+        picks = [{ playerId: data.boldPlayerId, goals: 1 }];
+      } else {
+        throw new Error(
+          "Ù„Ø§Ø²Ù… Ù„Ø§Ø¹Ø¨ Ø§Ù„Ø±Ù‡Ø§Ù† ÙŠÙƒÙˆÙ† Ù…Ù† Ø§Ù„Ù‡Ø¯Ø§ÙÙŠÙ† Ø§Ù„Ù„ÙŠ Ø§Ø®ØªØ±ØªÙ‡Ù… ÙÙŠ Ù†ÙØ³ Ø§Ù„ØªÙˆÙ‚Ø¹"
+        );
+      }
+    }
   }
+
+  await validateScorerPicks(match, predHome, predAway, picks);
 
   const usageScope = await getUsageRoundScope(data.matchId);
 
@@ -456,15 +462,6 @@ export async function submitMatchPredictionBundle(
       },
     },
   });
-
-  if (data.boldPlayerId && !storedBold) {
-    const totalPoints = await getUserTotalPoints(userId);
-    if (totalPoints < MIN_POINTS_FOR_BOLD_SCORER_BET) {
-      throw new Error(
-        `You need at least ${MIN_POINTS_FOR_BOLD_SCORER_BET} points to use the scorer bet`
-      );
-    }
-  }
 
   // ✅ منع استخدام الـ Double والـ Bold معاً على نفس المباراة
   if (isDouble && data.boldPlayerId) {
@@ -495,16 +492,16 @@ export async function submitMatchPredictionBundle(
     create: {
       userId,
       matchId: data.matchId,
-      predHome: data.predHome,
-      predAway: data.predAway,
+      predHome,
+      predAway,
       isDouble,
       predictedFinishType: data.predictedFinishType ?? null,
       predictedPenaltyWinnerTeamId:
         data.predictedPenaltyWinnerTeamId ?? null,
     },
     update: {
-      predHome: data.predHome,
-      predAway: data.predAway,
+      predHome,
+      predAway,
       isDouble,
       predictedFinishType: data.predictedFinishType ?? null,
       predictedPenaltyWinnerTeamId:
@@ -513,7 +510,7 @@ export async function submitMatchPredictionBundle(
     select: { id: true },
   });
 
-  await replaceScorerPredictions(userId, data.matchId, data.picks);
+  await replaceScorerPredictions(userId, data.matchId, picks);
 
   let boldBet = null;
   if (data.boldPlayerId) {
@@ -542,7 +539,7 @@ export async function submitMatchPredictionBundle(
     });
   }
 
-  return { prediction, scorers: data.picks.length, boldBet };
+  return { prediction, scorers: picks.length, boldBet };
 }
 
 type ScorerPredictionWithPlayer = {
