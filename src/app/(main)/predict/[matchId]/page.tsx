@@ -125,6 +125,8 @@ type MatchData = {
       userPoints: number;
       otherMatchId: string | null;
       playerName: string | null;
+      playerId?: string | null;
+      points?: number;
     };
   } | null;
 };
@@ -647,6 +649,79 @@ export default function PredictPage() {
     if (!checked) setBoldPlayerId("");
   }
 
+  async function handleClearBoldBet() {
+    setError("");
+    setSuccess("");
+
+    const savedOnThisMatch =
+      match?.roundUsageLimits?.boldScorer?.onThisMatch ||
+      match?.boldScorerRoundStatus?.onThisMatch ||
+      Boolean(match?.userBoldScorerBet?.playerId);
+
+    if (!savedOnThisMatch) {
+      setBoldPlayerId("");
+      setBoldEnabled(false);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await clientFetch("/api/bold-scorer-bet", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matchId, playerId: null }),
+      });
+      if (!res) throw new Error(t.errors.loadFailed);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+
+      setBoldPlayerId("");
+      setBoldEnabled(false);
+      setMatch((previous) => {
+        if (!previous) return previous;
+        const bold = previous.roundUsageLimits?.boldScorer;
+        const roundUsageLimits =
+          previous.roundUsageLimits && bold
+            ? {
+                ...previous.roundUsageLimits,
+                boldScorer: {
+                  ...bold,
+                  used: false,
+                  onThisMatch: false,
+                  onOtherMatch: false,
+                  canUse: bold.hasMinimumPoints,
+                  otherMatchId: null,
+                  playerName: null,
+                  playerId: null,
+                  points: 0,
+                },
+              }
+            : previous.roundUsageLimits;
+        return {
+          ...previous,
+          userBoldScorerBet: null,
+          boldScorerRoundStatus: previous.boldScorerRoundStatus
+            ? {
+                ...previous.boldScorerRoundStatus,
+                used: false,
+                onThisMatch: false,
+                onOtherMatch: false,
+                otherMatchId: null,
+              }
+            : previous.boldScorerRoundStatus,
+          roundUsageLimits,
+        };
+      });
+      invalidatePredictCaches(matchId);
+      invalidateMatchesListCaches();
+      setSuccess(t.matches.predictionSubmitted);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.errors.loadFailed);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -758,6 +833,10 @@ export default function PredictPage() {
 
   const doubleLimits = match.roundUsageLimits?.doubles;
   const boldLimits = match.roundUsageLimits?.boldScorer;
+  const boldOnThisMatch =
+    Boolean(boldLimits?.onThisMatch) ||
+    Boolean(match.boldScorerRoundStatus?.onThisMatch) ||
+    Boolean(match.userBoldScorerBet?.playerId);
   const boldLockedOnOther =
     boldLimits?.onOtherMatch ??
     match.boldScorerRoundStatus?.onOtherMatch ??
@@ -985,6 +1064,30 @@ export default function PredictPage() {
                     ? t.predict.boldExhausted
                     : t.predict.boldAvailable}
               </span>
+            </div>
+          )}
+
+          {boldOnThisMatch && (
+            <div className="mb-4 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>
+                  {boldLimits?.playerName || match.userBoldScorerBet?.player.name
+                    ? t.predict.boldUsedHere(
+                        boldLimits?.playerName ??
+                          match.userBoldScorerBet?.player.name ??
+                          ""
+                      )
+                    : t.predict.boldScorerBet.selectingPlayer}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearBoldBet}
+                  disabled={submitting || Boolean(matchLockReason)}
+                  className="rounded-lg border border-primary/40 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {t.predict.boldScorerBet.clearSelection}
+                </button>
+              </div>
             </div>
           )}
 
