@@ -16,6 +16,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const PRIVATE_SHORT_CACHE = {
+  headers: {
+    "Cache-Control": "private, max-age=15, stale-while-revalidate=45",
+  },
+} satisfies ResponseInit;
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -48,7 +54,7 @@ export async function GET(request: Request) {
       
       if (light && !completed) {
         const matches = await enrichMatchesWithUserPredictions(items, user?.userId);
-        return apiSuccess({ matches, pinnedMatches: [], ...meta });
+        return apiSuccess({ matches, pinnedMatches: [], ...meta }, 200, PRIVATE_SHORT_CACHE);
       }
       
       const [matches, pinnedMatches] = await Promise.all([
@@ -57,7 +63,7 @@ export async function GET(request: Request) {
           ? getUserPinnedTodayMatches(user.userId, roundId)
           : [],
       ]);
-      return apiSuccess({ matches, pinnedMatches, ...meta });
+      return apiSuccess({ matches, pinnedMatches, ...meta }, 200, PRIVATE_SHORT_CACHE);
     }
 
     if (light && !completed) {
@@ -75,16 +81,12 @@ export async function GET(request: Request) {
         actualFinishType: m.actualFinishType ?? null,
         penaltyWinnerTeamId: m.penaltyWinnerTeamId ?? null,
       }));
-      return apiSuccess(lite, 200, { headers: { "Cache-Control": "private, no-cache" } });
+      return apiSuccess(lite, 200, PRIVATE_SHORT_CACHE);
     }
 
     const matches = await enrichMatchesWithUserPredictions(raw, user?.userId);
 
-    return apiSuccess(matches, 200, {
-      headers: {
-        "Cache-Control": "private, no-cache",
-      },
-    });
+    return apiSuccess(matches, 200, PRIVATE_SHORT_CACHE);
   } catch (error) {
     return handleApiError(error);
   }

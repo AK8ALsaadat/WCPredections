@@ -35,7 +35,9 @@ export async function GET(
     }
 
     return apiSuccess(match, 200, {
-      headers: { "Cache-Control": "no-store" },
+      headers: {
+        "Cache-Control": "private, max-age=15, stale-while-revalidate=45",
+      },
     });
   } catch (error) {
     return handleApiError(error);

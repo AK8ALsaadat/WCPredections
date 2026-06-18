@@ -23,6 +23,11 @@ import {
   prefetchPredictData,
   seedPredictMatchFromList,
 } from "@/lib/predict-prefetch";
+import {
+  isMatchDetailCacheFresh,
+  readMatchDetailCache,
+  writeMatchDetailCache,
+} from "@/lib/match-detail-cache";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 const TEAM_THEME_PALETTE = [
@@ -78,18 +83,31 @@ export default function MatchDetailPage() {
   const { messages: t, locale } = useI18n();
   const params = useParams();
   const matchId = params.id as string;
-  const [match, setMatch] = useState<Record<string, unknown> | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [match, setMatch] = useState<Record<string, unknown> | null>(() =>
+    readMatchDetailCache<Record<string, unknown>>(matchId)
+  );
+  const [loading, setLoading] = useState(
+    () => !readMatchDetailCache<Record<string, unknown>>(matchId)
+  );
   const [error, setError] = useState("");
 
   const loadMatch = useCallback(
     (opts?: { silent?: boolean }) => {
-      if (!opts?.silent) setLoading(true);
+      const cached = readMatchDetailCache<Record<string, unknown>>(matchId);
+      if (cached && !opts?.silent) {
+        setMatch(cached);
+        setLoading(false);
+      }
+      if (cached && !opts?.silent && isMatchDetailCacheFresh(matchId)) {
+        return Promise.resolve();
+      }
+      if (!opts?.silent && !cached) setLoading(true);
       return clientFetch(`/api/matches/${matchId}`)
         .then((r) => (r ? r.json() : null))
         .then((data) => {
           if (data.success) {
             setMatch(data.data);
+            writeMatchDetailCache(matchId, data.data);
             const m = data.data as {
               id: string;
               matchTime: string;
@@ -121,7 +139,7 @@ export default function MatchDetailPage() {
                   predictedGoals: sp.predictedGoals,
                 })),
               });
-              prefetchPredictData(matchId);
+              void prefetchPredictData(matchId);
             }
           } else {
             setError(data.error);
@@ -132,7 +150,7 @@ export default function MatchDetailPage() {
           if (!opts?.silent) setLoading(false);
         });
     },
-    [matchId]
+    [matchId, t.errors.loadFailed]
   );
 
   useEffect(() => {

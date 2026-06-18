@@ -482,6 +482,45 @@ function getCachedMatchShell(matchId: string) {
   )();
 }
 
+async function fetchMatchDetailBase(matchId: string) {
+  return prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      id: true,
+      matchTime: true,
+      status: true,
+      isKnockout: true,
+      actualFinishType: true,
+      penaltyWinnerTeamId: true,
+      homeScore: true,
+      awayScore: true,
+      roundId: true,
+      homeTeamId: true,
+      awayTeamId: true,
+      homeTeam: { select: teamSelect },
+      awayTeam: { select: teamSelect },
+      round: { select: { id: true, name: true } },
+      matchScorers: {
+        select: {
+          goals: true,
+          player: { select: { id: true, name: true } },
+        },
+      },
+      goalkeeperStats: {
+        select: { playerId: true, saves: true },
+      },
+    },
+  });
+}
+
+function getCachedMatchDetailBase(matchId: string) {
+  return unstable_cache(
+    () => fetchMatchDetailBase(matchId),
+    ["match-detail-base-v1", matchId],
+    { revalidate: MATCH_SHELL_REVALIDATE_SECONDS, tags: [`match-${matchId}`] }
+  )();
+}
+
 async function buildMatchLineup(matchId: string) {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
@@ -649,21 +688,7 @@ export async function getMatchById(
   userId?: string,
   options?: { includeLineup?: boolean }
 ) {
-  const match = await prisma.match.findUnique({
-    where: { id: matchId },
-    include: {
-      homeTeam: { select: teamSelect },
-      awayTeam: { select: teamSelect },
-      penaltyWinnerTeam: { select: teamSelect },
-      round: { select: { id: true, name: true } },
-      matchScorers: {
-        include: { player: { select: { id: true, name: true } } },
-      },
-      goalkeeperStats: {
-        select: { playerId: true, saves: true },
-      },
-    },
-  });
+  const match = await getCachedMatchDetailBase(matchId);
 
   if (!match) return null;
   if (match.isKnockout && !(await canShowKnockoutFeatures())) return null;
@@ -684,10 +709,25 @@ export async function getMatchById(
     const [prediction, scorers, limits, closedBoldBet, closedOctopusBet] = await Promise.all([
       prisma.prediction.findUnique({
         where: { userId_matchId: { userId, matchId } },
+        select: {
+          predHome: true,
+          predAway: true,
+          isDouble: true,
+          points: true,
+          doubleBonus: true,
+          finishTypePoints: true,
+          penaltyWinnerPoints: true,
+          predictedFinishType: true,
+          predictedPenaltyWinnerTeamId: true,
+        },
       }),
       prisma.scorerPrediction.findMany({
         where: { userId, matchId },
-        include: { player: true },
+        select: {
+          predictedGoals: true,
+          points: true,
+          player: { select: { id: true, name: true, teamId: true } },
+        },
       }),
       predictionOpen
         ? getRoundUsageLimits(userId, matchId, match.roundId)
@@ -709,7 +749,7 @@ export async function getMatchById(
             select: {
               playerId: true,
               points: true,
-              player: { select: { name: true } },
+              player: { select: { id: true, name: true, teamId: true } },
             },
           }),
     ]);

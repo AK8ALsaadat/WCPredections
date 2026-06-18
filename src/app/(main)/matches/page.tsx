@@ -146,10 +146,17 @@ function queueAdjacentMatchesPrefetch(
       3
     );
   }
+  for (let targetPage = 1; targetPage <= totalPages; targetPage += 1) {
+    if (targetPage === currentPage || targetPage === currentPage + 1) continue;
+    enqueueBackgroundPrefetch(
+      () => prefetchMatchesPage(targetPage, targetRound, targetType),
+      4
+    );
+  }
   if (currentPage === 1 && targetType === "upcoming") {
     enqueueBackgroundPrefetch(
       () => prefetchMatchesPage(1, targetRound, "past"),
-      3
+      4
     );
   }
 }

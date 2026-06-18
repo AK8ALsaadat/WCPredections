@@ -18,6 +18,7 @@ import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
 import { LeaguePredictionsNavLink } from "@/components/matches/LeaguePredictionsNavLink";
 import { seedPredictMatchFromList } from "@/lib/predict-prefetch";
+import { prefetchMatchDetail } from "@/lib/match-detail-cache";
 import { getSaudiLossDisplayTeam } from "@/lib/saudi-kuwait-joke";
 
 type ScorerPick = {
@@ -216,7 +217,14 @@ export function MatchCard({
         </div>
       </div>
 
-      <Link href={`/matches/${match.id}`} prefetch={false} className="block">
+      <Link
+        href={`/matches/${match.id}`}
+        prefetch={false}
+        className="block"
+        onMouseEnter={() => void prefetchMatchDetail(match.id, true)}
+        onFocus={() => void prefetchMatchDetail(match.id, true)}
+        onTouchStart={() => void prefetchMatchDetail(match.id, true)}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <TeamLogo {...homeTeamDisplay} />
