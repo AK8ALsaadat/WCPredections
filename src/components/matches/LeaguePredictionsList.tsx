@@ -153,40 +153,31 @@ function PredictionScoreboard({
 
       {(homeScorers.length > 0 || awayScorers.length > 0 || allScorers.length > 0) && (
         (homeScorers.length > 0 || awayScorers.length > 0) ? (
-          <div className="grid w-full grid-cols-2 gap-1.5">
-            <div className="min-w-0">
-              <div className="mb-1 flex items-center gap-1 md:hidden">
-                <TeamLogo {...homeTeam} size="sm" />
-                <span className="truncate text-[10px] font-medium text-muted">
-                  {homeTeam.shortName}
-                </span>
+          <div className="w-full space-y-1.5">
+            {[
+              { team: homeTeam, scorers: homeScorers },
+              { team: awayTeam, scorers: awayScorers },
+            ].map(({ team, scorers }) => (
+              <div
+                key={team.shortName}
+                className="rounded-lg border border-card-border/70 bg-background/35 px-2.5 py-2"
+              >
+                <div className="mb-1.5 flex items-center justify-center gap-1.5">
+                  <TeamLogo {...team} size="sm" />
+                  <span className="truncate text-[10px] font-bold text-foreground/85">
+                    {team.shortName}
+                  </span>
+                </div>
+                <div className="flex justify-center">
+                  <ScorerChips
+                    scorers={scorers}
+                    align="center"
+                    showResults={showResults}
+                    showMisses={showMisses}
+                  />
+                </div>
               </div>
-              <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
-                {homeTeam.shortName}
-              </p>
-              <ScorerChips
-                scorers={homeScorers}
-                showResults={showResults}
-                showMisses={showMisses}
-              />
-            </div>
-            <div className="min-w-0 text-end">
-              <div className="mb-1 flex items-center justify-end gap-1 md:hidden">
-                <span className="truncate text-[10px] font-medium text-muted">
-                  {awayTeam.shortName}
-                </span>
-                <TeamLogo {...awayTeam} size="sm" />
-              </div>
-              <p className="mb-1 hidden text-[10px] font-medium text-muted md:block">
-                {awayTeam.shortName}
-              </p>
-              <ScorerChips
-                scorers={awayScorers}
-                align="end"
-                showResults={showResults}
-                showMisses={showMisses}
-              />
-            </div>
+            ))}
           </div>
         ) : (
           <div className="w-full">
@@ -212,7 +203,7 @@ function ScorerChips({
   showMisses = false,
 }: {
   scorers: LeagueMatchPredictionRow["scorerPredictions"];
-  align?: "start" | "end";
+  align?: "start" | "center" | "end";
   showResults?: boolean;
   showMisses?: boolean;
 }) {
@@ -222,7 +213,13 @@ function ScorerChips({
 
   return (
     <div
-      className={`flex flex-wrap gap-1 ${align === "end" ? "justify-end" : "justify-start"}`}
+      className={`flex flex-wrap gap-1 ${
+        align === "center"
+          ? "justify-center"
+          : align === "end"
+            ? "justify-end"
+            : "justify-start"
+      }`}
     >
       {scorers.map((pick) => {
         const hit = showResults && (pick.points ?? 0) > 0;
@@ -387,16 +384,16 @@ function LeaguePredictionRow({
 
   return (
     <li
-      className={`relative px-3 py-3 transition-colors md:px-5 md:py-4 ${
+      className={`relative mx-2 my-2 overflow-hidden rounded-xl border px-3 py-3 transition-colors md:mx-3 md:px-5 md:py-4 ${
         hasDouble
-          ? "border-s-4 border-orange-300 bg-gradient-to-br from-orange-950/80 via-orange-900/45 to-amber-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_35px_rgba(124,45,18,0.28)] ring-1 ring-inset ring-orange-300/50"
+          ? "border-orange-300/70 bg-gradient-to-br from-orange-950/80 via-orange-900/45 to-amber-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_35px_rgba(124,45,18,0.28)] ring-1 ring-inset ring-orange-300/50"
           : hasBold
-            ? "border-s-4 border-red-400 bg-gradient-to-br from-red-950/85 via-red-900/45 to-rose-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_35px_rgba(127,29,29,0.28)] ring-1 ring-inset ring-red-400/50"
+            ? "border-red-400/70 bg-gradient-to-br from-red-950/85 via-red-900/45 to-rose-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_35px_rgba(127,29,29,0.28)] ring-1 ring-inset ring-red-400/50"
             : isMe
-              ? "bg-primary/[0.07] ring-1 ring-inset ring-primary/25"
+              ? "border-primary/35 bg-primary/[0.07] ring-1 ring-inset ring-primary/25"
               : index % 2 === 0
-                ? "bg-transparent"
-                : "bg-background/20"
+                ? "border-card-border/65 bg-background/25"
+                : "border-card-border/65 bg-card/75"
       }`}
     >
       <div className="flex flex-col gap-2.5 md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:items-start md:gap-4">
@@ -588,7 +585,7 @@ export function LeaguePredictionsList({
         />
       </div>
 
-      <ul className="divide-y divide-card-border/80">
+      <ul className="py-1">
         {rows.map((row, index) => (
           <LeaguePredictionRow
             key={row.userId}

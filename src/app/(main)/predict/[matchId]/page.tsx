@@ -924,13 +924,14 @@ export default function PredictPage() {
     match.boldScorerRoundStatus?.onOtherMatch ??
     false;
   const matchLockReason = getPredictionLockReason(match.matchTime, match.status);
-  // Disable checkboxes only when trying to enable if the other feature is active
-  // Allow unchecking anytime (handlers do the conflict check)
+  const boldCheckboxLockedBySelection = boldEnabled && Boolean(boldPlayerId);
+  // Once a bold player is selected, changing/removing happens from the player controls.
   const boldCheckboxDisabled =
     loading || !match.roundUsageLimits ||
     Boolean(matchLockReason) ||
+    boldCheckboxLockedBySelection ||
     (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
-    (isDouble && !boldEnabled); // disable enabling only, allow unchecking
+    (isDouble && !boldEnabled);
   const doubleCheckboxDisabled =
     loading || !match.roundUsageLimits ||
     (doubleLimits != null &&
@@ -1459,6 +1460,7 @@ export default function PredictPage() {
                 }}
                 lineupStatus={lineup.lineupStatus ?? "estimated"}
                 scorerPicks={scorerPicks}
+                boldPlayerId={boldPlayerId}
                 canSelectPlayer={canSelectScorer}
                 maxGoalsForPlayer={getMaxGoalsForPlayer}
                 onToggle={toggleScorer}

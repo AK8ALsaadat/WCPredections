@@ -18,6 +18,7 @@ import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
 import { LeaguePredictionsNavLink } from "@/components/matches/LeaguePredictionsNavLink";
 import { seedPredictMatchFromList } from "@/lib/predict-prefetch";
+import { getSaudiLossDisplayTeam } from "@/lib/saudi-kuwait-joke";
 
 type ScorerPick = {
   predictedGoals: number;
@@ -121,6 +122,18 @@ export function MatchCard({
 
   const showPredictionInfo = hasPrediction && match.userPrediction;
   const showUserPrediction = showPredictionInfo && !isFinished;
+  const homeTeamDisplay = getSaudiLossDisplayTeam(
+    match.homeTeam,
+    match.homeScore,
+    match.awayScore,
+    true
+  );
+  const awayTeamDisplay = getSaudiLossDisplayTeam(
+    match.awayTeam,
+    match.homeScore,
+    match.awayScore,
+    false
+  );
 
   useEffect(() => {
     setCanPredict(isPredictionAllowed(match.matchTime, match.status));
@@ -195,8 +208,8 @@ export function MatchCard({
       <Link href={`/matches/${match.id}`} prefetch={false} className="block">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <TeamLogo {...match.homeTeam} />
-            <span className="truncate font-medium">{match.homeTeam.shortName}</span>
+            <TeamLogo {...homeTeamDisplay} />
+            <span className="truncate font-medium">{homeTeamDisplay.shortName}</span>
           </div>
 
           <div className="flex shrink-0 flex-col items-center px-1">
@@ -268,8 +281,8 @@ export function MatchCard({
           </div>
 
           <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-            <span className="truncate font-medium">{match.awayTeam.shortName}</span>
-            <TeamLogo {...match.awayTeam} />
+            <span className="truncate font-medium">{awayTeamDisplay.shortName}</span>
+            <TeamLogo {...awayTeamDisplay} />
           </div>
         </div>
       </Link>
@@ -374,13 +387,13 @@ export function MatchCard({
               isKnockout={match.isKnockout}
               actualFinishType={asFinishType(match.actualFinishType)}
               penaltyWinnerTeamId={match.penaltyWinnerTeamId}
-              homeTeamName={match.homeTeam.name}
-              awayTeamName={match.awayTeam.name}
+              homeTeamName={homeTeamDisplay.name}
+              awayTeamName={awayTeamDisplay.name}
               penaltyWinnerName={
                 match.penaltyWinnerTeamId === match.homeTeam.id
-                  ? match.homeTeam.name
+                  ? homeTeamDisplay.name
                   : match.penaltyWinnerTeamId === match.awayTeam.id
-                    ? match.awayTeam.name
+                    ? awayTeamDisplay.name
                     : null
               }
               userPrediction={

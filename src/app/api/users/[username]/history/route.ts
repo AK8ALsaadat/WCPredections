@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { apiSuccess, handleApiError } from "@/lib/api";
-import { getUserPredictionHistory } from "@/services/prediction.service";
 import { buildMatchHistoryEntries } from "@/lib/profile-history";
 
 export async function GET(
@@ -25,7 +24,67 @@ export async function GET(
       });
     }
 
-    const history = await getUserPredictionHistory(user.id);
+    const matches = await prisma.match.findMany({
+      where: {
+        status: "FINISHED",
+        homeScore: { not: null },
+        awayScore: { not: null },
+        OR: [
+          { predictions: { some: { userId: user.id } } },
+          { scorerPredictions: { some: { userId: user.id } } },
+          { boldScorerBets: { some: { userId: user.id } } },
+        ],
+      },
+      include: {
+        homeTeam: true,
+        awayTeam: true,
+        round: true,
+      },
+      orderBy: { matchTime: "desc" },
+      take: 5,
+    });
+    const matchIds = matches.map((match) => match.id);
+    const [predictions, scorerPredictions, boldScorerBets] = await Promise.all([
+      prisma.prediction.findMany({
+        where: { userId: user.id, matchId: { in: matchIds } },
+        include: {
+          match: {
+            include: {
+              homeTeam: true,
+              awayTeam: true,
+              round: true,
+            },
+          },
+        },
+      }),
+      prisma.scorerPrediction.findMany({
+        where: { userId: user.id, matchId: { in: matchIds } },
+        include: {
+          player: true,
+          match: {
+            include: {
+              homeTeam: true,
+              awayTeam: true,
+              round: true,
+            },
+          },
+        },
+      }),
+      prisma.boldScorerBet.findMany({
+        where: { userId: user.id, matchId: { in: matchIds } },
+        include: {
+          player: true,
+          match: {
+            include: {
+              homeTeam: true,
+              awayTeam: true,
+              round: true,
+            },
+          },
+        },
+      }),
+    ]);
+    const history = { predictions, scorerPredictions, boldScorerBets };
 
     // تحويل البيانات ليطابقها النوع المتوقع (matchTime: string)
     const formattedHistory = {
@@ -54,14 +113,7 @@ export async function GET(
 
     const allEntries = buildMatchHistoryEntries(formattedHistory);
 
-    const finished = allEntries.filter(
-      (entry) =>
-        entry.match.status === "FINISHED" &&
-        entry.match.homeScore != null &&
-        entry.match.awayScore != null
-    );
-
-    const entries = finished.slice(0, 5);
+    const entries = allEntries.slice(0, 5);
 
     return apiSuccess({
       user: {

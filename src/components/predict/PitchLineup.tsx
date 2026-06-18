@@ -27,6 +27,7 @@ type PitchLineupProps = {
   };
   lineupStatus: LineupSource;
   scorerPicks: ScorerPicks;
+  boldPlayerId?: string | null;
   canSelectPlayer?: (playerId: string) => boolean;
   maxGoalsForPlayer?: (playerId: string) => number;
   onToggle: (playerId: string) => void;
@@ -117,10 +118,12 @@ function PlayerPortrait({
   player,
   sizeClass,
   enabled,
+  isBold = false,
 }: {
   player: MatchPlayerView;
   sizeClass: string;
   enabled: boolean;
+  isBold?: boolean;
 }) {
   const photoUrl =
     player.photoUrl ??
@@ -148,7 +151,7 @@ function PlayerPortrait({
       onError={() => setFailed(true)}
       className={`absolute inset-0 object-cover object-top transition-opacity duration-150 ${sizeClass} ${
         loaded ? "opacity-100" : "opacity-0"
-      }`}
+      } ${isBold ? "saturate-125" : ""}`}
     />
   );
 }
@@ -177,6 +180,7 @@ function PlayerDot({
   onToggle,
   style,
   showPhotos,
+  isBold = false,
 }: {
   player: MatchPlayerView;
   goals: number;
@@ -185,6 +189,7 @@ function PlayerDot({
   onToggle: () => void;
   style: React.CSSProperties;
   showPhotos: boolean;
+  isBold?: boolean;
 }) {
   const gk = isGoalkeeper(player);
 
@@ -198,12 +203,14 @@ function PlayerDot({
         !selected && !selectable
           ? "cursor-not-allowed opacity-45"
           : "hover:scale-105"
-      } ${selected ? "scale-105" : ""}`}
+      } ${selected ? "scale-105" : ""} ${isBold ? "scale-110" : ""}`}
     >
-      <span className="relative">
+      <span className={`relative ${isBold ? "bold-player-glow rounded-full" : ""}`}>
         <span
           className={`relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold shadow-lg sm:h-11 sm:w-11 sm:text-xs ${
-            selected
+            isBold
+              ? "bg-gradient-to-br from-amber-200 via-orange-400 to-red-500 text-white ring-2 ring-amber-100 shadow-[0_0_24px_rgba(249,115,22,0.8)]"
+              : selected
               ? "bg-primary text-white ring-2 ring-white"
               : gk
                 ? "bg-amber-300 text-emerald-950 ring-1 ring-amber-500"
@@ -217,8 +224,14 @@ function PlayerDot({
             player={player}
             sizeClass="h-[130%] w-full origin-top scale-110"
             enabled={showPhotos}
+            isBold={isBold}
           />
         </span>
+        {isBold && (
+          <span className="absolute -right-2 -top-2 rounded-full border border-amber-100/80 bg-black/70 px-1.5 py-0.5 text-[10px] font-black text-amber-200 shadow-[0_0_14px_rgba(251,191,36,0.7)]">
+            ✦
+          </span>
+        )}
         <span className="absolute -bottom-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-white/70 bg-emerald-950 px-0.5 text-[8px] font-black text-white sm:h-5 sm:min-w-5 sm:px-1 sm:text-[9px]">
           {player.shirtNumber ?? positionFallback(player.position)}
         </span>
@@ -247,6 +260,7 @@ function BenchRow({
   onToggle,
   label,
   showPhotos,
+  boldPlayerId,
 }: {
   players: MatchPlayerView[];
   scorerPicks: ScorerPicks;
@@ -254,6 +268,7 @@ function BenchRow({
   onToggle: (id: string) => void;
   label: string;
   showPhotos: boolean;
+  boldPlayerId?: string | null;
 }) {
   if (players.length === 0) return null;
 
@@ -270,6 +285,7 @@ function BenchRow({
             goals={scorerPicks[player.id] ?? 1}
             onToggle={() => onToggle(player.id)}
             showPhotos={showPhotos}
+            isBold={player.id === boldPlayerId}
           />
         ))}
       </div>
@@ -284,6 +300,7 @@ function BenchPlayerTile({
   goals,
   onToggle,
   showPhotos,
+  isBold = false,
 }: {
   player: MatchPlayerView;
   selected: boolean;
@@ -291,6 +308,7 @@ function BenchPlayerTile({
   goals: number;
   onToggle: () => void;
   showPhotos: boolean;
+  isBold?: boolean;
 }) {
   return (
     <button
@@ -298,7 +316,9 @@ function BenchPlayerTile({
       onClick={onToggle}
       disabled={!selectable}
       className={`flex items-center gap-2 rounded-full border py-1 pl-3 pr-1 text-xs transition-colors ${
-        selected
+        isBold
+          ? "border-amber-300/80 bg-gradient-to-l from-amber-500/25 to-red-500/15 text-amber-100 shadow-[0_0_18px_rgba(245,158,11,0.28)]"
+          : selected
           ? "border-primary bg-primary/15 text-primary"
           : selectable
             ? "border-card-border bg-card hover:border-primary/40"
@@ -306,7 +326,9 @@ function BenchPlayerTile({
       }`}
     >
       <span className="relative h-8 w-8 shrink-0">
-        <span className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-card-border text-[10px] font-bold">
+        <span className={`relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold ${
+          isBold ? "bg-gradient-to-br from-amber-200 via-orange-400 to-red-500 ring-2 ring-amber-100" : "bg-card-border"
+        }`}>
           <span className="font-black text-sm text-emerald-900">
             {player.shirtNumber ?? positionFallback(player.position)}
           </span>
@@ -314,6 +336,7 @@ function BenchPlayerTile({
             player={player}
             sizeClass="h-[130%] w-full origin-top scale-110"
             enabled={showPhotos}
+            isBold={isBold}
           />
         </span>
         <span className="absolute -bottom-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-card bg-emerald-950 px-0.5 text-[8px] font-black text-white">
@@ -392,6 +415,7 @@ export function PitchLineup({
   home,
   away,
   scorerPicks,
+  boldPlayerId,
   canSelectPlayer,
   maxGoalsForPlayer,
   onToggle,
@@ -511,6 +535,7 @@ export function PitchLineup({
               onToggle={() => onToggle(player.id)}
               style={{ left: `${x}%`, top: `${y}%` }}
               showPhotos={showPhotos}
+              isBold={player.id === boldPlayerId}
             />
           ))}
 
@@ -527,6 +552,7 @@ export function PitchLineup({
               onToggle={() => onToggle(player.id)}
               style={{ left: `${x}%`, top: `${y}%` }}
               showPhotos={showPhotos}
+              isBold={player.id === boldPlayerId}
             />
           ))}
         </div>
@@ -539,6 +565,7 @@ export function PitchLineup({
           canSelectPlayer={canSelectPlayer}
           onToggle={onToggle}
           showPhotos={showPhotos}
+          boldPlayerId={boldPlayerId}
           label={`${labels.bench} — ${home.teamName}`}
         />
         <BenchRow
@@ -547,6 +574,7 @@ export function PitchLineup({
           canSelectPlayer={canSelectPlayer}
           onToggle={onToggle}
           showPhotos={showPhotos}
+          boldPlayerId={boldPlayerId}
           label={`${labels.bench} — ${away.teamName}`}
         />
       </div>

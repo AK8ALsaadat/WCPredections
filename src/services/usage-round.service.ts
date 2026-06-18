@@ -11,6 +11,7 @@ type UsageMatch = {
   groupCode: string | null;
   homeTeam?: { name: string };
   awayTeam?: { name: string };
+  round?: { name: string };
 };
 
 export type UsageRoundScope = {
@@ -29,6 +30,11 @@ function stageKey(stageName: string | null): string {
 
 function isGroupStage(stageName: string | null): boolean {
   return stageKey(stageName).includes("group");
+}
+
+function hasSpecificKnockoutStage(stageName: string | null): boolean {
+  const key = stageKey(stageName);
+  return Boolean(key && key !== "default" && key !== "knockout-stage");
 }
 
 function matchTimeMs(matchTime: Date | string): number {
@@ -82,12 +88,69 @@ function isGroupMatch(match: UsageMatch): boolean {
   return Boolean(normalizedGroupCode(match.groupCode)) || isGroupStage(match.stageName);
 }
 
+function knockoutPhaseFromIndex(index: number, total: number): string {
+  if (total >= 32) {
+    if (index < 16) return "round-of-32";
+    if (index < 24) return "round-of-16";
+    if (index < 28) return "quarter-finals";
+    if (index < 30) return "semi-finals";
+    if (index === 30) return "third-place-final";
+    return "final";
+  }
+
+  if (total >= 16) {
+    if (index < 8) return "round-of-16";
+    if (index < 12) return "quarter-finals";
+    if (index < 14) return "semi-finals";
+    if (index === 14) return "third-place-final";
+    return "final";
+  }
+
+  if (total >= 8) {
+    if (index < 4) return "quarter-finals";
+    if (index < 6) return "semi-finals";
+    if (index === 6) return "third-place-final";
+    return "final";
+  }
+
+  if (total >= 4) {
+    if (index < 2) return "semi-finals";
+    if (index === 2) return "third-place-final";
+    return "final";
+  }
+
+  return index === 0 && total > 1 ? "third-place-final" : "final";
+}
+
+function knockoutFallbackUsageKey(match: UsageMatch, roundMatches: UsageMatch[]) {
+  const knockoutMatches = roundMatches
+    .filter((candidate) => !isGroupMatch(candidate))
+    .sort((a, b) => {
+      const timeDiff = matchTimeMs(a.matchTime) - matchTimeMs(b.matchTime);
+      return timeDiff !== 0 ? timeDiff : a.id.localeCompare(b.id);
+    });
+  const index = Math.max(
+    0,
+    knockoutMatches.findIndex((candidate) => candidate.id === match.id)
+  );
+
+  return `${match.roundId}:knockout:${knockoutPhaseFromIndex(index, knockoutMatches.length)}`;
+}
+
 export function buildUsageRoundKey(
   match: UsageMatch,
   roundMatches: UsageMatch[]
 ): string {
   if (!isGroupMatch(match)) {
-    return `${match.roundId}:stage:${stageKey(match.stageName)}`;
+    if (hasSpecificKnockoutStage(match.stageName)) {
+      return `${match.roundId}:stage:${stageKey(match.stageName)}`;
+    }
+
+    if (hasSpecificKnockoutStage(match.round?.name ?? null)) {
+      return `${match.roundId}:stage:${stageKey(match.round?.name ?? null)}`;
+    }
+
+    return knockoutFallbackUsageKey(match, roundMatches);
   }
 
   const group = normalizedGroupCode(match.groupCode);
@@ -142,6 +205,7 @@ const usageMatchSelect = {
   groupCode: true,
   homeTeam: { select: { name: true } },
   awayTeam: { select: { name: true } },
+  round: { select: { name: true } },
 } as const;
 
 const getCachedUsageMatch = unstable_cache(
@@ -150,7 +214,7 @@ const getCachedUsageMatch = unstable_cache(
       where: { id: matchId },
       select: usageMatchSelect,
     }),
-  ["usage-match-v3"],
+  ["usage-match-v4"],
   { revalidate: 300, tags: ["matches-schedule"] }
 );
 
@@ -160,7 +224,7 @@ const getCachedUsageRoundMatches = unstable_cache(
       where: { roundId },
       select: usageMatchSelect,
     }),
-  ["usage-round-matches-v3"],
+  ["usage-round-matches-v4"],
   { revalidate: 300, tags: ["matches-schedule"] }
 );
 

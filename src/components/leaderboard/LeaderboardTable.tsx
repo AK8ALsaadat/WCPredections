@@ -113,6 +113,21 @@ function RelegationTag() {
   );
 }
 
+function isMohannad(username: string) {
+  return username.trim().toLocaleLowerCase("en-US") === "mohannad";
+}
+
+function MohannadYellowTag() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-300/45 bg-lime-500/15 px-2.5 py-1 text-[10px] font-black text-lime-100 shadow-[0_0_18px_rgba(132,204,22,0.18)]">
+      <span className="inline-flex h-4 w-4 items-center justify-center rounded-[4px] border border-lime-100/60 bg-gradient-to-br from-lime-300 to-emerald-700 text-[7px] font-black text-emerald-950">
+        A
+      </span>
+      مو غريب على يلو عاد
+    </span>
+  );
+}
+
 function LeaderTag() {
   const { messages: t } = useI18n();
 
@@ -141,7 +156,6 @@ function LeaderSpotlight({
   return (
     <Link
       href={`/user/${encodeURIComponent(entry.username)}`}
-      prefetch={false}
       className={`group relative block overflow-hidden rounded-2xl border p-[1px] shadow-[0_20px_60px_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5 ${
         isMe ? "border-primary/70" : "border-amber-300/60"
       }`}
@@ -221,7 +235,6 @@ function MobileLeaderboardList({
           <Link
             key={entry.userId}
             href={`/user/${encodeURIComponent(entry.username)}`}
-            prefetch={false}
             className={`relative flex items-center gap-3 overflow-hidden rounded-xl border px-3 py-3 shadow-sm transition-colors ${
               isExempt
                 ? `border-emerald-300/55 bg-gradient-to-l from-emerald-950/80 via-emerald-900/45 to-card shadow-[0_10px_32px_rgba(5,150,105,0.18)] hover:border-emerald-200/70 ${
@@ -256,6 +269,9 @@ function MobileLeaderboardList({
                 ) : isRelegated ? (
                   <RelegationTag />
                 ) : null}
+                {isRelegated && isMohannad(entry.username) && (
+                  <MohannadYellowTag />
+                )}
                 <span className="truncate font-semibold">{entry.username}</span>
                 <RankBadge
                   rank={entry.rank}
@@ -466,9 +482,11 @@ export function LeaderboardTable({
                         ) : isRelegated ? (
                           <RelegationTag />
                         ) : null}
+                        {isRelegated && isMohannad(entry.username) && (
+                          <MohannadYellowTag />
+                        )}
                         <Link
                           href={`/user/${encodeURIComponent(entry.username)}`}
-                          prefetch={false}
                           className="font-semibold text-foreground transition-colors hover:text-primary"
                         >
                           {entry.username}
