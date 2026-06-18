@@ -13,6 +13,7 @@ export type HistoryMatch = {
   homeTeam: { id: string; name: string; shortName: string };
   awayTeam: { id: string; name: string; shortName: string };
   round: { id: string; name: string };
+  goalkeeperStats?: { playerId: string; saves: number }[];
 };
 
 export type MatchHistoryEntry = {
@@ -39,7 +40,10 @@ export type MatchHistoryEntry = {
   } | null;
   octopus: {
     points: number;
-    player: { name: string };
+    playerId?: string;
+    saves?: number | null;
+    goalsConceded?: number | null;
+    player: { name: string; teamId?: string | null };
   } | null;
 };
 
@@ -68,11 +72,19 @@ type RawHistory = {
     match: HistoryMatch;
   }[];
   octopusBets: {
+    playerId?: string;
     points: number;
-    player: { name: string };
+    player: { name: string; teamId?: string | null };
     match: HistoryMatch;
   }[];
 };
+
+function getGoalsConceded(match: HistoryMatch, teamId?: string | null) {
+  if (!teamId) return null;
+  if (teamId === match.homeTeam.id) return match.awayScore;
+  if (teamId === match.awayTeam.id) return match.homeScore;
+  return null;
+}
 
 export function buildMatchHistoryEntries(history: RawHistory): MatchHistoryEntry[] {
   const byMatch = new Map<string, MatchHistoryEntry>();
@@ -119,7 +131,14 @@ export function buildMatchHistoryEntries(history: RawHistory): MatchHistoryEntry
       bold: null,
       octopus: null,
     };
-    existing.octopus = octopus;
+    existing.octopus = {
+      ...octopus,
+      saves:
+        octopus.match.goalkeeperStats?.find(
+          (stat) => stat.playerId === octopus.playerId
+        )?.saves ?? null,
+      goalsConceded: getGoalsConceded(octopus.match, octopus.player.teamId),
+    };
     byMatch.set(octopus.match.id, existing);
   }
 
@@ -213,6 +232,8 @@ export function entryToBreakdownInput(
     userOctopusBet: entry.octopus
       ? {
           points: entry.octopus.points,
+          saves: entry.octopus.saves ?? null,
+          goalsConceded: entry.octopus.goalsConceded ?? null,
           player: { name: entry.octopus.player.name },
         }
       : null,

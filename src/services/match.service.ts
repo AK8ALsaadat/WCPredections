@@ -122,10 +122,38 @@ export async function enrichMatchesWithUserPredictions<
           matchId: true,
           points: true,
           playerId: true,
-          player: { select: { id: true, name: true } },
+          player: { select: { id: true, name: true, teamId: true } },
         },
       }),
     ]);
+
+  const octopusStats =
+    octopusBets.length > 0
+      ? await prisma.matchGoalkeeperStat.findMany({
+          where: {
+            matchId: { in: matchIds },
+            playerId: { in: octopusBets.map((bet) => bet.playerId) },
+          },
+          select: { matchId: true, playerId: true, saves: true },
+        })
+      : [];
+  const octopusStatsByMatchPlayer = new Map(
+    octopusStats.map((stat) => [
+      statKey(stat.matchId, stat.playerId),
+      stat.saves,
+    ])
+  );
+  const matchContextById = new Map(
+    matches.map((match) => [
+      match.id,
+      {
+        homeTeamId: (match as any).homeTeamId,
+        awayTeamId: (match as any).awayTeamId,
+        homeScore: (match as any).homeScore ?? null,
+        awayScore: (match as any).awayScore ?? null,
+      } as OctopusMatchContext,
+    ])
+  );
 
   const predictionByMatch = new Map(predictions.map((p) => [p.matchId, p]));
   const scorersByMatch = new Map<string, typeof scorerPredictions>();
@@ -138,7 +166,11 @@ export async function enrichMatchesWithUserPredictions<
   const octopusByMatch = new Map(
     octopusBets.map((b) => [
       b.matchId,
-      { points: b.points, player: b.player },
+      buildOctopusBetView(
+        b,
+        matchContextById.get(b.matchId),
+        octopusStatsByMatchPlayer.get(statKey(b.matchId, b.playerId))
+      ),
     ])
   );
 
@@ -155,6 +187,50 @@ export async function enrichMatchesWithUserPredictions<
     userBoldScorerBet: boldByMatch.get(match.id) ?? null,
     userOctopusBet: octopusByMatch.get(match.id) ?? null,
   }));
+}
+
+type OctopusMatchContext = {
+  homeTeamId: string;
+  awayTeamId: string;
+  homeScore: number | null;
+  awayScore: number | null;
+};
+
+type OctopusBetSource = {
+  matchId?: string;
+  points: number;
+  playerId: string;
+  player: { id?: string; name: string; teamId?: string | null };
+};
+
+function getGoalsConcededForTeam(
+  match: OctopusMatchContext | null | undefined,
+  teamId: string | null | undefined
+) {
+  if (!match || !teamId) return null;
+  if (teamId === match.homeTeamId) return match.awayScore;
+  if (teamId === match.awayTeamId) return match.homeScore;
+  return null;
+}
+
+function statKey(matchId: string, playerId: string) {
+  return `${matchId}:${playerId}`;
+}
+
+function buildOctopusBetView(
+  bet: OctopusBetSource,
+  match: OctopusMatchContext | null | undefined,
+  saves?: number | null
+) {
+  return {
+    points: bet.points,
+    saves: saves ?? null,
+    goalsConceded: getGoalsConcededForTeam(match, bet.player.teamId),
+    player: {
+      id: bet.player.id,
+      name: bet.player.name,
+    },
+  };
 }
 
 async function fetchScheduleMatches(roundId?: string) {
@@ -226,9 +302,14 @@ export async function getUserPinnedTodayMatches(
     octopusBets: {
       where: { userId },
       select: {
+        matchId: true,
+        playerId: true,
         points: true,
-        player: { select: { name: true } },
+        player: { select: { id: true, name: true, teamId: true } },
       },
+    },
+    goalkeeperStats: {
+      select: { playerId: true, saves: true },
     },
   } as const;
   const baseWhere = {
@@ -266,13 +347,23 @@ export async function getUserPinnedTodayMatches(
   };
 
   return rows
-    .map(({ predictions, scorerPredictions, boldScorerBets, octopusBets, ...match }) => ({
-      ...match,
-      userPrediction: predictions[0] ?? null,
-      userScorerPredictions: scorerPredictions,
-      userBoldScorerBet: boldScorerBets[0] ?? null,
-      userOctopusBet: octopusBets[0] ?? null,
-    }))
+    .map(({ predictions, scorerPredictions, boldScorerBets, octopusBets, goalkeeperStats, ...match }) => {
+      const octopusBet = octopusBets[0] ?? null;
+      return {
+        ...match,
+        userPrediction: predictions[0] ?? null,
+        userScorerPredictions: scorerPredictions,
+        userBoldScorerBet: boldScorerBets[0] ?? null,
+        userOctopusBet: octopusBet
+          ? buildOctopusBetView(
+              octopusBet,
+              match,
+              goalkeeperStats.find((stat) => stat.playerId === octopusBet.playerId)
+                ?.saves
+            )
+          : null,
+      };
+    })
     .sort((a, b) => {
       const statusDiff =
         (statusPriority[a.status] ?? 4) - (statusPriority[b.status] ?? 4);
@@ -568,6 +659,9 @@ export async function getMatchById(
       matchScorers: {
         include: { player: { select: { id: true, name: true } } },
       },
+      goalkeeperStats: {
+        select: { playerId: true, saves: true },
+      },
     },
   });
 
@@ -602,12 +696,12 @@ export async function getMatchById(
         ? Promise.resolve(null)
         : prisma.boldScorerBet.findFirst({
             where: { userId, matchId },
-            select: {
-              playerId: true,
-              points: true,
-              player: { select: { name: true } },
-            },
-          }),
+          select: {
+            playerId: true,
+            points: true,
+            player: { select: { id: true, name: true, teamId: true } },
+          },
+        }),
       predictionOpen
         ? Promise.resolve(null)
         : prisma.octopusGoalkeeperBet.findFirst({
@@ -648,6 +742,11 @@ export async function getMatchById(
         userOctopusBet = {
           playerId: octopusStatus.playerId,
           points: octopusStatus.points,
+          saves:
+            match.goalkeeperStats.find(
+              (stat) => stat.playerId === octopusStatus.playerId
+            )?.saves ?? null,
+          goalsConceded: null,
           player: { name: octopusStatus.playerName ?? "" },
         };
       }
@@ -659,16 +758,21 @@ export async function getMatchById(
       };
     }
     if (!limits && closedOctopusBet) {
-      userOctopusBet = {
-        playerId: closedOctopusBet.playerId,
-        points: closedOctopusBet.points,
-        player: closedOctopusBet.player,
-      };
+      userOctopusBet = buildOctopusBetView(
+        closedOctopusBet,
+        match,
+        match.goalkeeperStats.find(
+          (stat) => stat.playerId === closedOctopusBet.playerId
+        )?.saves
+      );
     }
   }
 
+  const { goalkeeperStats: _goalkeeperStats, ...matchWithoutGoalkeeperStats } =
+    match;
+  void _goalkeeperStats;
   const base = {
-    ...match,
+    ...matchWithoutGoalkeeperStats,
     userPrediction,
     userScorerPredictions,
     userBoldScorerBet,

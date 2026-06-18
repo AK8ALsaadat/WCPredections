@@ -3,7 +3,6 @@ import { getCurrentUser } from "@/lib/session";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { Navbar } from "@/components/layout/Navbar";
 import { SportScoreAttribution } from "@/components/layout/SportScoreAttribution";
-import { UpdatesNotice } from "@/components/auth/UpdatesNotice";
 import { canShowKnockoutFeatures } from "@/lib/tournament-gates";
 
 export default async function MainLayout({
@@ -28,7 +27,6 @@ export default async function MainLayout({
       <main className="mx-auto max-w-7xl px-3 py-4 pb-24 md:px-6 md:py-8 md:pb-8">
         {children}
       </main>
-      <UpdatesNotice />
       <MobileBottomNav />
       <SportScoreAttribution />
     </div>

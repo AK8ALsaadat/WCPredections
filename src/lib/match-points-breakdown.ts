@@ -1,6 +1,7 @@
 import { getMatchResult } from "@/lib/utils";
 import type { Messages } from "@/lib/i18n/ar";
 import type { FinishType } from "@prisma/client";
+import { getOctopusConcededCapLabel } from "@/lib/octopus-points";
 import { PERFECT_PREDICTION_BONUS_POINTS } from "@/services/scoring.service";
 
 /** تحويل موضع اللاعب الإنجليزي إلى عربي مع عدد النقاط */
@@ -78,6 +79,8 @@ export type MatchPointsBreakdownInput = {
   } | null;
   userOctopusBet?: {
     points: number;
+    saves?: number | null;
+    goalsConceded?: number | null;
     player: { name: string };
   } | null;
 };
@@ -267,10 +270,19 @@ export function buildMatchPointsBreakdown(
   if (input.userOctopusBet) {
     const octopus = input.userOctopusBet;
     if (showMisses || octopus.points !== 0) {
+      const octopusDetails = [
+        octopus.saves != null
+          ? `${octopus.saves} تصديات رسمية`
+          : "تصديات الحارس الرسمية",
+        octopus.goalsConceded != null
+          ? `منتخبه استقبل ${octopus.goalsConceded}`
+          : null,
+        getOctopusConcededCapLabel(octopus.goalsConceded),
+      ].filter(Boolean);
       lines.push({
         id: "octopus-goalkeeper",
         label: `الأخطبوط: ${octopus.player.name}`,
-        detail: "تصديات الحارس الرسمية مع سقف أهداف منتخب الحارس",
+        detail: octopusDetails.join(" • "),
         points: octopus.points,
         correct: octopus.points > 0,
       });
@@ -420,7 +432,7 @@ export function buildLeaguePendingBreakdown(
     lines.push({
       id: "octopus-goalkeeper",
       label: `الأخطبوط: ${row.octopusGoalkeeperBet.player.name}`,
-      detail: "تصديات الحارس الرسمية",
+      detail: "التصديات والأهداف المستقبلة تظهر بعد نهاية المباراة",
       points: 0,
     });
   }
@@ -452,6 +464,8 @@ export function leagueRowToBreakdownInput(
     } | null;
     octopusGoalkeeperBet?: {
       points?: number;
+      saves?: number | null;
+      goalsConceded?: number | null;
       player: { name: string };
     } | null;
   },
@@ -495,6 +509,8 @@ export function leagueRowToBreakdownInput(
     userOctopusBet: row.octopusGoalkeeperBet
       ? {
           points: row.octopusGoalkeeperBet.points ?? 0,
+          saves: row.octopusGoalkeeperBet.saves ?? null,
+          goalsConceded: row.octopusGoalkeeperBet.goalsConceded ?? null,
           player: { name: row.octopusGoalkeeperBet.player.name },
         }
       : null,

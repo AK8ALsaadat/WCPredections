@@ -63,6 +63,8 @@ export type LeagueMatchPredictionRow = {
   octopusGoalkeeperBet: {
     player: { id: string; name: string };
     points?: number;
+    saves?: number | null;
+    goalsConceded?: number | null;
   } | null;
 };
 

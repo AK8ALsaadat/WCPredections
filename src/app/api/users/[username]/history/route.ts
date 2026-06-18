@@ -69,6 +69,9 @@ export async function GET(
                 homeTeam: true,
                 awayTeam: true,
                 round: true,
+                goalkeeperStats: {
+                  select: { playerId: true, saves: true },
+                },
               },
             },
           },

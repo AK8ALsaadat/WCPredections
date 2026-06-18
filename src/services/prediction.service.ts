@@ -952,6 +952,9 @@ export async function getUserPredictionHistory(userId: string) {
             homeTeam: true,
             awayTeam: true,
             round: true,
+            goalkeeperStats: {
+              select: { playerId: true, saves: true },
+            },
           },
         },
       },
@@ -989,7 +992,7 @@ async function fetchLeagueMatchPredictions(matchId: string) {
     throw new Error("Predictions still open");
   }
 
-  const [predictions, scorerPredictions, boldBets, octopusBets] =
+  const [predictions, scorerPredictions, boldBets, octopusBets, goalkeeperStats] =
     await Promise.all([
     prisma.prediction.findMany({
       where: { matchId },
@@ -1031,13 +1034,25 @@ async function fetchLeagueMatchPredictions(matchId: string) {
         select: {
           userId: true,
           points: true,
+          playerId: true,
           user: { select: { username: true } },
-          player: { select: { id: true, name: true } },
+          player: { select: { id: true, name: true, teamId: true } },
         },
+      }),
+      prisma.matchGoalkeeperStat.findMany({
+        where: { matchId },
+        select: { playerId: true, saves: true },
       }),
     ]);
 
   const rows = new Map<string, LeagueMatchPredictionRow>();
+  const goalkeeperSavesByPlayer = new Map(
+    goalkeeperStats.map((stat) => [stat.playerId, stat.saves])
+  );
+  const goalsConcededByTeam = new Map<string, number | null>([
+    [match.homeTeam.id, match.awayScore],
+    [match.awayTeam.id, match.homeScore],
+  ]);
 
   for (const prediction of predictions) {
     rows.set(prediction.userId, {
@@ -1103,8 +1118,10 @@ async function fetchLeagueMatchPredictions(matchId: string) {
       octopusGoalkeeperBet: null,
     };
     existing.octopusGoalkeeperBet = {
-      player: octopus.player,
+      player: { id: octopus.player.id, name: octopus.player.name },
       points: octopus.points,
+      saves: goalkeeperSavesByPlayer.get(octopus.playerId) ?? null,
+      goalsConceded: goalsConcededByTeam.get(octopus.player.teamId) ?? null,
     };
     rows.set(octopus.userId, existing);
   }

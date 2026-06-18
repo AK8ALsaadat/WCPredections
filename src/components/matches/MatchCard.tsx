@@ -58,6 +58,8 @@ type MatchCardProps = {
     } | null;
     userOctopusBet?: {
       points: number;
+      saves?: number | null;
+      goalsConceded?: number | null;
       player: { name: string };
     } | null;
   };
@@ -450,6 +452,8 @@ export function MatchCard({
                 match.userOctopusBet
                   ? {
                       points: match.userOctopusBet.points,
+                      saves: match.userOctopusBet.saves ?? null,
+                      goalsConceded: match.userOctopusBet.goalsConceded ?? null,
                       player: { name: match.userOctopusBet.player.name },
                     }
                   : null

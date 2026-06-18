@@ -1,6 +1,7 @@
 "use client";
 
 import { SWRConfig } from "swr";
+import { UpdatesNotice } from "@/components/auth/UpdatesNotice";
 import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
 import type { Locale } from "@/lib/i18n/index";
 
@@ -18,6 +19,7 @@ export function ClientProviders({ children, initialLocale }: { children: React.R
     >
       <LocaleProvider initialLocale={initialLocale}>
         {children}
+        <UpdatesNotice />
       </LocaleProvider>
     </SWRConfig>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
-const NOTICE_KEY = "wc-predictions-updates-2026-06-18-v3-octopus-goals-cap";
+const NOTICE_KEY = "wc-predictions-updates-2026-06-18-v4-global-octopus-time";
 
 const OCTOPUS_POINTS = [
   { saves: 3, points: 1 },
@@ -57,7 +57,7 @@ export function UpdatesNotice() {
       aria-modal="true"
       aria-labelledby="updates-notice-title"
     >
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-cyan-300/45 bg-card p-6 text-center shadow-2xl shadow-black/50">
+      <div className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-cyan-300/45 bg-card p-6 text-center shadow-2xl shadow-black/50">
         <div className="pointer-events-none absolute inset-x-8 -top-24 h-32 rounded-full bg-cyan-400/20 blur-3xl" />
 
         <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-200/45 bg-cyan-400/15 text-lg font-black text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.22)] ring-1 ring-cyan-100/25">
@@ -88,6 +88,17 @@ export function UpdatesNotice() {
               </p>
             </div>
           ))}
+        </div>
+
+        <div className="relative mt-3 rounded-xl border border-primary/25 bg-primary/10 px-4 py-3 text-start">
+          <p className="text-xs font-bold uppercase tracking-wide text-primary">
+            {isAr ? "وقت إغلاق التوقع" : "Prediction deadline"}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-foreground">
+            {isAr
+              ? "كل التوقعات والميزات تقفل قبل بداية المباراة بساعة ونصف، ويظهر نفس الوقت في عدّاد الإغلاق."
+              : "Predictions and feature cards close 90 minutes before kickoff, and the countdown shows that same deadline."}
+          </p>
         </div>
 
         <div
@@ -123,8 +134,8 @@ export function UpdatesNotice() {
           </p>
           <p>
             {isAr
-              ? "بعدها يطبق سقف أهداف منتخب الحارس: إذا استقبل هدفًا ما عاد يقدر ياخذ سقف 10 تصديات، هدفين تلغي سقف 7، و3 أهداف فأكثر تلغي سقف 5. النقاط النهائية تكون الأقل بين التصديات والسقف."
-              : "Then the goalkeeper's team goals-conceded cap applies: 1 conceded removes the 10-save tier, 2 removes the 7-save tier, and 3+ removes the 5-save tier. Final points are the lower of saves points and that cap."}
+              ? "بعدها يطبق سقف أهداف منتخب الحارس: إذا استقبل هدفًا يروح سقف 10 تصديات (+8)، هدفين يروح سقف 7 تصديات (+5)، و3 أهداف فأكثر يروح سقف 5 تصديات (+3). النقاط النهائية تكون الأقل بين نقاط التصديات والسقف."
+              : "Then the goalkeeper's team goals-conceded cap applies: 1 conceded removes the 10-save tier (+8), 2 removes the 7-save tier (+5), and 3+ removes the 5-save tier (+3). Final points are the lower of saves points and that cap."}
           </p>
           <p>
             {isAr

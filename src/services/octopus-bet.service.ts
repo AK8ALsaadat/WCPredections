@@ -1,5 +1,10 @@
 import { resolvePlayerInSquad } from "@/lib/player-matching";
 import { goalkeeperPositionWhere, isGoalkeeperPosition } from "@/lib/goalkeeper";
+import {
+  calculateOctopusPoints,
+  getOctopusConcededCapPoints,
+  OCTOPUS_POINTS,
+} from "@/lib/octopus-points";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason } from "@/lib/utils";
 import { ApiFootballProvider } from "@/services/football-api/api-football.provider";
@@ -14,12 +19,7 @@ import {
   type UsageRoundScope,
 } from "@/services/usage-round.service";
 
-export const OCTOPUS_POINTS = {
-  three: 1,
-  five: 3,
-  seven: 5,
-  ten: 8,
-} as const;
+export { calculateOctopusPoints, getOctopusConcededCapPoints, OCTOPUS_POINTS };
 
 type MatchForGoalkeeperStats = {
   matchTime?: Date | null;
@@ -40,30 +40,6 @@ function slugifyTeamName(text: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-}
-
-export function getOctopusConcededCapPoints(
-  goalsConceded: number | null | undefined
-) {
-  if (goalsConceded == null) return Number.POSITIVE_INFINITY;
-  if (goalsConceded >= 3) return OCTOPUS_POINTS.three;
-  if (goalsConceded === 2) return OCTOPUS_POINTS.five;
-  if (goalsConceded === 1) return OCTOPUS_POINTS.seven;
-  return Number.POSITIVE_INFINITY;
-}
-
-export function calculateOctopusPoints(
-  saves: number | null | undefined,
-  goalsConceded?: number | null
-) {
-  const count = saves ?? 0;
-  let points = 0;
-  if (count >= 10) points = OCTOPUS_POINTS.ten;
-  else if (count >= 7) points = OCTOPUS_POINTS.seven;
-  else if (count >= 5) points = OCTOPUS_POINTS.five;
-  else if (count >= 3) points = OCTOPUS_POINTS.three;
-
-  return Math.min(points, getOctopusConcededCapPoints(goalsConceded));
 }
 
 async function resolveTeamId(
