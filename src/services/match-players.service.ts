@@ -361,7 +361,7 @@ async function within<T>(promise: Promise<T>, ms: number, fallback: T) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      promise,
+      promise.catch(() => fallback),
       new Promise<T>((resolve) => {
         timer = setTimeout(() => resolve(fallback), ms);
       }),

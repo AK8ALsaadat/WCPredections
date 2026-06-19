@@ -654,6 +654,17 @@ function getCachedFastMatchLineup(matchId: string) {
   )();
 }
 
+function getCachedFullMatchLineup(matchId: string) {
+  return unstable_cache(
+    () => buildMatchLineup(matchId),
+    ["match-lineup-full-v2", matchId],
+    {
+      revalidate: MATCH_LINEUP_SHARED_CACHE_SECONDS,
+      tags: [`lineup-${matchId}`],
+    }
+  )();
+}
+
 export function prewarmFastMatchLineups(matchIds: string[]) {
   const uniqueIds = Array.from(new Set(matchIds)).slice(0, 8);
   if (uniqueIds.length === 0) return;
@@ -681,7 +692,12 @@ export async function getMatchLineup(
 ) {
   if (options?.fresh) {
     clearMatchLineupMemoryCache(matchId);
-    const { invalidateCacheKey } = await import("@/lib/api-cache");
+    const [{ invalidateCacheKey }, { clearExpectedLineupCaches }] =
+      await Promise.all([
+        import("@/lib/api-cache"),
+        import("@/services/match-players.service"),
+      ]);
+    clearExpectedLineupCaches();
     const match = await prisma.match.findUnique({
       where: { id: matchId },
       select: { apiMatchId: true },
@@ -697,7 +713,7 @@ export async function getMatchLineup(
     return hit.data;
   }
 
-  const data = await getCachedFastMatchLineup(matchId);
+  const data = await getCachedFullMatchLineup(matchId);
 
   if (data) {
     matchLineupCache.set(matchId, {

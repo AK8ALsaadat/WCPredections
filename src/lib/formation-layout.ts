@@ -1,4 +1,5 @@
 import type { MatchPlayerView } from "@/services/match-players.service";
+import { isGoalkeeperPosition } from "@/lib/goalkeeper";
 
 export type PitchSlot = {
   player: MatchPlayerView;
@@ -69,8 +70,7 @@ function spreadLine(
 }
 
 function isGoalkeeper(player: MatchPlayerView) {
-  const p = (player.position ?? "").toLowerCase();
-  return p.includes("goal");
+  return isGoalkeeperPosition(player.position);
 }
 
 function positionRank(player: MatchPlayerView) {
@@ -79,6 +79,8 @@ function positionRank(player: MatchPlayerView) {
     ? Number.parseInt(player.grid!, 10)
     : null;
   const isDefender =
+    /^(d|def)$/.test(position) ||
+    /\b(cb|lb|rb|lwb|rwb)\b/.test(position) ||
     position.includes("def") ||
     position.includes("back") ||
     position.includes("sweeper");
@@ -93,10 +95,13 @@ function positionRank(player: MatchPlayerView) {
     if (isFullback || gridPlace === 2 || gridPlace === 3) return 0.5;
     return 0;
   }
+  if (/^(m|mid)$/.test(position) || /\b(cm|dm|am|lm|rm)\b/.test(position)) return 2;
   if (position.includes("defensive") && position.includes("mid")) return 1;
   if (position.includes("attack") && position.includes("mid")) return 3;
   if (position.includes("mid")) return 2;
   if (
+    /^(f|for|att)$/.test(position) ||
+    /\b(fw|st|cf|lw|rw)\b/.test(position) ||
     position.includes("attack") ||
     position.includes("forward") ||
     position.includes("offence") ||
@@ -156,6 +161,8 @@ function sortFormationLine(
 
 function horizontalRank(player: MatchPlayerView) {
   const position = (player.position ?? "").toLowerCase();
+  if (/^(lwb|lb|lw)$/.test(position)) return 0;
+  if (/^(rwb|rb|rw)$/.test(position)) return 2;
   if (/\bleft\b|\blb\b|\blwb\b|\blw\b/.test(position)) return 0;
   if (/\bright\b|\brb\b|\brwb\b|\brw\b/.test(position)) return 2;
   return 1;

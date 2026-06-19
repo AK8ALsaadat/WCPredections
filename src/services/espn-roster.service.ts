@@ -48,6 +48,7 @@ const ESPN_TEAM_SEARCH_NAMES: Record<string, string> = {
   turkey: "Turkiye",
   curacao: "Curacao",
   "cape verde": "Cape Verde",
+  "congo dr": "Congo DR",
   "united states": "United States",
   "south korea": "South Korea",
   "ivory coast": "Ivory Coast",

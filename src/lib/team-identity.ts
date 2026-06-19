@@ -6,7 +6,13 @@ const TEAM_ALIASES: Record<string, string> = {
   "united states of america": "united states",
   "cote d ivoire": "ivory coast",
   "curaa ao": "curacao",
+  "cabo verde": "cape verde",
   "cape verde islands": "cape verde",
+  "dr congo": "congo dr",
+  "d r congo": "congo dr",
+  "democratic republic of congo": "congo dr",
+  "democratic republic of the congo": "congo dr",
+  "congo democratic republic": "congo dr",
   "ir iran": "iran",
 };
 
