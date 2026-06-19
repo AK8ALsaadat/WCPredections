@@ -21,7 +21,6 @@ export function MobileBottomNav() {
     () => [
       { href: "/dashboard", label: t.nav.dashboard, icon: "🏠" },
       { href: "/matches", label: t.nav.matches, icon: "⚽" },
-      { href: "/fan-clash", label: "Clash", icon: "FC" },
       { href: "/leaderboard/overall", label: t.nav.leaderboard, icon: "🏆" },
       { href: "/profile", label: t.nav.profile, icon: "👤" },
     ],
@@ -33,7 +32,7 @@ export function MobileBottomNav() {
       className="fixed inset-x-0 bottom-0 z-50 border-t border-card-border bg-background md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-4">
         {navItems.map((item) => {
           const active = isActive(pathname, item.href);
           return (
