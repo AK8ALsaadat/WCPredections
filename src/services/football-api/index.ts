@@ -287,6 +287,7 @@ export async function reconcileDuplicateMatchesInRound(roundId: string) {
         select: {
           predictions: true,
           scorerPredictions: true,
+          fanClashPicks: true,
         },
       },
     },
@@ -294,7 +295,10 @@ export async function reconcileDuplicateMatchesInRound(roundId: string) {
 
   const byPair = new Map<string, typeof matches>();
   for (const m of matches) {
-    const key = matchIdentityKey(m.homeTeam.name, m.awayTeam.name);
+    const key = `${matchIdentityKey(
+      m.homeTeam.name,
+      m.awayTeam.name
+    )}|${m.matchTime.getTime()}`;
     const list = byPair.get(key) ?? [];
     list.push(m);
     byPair.set(key, list);
@@ -317,6 +321,7 @@ export async function reconcileDuplicateMatchesInRound(roundId: string) {
 
     const canonical = group[0];
     for (const dup of group.slice(1)) {
+      if (dup._count.fanClashPicks > 0) continue;
       await mergeMatchIntoCanonical(canonical.id, dup.id);
       merged++;
     }

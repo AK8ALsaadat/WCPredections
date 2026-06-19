@@ -139,6 +139,23 @@ function LeaderTag() {
   );
 }
 
+function NightChampionTag({ points }: { points?: number }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-300/60 bg-orange-500/20 px-2.5 py-1 text-[10px] font-black text-orange-100 shadow-[0_0_22px_rgba(249,115,22,0.25)]">
+      <span
+        className="inline-flex h-4 w-4 items-center justify-center rounded-[5px] bg-gradient-to-br from-yellow-200 via-orange-400 to-red-600 text-[10px] shadow-[0_0_14px_rgba(249,115,22,0.65)]"
+        aria-hidden
+      >
+        F
+      </span>
+      Night king
+      {points && points > 0 ? (
+        <span className="text-orange-200/80">+{points}</span>
+      ) : null}
+    </span>
+  );
+}
+
 function LeaderSpotlight({
   entry,
   highlightUserId,
@@ -152,18 +169,39 @@ function LeaderSpotlight({
 }) {
   const { messages: t } = useI18n();
   const isMe = entry.userId === highlightUserId;
+  const isNightChampion = entry.isNightChampion;
 
   return (
     <Link
       href={`/user/${encodeURIComponent(entry.username)}`}
       className={`group relative block overflow-hidden rounded-2xl border p-[1px] shadow-[0_20px_60px_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5 ${
-        isMe ? "border-primary/70" : "border-amber-300/60"
+        isNightChampion
+          ? "border-orange-300/80"
+          : isMe ? "border-primary/70" : "border-amber-300/60"
       }`}
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-amber-500/60 via-yellow-200/30 to-amber-600/60" />
-      <div className="relative overflow-hidden rounded-[15px] bg-gradient-to-br from-[#302307] via-[#191912] to-[#101722] px-4 py-5 sm:px-7 sm:py-6">
+      <div
+        className={`absolute inset-0 ${
+          isNightChampion
+            ? "bg-gradient-to-r from-red-600/65 via-orange-300/40 to-yellow-400/55"
+            : "bg-gradient-to-r from-amber-500/60 via-yellow-200/30 to-amber-600/60"
+        }`}
+      />
+      <div
+        className={`relative overflow-hidden rounded-[15px] px-4 py-5 sm:px-7 sm:py-6 ${
+          isNightChampion
+            ? "bg-gradient-to-br from-[#3a0b05] via-[#241007] to-[#101722]"
+            : "bg-gradient-to-br from-[#302307] via-[#191912] to-[#101722]"
+        }`}
+      >
         <div className="pointer-events-none absolute -start-12 -top-16 h-44 w-44 rounded-full bg-amber-300/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 end-0 h-48 w-48 rounded-full bg-warning/10 blur-3xl" />
+        {isNightChampion && (
+          <>
+            <div className="leaderboard-fire-aura pointer-events-none absolute -end-10 -top-16 h-56 w-56 rounded-full bg-orange-500/25 blur-3xl" />
+            <div className="leaderboard-fire-flicker pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-orange-300 to-transparent" />
+          </>
+        )}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-100/80 to-transparent" />
 
         <div className="relative flex items-center gap-4 sm:gap-6">
@@ -176,6 +214,9 @@ function LeaderSpotlight({
 
           <div className="min-w-0 flex-1 text-end">
             <div className="flex flex-wrap items-center justify-end gap-2">
+              {isNightChampion && (
+                <NightChampionTag points={entry.nightWindowPoints} />
+              )}
               <LeaderTag />
               {isMe && (
                 <span className="rounded-full bg-primary/15 px-2 py-1 text-[10px] font-bold text-primary ring-1 ring-primary/30">
@@ -230,6 +271,7 @@ function MobileLeaderboardList({
         const isRelegated = relegatedUserIds.has(entry.userId);
         const isExempt = exemptUserIds.has(entry.userId);
         const isMe = entry.userId === highlightUserId;
+        const isNightChampion = entry.isNightChampion;
 
         return (
           <Link
@@ -238,6 +280,10 @@ function MobileLeaderboardList({
             className={`relative flex items-center gap-3 overflow-hidden rounded-xl border px-3 py-3 shadow-sm transition-colors ${
               isExempt
                 ? `border-emerald-300/55 bg-gradient-to-l from-emerald-950/80 via-emerald-900/45 to-card shadow-[0_10px_32px_rgba(5,150,105,0.18)] hover:border-emerald-200/70 ${
+                    isMe ? "ring-1 ring-primary/60" : ""
+                  }`
+                : isNightChampion
+                ? `border-orange-300/55 bg-gradient-to-l from-red-950/80 via-orange-900/35 to-card shadow-[0_10px_32px_rgba(249,115,22,0.18)] hover:border-orange-200/70 ${
                     isMe ? "ring-1 ring-primary/60" : ""
                   }`
                 : isRelegated
@@ -264,6 +310,9 @@ function MobileLeaderboardList({
             )}
             <div className="min-w-0 flex-1 text-end">
               <div className="flex min-w-0 items-center justify-end gap-2">
+                {isNightChampion && (
+                  <NightChampionTag points={entry.nightWindowPoints} />
+                )}
                 {isExempt ? (
                   <AdministrationExemptionTag />
                 ) : isRelegated ? (
@@ -290,6 +339,8 @@ function MobileLeaderboardList({
                 className={`text-[10px] ${
                   isExempt
                     ? "text-emerald-100/70"
+                    : isNightChampion
+                      ? "text-orange-100/75"
                     : isRelegated
                       ? "text-red-200/70"
                       : "text-muted"
@@ -301,6 +352,8 @@ function MobileLeaderboardList({
                 className={`text-lg font-black tabular-nums ${
                   isExempt
                     ? "text-emerald-200"
+                    : isNightChampion
+                      ? "text-orange-200"
                     : isRelegated
                       ? "text-red-200"
                       : pointsTone(entry.points)
@@ -448,6 +501,7 @@ export function LeaderboardTable({
                 const isRelegated = relegatedUserIds.has(entry.userId);
                 const isExempt = exemptUserIds.has(entry.userId);
                 const isMe = entry.userId === highlightUserId;
+                const isNightChampion = entry.isNightChampion;
 
                 return (
                   <tr
@@ -455,6 +509,10 @@ export function LeaderboardTable({
                     className={`border-b transition-colors ${
                       isExempt
                         ? `border-emerald-300/25 bg-gradient-to-l from-emerald-950/80 via-emerald-900/35 to-transparent shadow-[inset_4px_0_0_rgba(52,211,153,0.75)] hover:from-emerald-900/80 ${
+                            isMe ? "outline outline-1 -outline-offset-1 outline-primary/60" : ""
+                          }`
+                        : isNightChampion
+                        ? `border-orange-300/30 bg-gradient-to-l from-red-950/65 via-orange-950/30 to-transparent shadow-[inset_4px_0_0_rgba(249,115,22,0.75)] hover:from-orange-900/55 ${
                             isMe ? "outline outline-1 -outline-offset-1 outline-primary/60" : ""
                           }`
                         : isRelegated
@@ -477,6 +535,9 @@ export function LeaderboardTable({
                     )}
                     <td className="px-5 py-3 font-medium">
                       <div className="flex items-center justify-end gap-3">
+                        {isNightChampion && (
+                          <NightChampionTag points={entry.nightWindowPoints} />
+                        )}
                         {isExempt ? (
                           <AdministrationExemptionTag />
                         ) : isRelegated ? (
@@ -500,9 +561,11 @@ export function LeaderboardTable({
                     </td>
                     <td
                       className={`px-5 py-3 text-start text-lg font-black tabular-nums ${
-                        isExempt
-                          ? "text-emerald-200"
-                          : isRelegated
+                      isExempt
+                        ? "text-emerald-200"
+                          : isNightChampion
+                            ? "text-orange-200"
+                        : isRelegated
                             ? "text-red-200"
                             : pointsTone(entry.points)
                       }`}

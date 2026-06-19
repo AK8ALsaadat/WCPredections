@@ -73,6 +73,8 @@ export type LeaderboardEntry = {
   userId: string;
   username: string;
   points: number;
+  nightWindowPoints?: number;
+  isNightChampion?: boolean;
   /** موجب = تحسّن الترتيب، سالب = تراجع مقارنة بالأسبوع الماضي */
   rankChange?: number;
 };

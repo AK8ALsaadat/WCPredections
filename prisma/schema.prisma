@@ -37,6 +37,7 @@ model User {
   scorerPredictions  ScorerPrediction[]
   boldScorerBets     BoldScorerBet[]
   octopusBets        OctopusGoalkeeperBet[]
+  fanClashPicks      FanClashPick[]
 
   @@map("users")
 }
@@ -86,6 +87,7 @@ model Player {
   boldScorerBets    BoldScorerBet[]
   goalkeeperStats   MatchGoalkeeperStat[]
   octopusBets       OctopusGoalkeeperBet[]
+  fanClashPicks      FanClashPick[]
 
   @@unique([teamId, apiPlayerId])
   @@map("players")
@@ -119,6 +121,7 @@ model Match {
   boldScorerBets      BoldScorerBet[]
   goalkeeperStats     MatchGoalkeeperStat[]
   octopusBets         OctopusGoalkeeperBet[]
+  fanClashPicks       FanClashPick[]
 
   @@index([roundId])
   @@index([status, matchTime])
@@ -241,4 +244,24 @@ model OctopusGoalkeeperBet {
   @@index([matchId])
   @@index([userId])
   @@map("octopus_goalkeeper_bets")
+}
+
+model FanClashPick {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  matchId         String    @map("match_id")
+  playerId        String    @map("player_id")
+  powerupStartsAt DateTime? @map("powerup_starts_at")
+  powerupEndsAt   DateTime? @map("powerup_ends_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId, playerId])
+  @@index([matchId])
+  @@index([userId])
+  @@map("fan_clash_picks")
 }

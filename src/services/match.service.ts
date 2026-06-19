@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { isPredictionAllowed } from "@/lib/utils";
 import { getTournamentRoundName } from "@/lib/rounds";
 import { canShowKnockoutFeatures, filterVisibleMatches } from "@/lib/tournament-gates";
+import { matchIdentityKey } from "@/lib/team-identity";
 import type { MatchStatus } from "@prisma/client";
 import { recalculateMatchScoring } from "@/services/prediction.service";
 import { getRoundUsageLimits } from "@/services/round-usage.service";
@@ -15,22 +16,13 @@ const teamSelect = {
   logoUrl: true,
 } as const;
 
-function slugifyTeamName(text: string) {
-  return String(text || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
 function dedupeMatches<T extends { matchTime?: unknown; homeTeam?: unknown; awayTeam?: unknown; apiMatchId?: unknown }>(rows: T[]): T[] {
   if (!rows || rows.length <= 1) return rows;
   const groups = new Map<string, T[]>();
   for (const r of rows) {
     const homeName = String((r.homeTeam as any)?.name ?? "");
     const awayName = String((r.awayTeam as any)?.name ?? "");
-    const key = `${slugifyTeamName(homeName)}|${slugifyTeamName(awayName)}|${new Date(
+    const key = `${matchIdentityKey(homeName, awayName)}|${new Date(
       (r.matchTime as any) ?? String(new Date())
     ).getTime()}`;
     const arr = groups.get(key) ?? [];
@@ -382,7 +374,7 @@ export async function getScheduleMatches(roundId?: string) {
     ["schedule-matches", roundId ?? "all"],
     { revalidate: 60, tags: ["matches-schedule"] }
   )();
-  return filterVisibleMatches(rows);
+  return filterVisibleMatches(dedupeMatches(rows));
 }
 
 export async function getUpcomingMatches(roundId?: string) {

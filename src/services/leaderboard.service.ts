@@ -14,6 +14,8 @@ type PointsFilter = {
   roundId?: string;
   roundIds?: string[];
   before?: Date;
+  from?: Date;
+  to?: Date;
 };
 
 function matchWhere(filter: PointsFilter) {
@@ -23,20 +25,29 @@ function matchWhere(filter: PointsFilter) {
       ? { roundId: filter.roundId }
       : {};
 
+  const matchTime =
+    filter.from || filter.to || filter.before
+      ? {
+          ...(filter.before ? { lt: filter.before } : {}),
+          ...(filter.from ? { gte: filter.from } : {}),
+          ...(filter.to ? { lt: filter.to } : {}),
+        }
+      : undefined;
+
   return {
     ...roundClause,
     ...(filter.before
       ? {
           status: "FINISHED" as const,
-          matchTime: { lt: filter.before },
         }
       : {}),
+    ...(matchTime ? { matchTime } : {}),
   };
 }
 
 async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, PointsRow>> {
   const hasMatchFilter = Boolean(
-    filter.roundId || filter.roundIds?.length || filter.before
+    filter.roundId || filter.roundIds?.length || filter.before || filter.from || filter.to
   );
   const where = hasMatchFilter ? { match: matchWhere(filter) } : undefined;
 
@@ -168,9 +179,61 @@ function attachRankChange(
   });
 }
 
+function currentNightWindow(now = new Date()) {
+  const RIYADH_OFFSET_MS = 3 * 60 * 60 * 1000;
+  const local = new Date(now.getTime() + RIYADH_OFFSET_MS);
+  const year = local.getUTCFullYear();
+  const month = local.getUTCMonth();
+  const day = local.getUTCDate();
+  const hour = local.getUTCHours();
+
+  const localUtc = (d: number, h: number) =>
+    new Date(Date.UTC(year, month, d, h, 0, 0, 0) - RIYADH_OFFSET_MS);
+
+  if (hour >= 19) {
+    return {
+      start: localUtc(day, 19),
+      end: localUtc(day + 1, 9),
+    };
+  }
+
+  return {
+    start: localUtc(day - 1, 19),
+    end: localUtc(day, 9),
+  };
+}
+
+async function attachNightChampion(
+  entries: LeaderboardEntry[]
+): Promise<LeaderboardEntry[]> {
+  if (entries.length === 0) return entries;
+
+  const { start, end } = currentNightWindow();
+  const windowPoints = await getUserPointsMap({ from: start, to: end });
+  let championUserId: string | null = null;
+  let championPoints = 0;
+
+  for (const [userId, row] of windowPoints.entries()) {
+    if (row.points > championPoints) {
+      championUserId = userId;
+      championPoints = row.points;
+    }
+  }
+
+  return entries.map((entry) => {
+    const nightWindowPoints = windowPoints.get(entry.userId)?.points ?? 0;
+    return {
+      ...entry,
+      nightWindowPoints,
+      isNightChampion:
+        championPoints > 0 && entry.userId === championUserId,
+    };
+  });
+}
+
 async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardEntry[]> {
   if (!withTrend) {
-    return buildLeaderboard(await getUserPointsMap());
+    return attachNightChampion(buildLeaderboard(await getUserPointsMap()));
   }
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -179,10 +242,10 @@ async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardE
     getUserPointsMap({ before: weekAgo }),
   ]);
 
-  return attachRankChange(
+  return attachNightChampion(attachRankChange(
     buildLeaderboard(currentMap),
     buildLeaderboard(previousMap)
-  );
+  ));
 }
 
 async function buildRoundLeaderboard(roundId: string): Promise<LeaderboardEntry[]> {

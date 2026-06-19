@@ -22,6 +22,7 @@ import {
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { clientFetch } from "@/lib/client-fetch";
 import { enqueueBackgroundPrefetch } from "@/lib/prefetch-queue";
+import { matchIdentityKey } from "@/lib/team-identity";
 
 type Round = { id: string; name: string };
 type Match = {
@@ -249,20 +250,11 @@ export default function MatchesPage() {
 
         if (data.success) {
           const resolvedPage = data.data.page as number;
-          // deduplicate matches with same teams (different short names like 'spa' vs 'spain')
-          function slugifyTeamNameLocal(text: string) {
-            return text
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/^-|-$/g, "");
-          }
-
           function dedupeMatches(rawMatches: Match[]) {
             const groups = new Map<string, Match[]>();
             for (const m of rawMatches) {
-              const key = `${slugifyTeamNameLocal(m.homeTeam.name)}|${slugifyTeamNameLocal(
+              const key = `${matchIdentityKey(
+                m.homeTeam.name,
                 m.awayTeam.name
               )}|${new Date(m.matchTime).getTime()}`;
               const arr = groups.get(key) ?? [];

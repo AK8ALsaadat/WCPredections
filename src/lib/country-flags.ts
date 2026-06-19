@@ -14,7 +14,11 @@ const COUNTRY_CODES: Record<string, string> = {
   "iran": "ir",
   "أمريكا": "us",
   "الولايات المتحدة": "us",
+  "usa": "us",
+  "u.s.a.": "us",
+  "us": "us",
   "united states": "us",
+  "united states of america": "us",
   "ويلز": "gb-wls",
   "wales": "gb-wls",
   
