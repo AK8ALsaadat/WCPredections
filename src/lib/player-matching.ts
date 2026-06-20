@@ -29,6 +29,8 @@ export function firstNameKey(name: string): string {
   return nameParts(name)[0] ?? "";
 }
 
+const NAME_SUFFIXES = new Set(["jr", "junior", "filho", "neto"]);
+
 export function playerNamesMatch(a: string, b: string): boolean {
   const normA = normalizePlayerName(a);
   const normB = normalizePlayerName(b);
@@ -38,9 +40,29 @@ export function playerNamesMatch(a: string, b: string): boolean {
   const partsB = nameParts(b);
   if (partsA.length === 0 || partsB.length === 0) return false;
 
+  const stripSuffixes = (parts: string[]): string[] =>
+    parts.filter((part) => !NAME_SUFFIXES.has(part));
+
+  const strippedA = stripSuffixes(partsA);
+  const strippedB = stripSuffixes(partsB);
+  if (strippedA.length > 0 && strippedB.length > 0 && strippedA.join(" ") === strippedB.join(" ")) {
+    return true;
+  }
+
   const lastA = partsA[partsA.length - 1];
   const lastB = partsB[partsB.length - 1];
-  if (lastA !== lastB || lastA.length < 2) return false;
+
+  if (
+    partsA.length > 1 &&
+    partsB.length > 1 &&
+    !NAME_SUFFIXES.has(lastA) &&
+    !NAME_SUFFIXES.has(lastB) &&
+    lastA !== lastB
+  ) {
+    return false;
+  }
+
+  if (lastA.length < 2 || lastB.length < 2) return false;
 
   const firstA = partsA[0];
   const firstB = partsB[0];
