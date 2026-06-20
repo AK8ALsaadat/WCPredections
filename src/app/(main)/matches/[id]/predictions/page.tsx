@@ -150,6 +150,7 @@ export default function LeagueMatchPredictionsPage() {
     isLive && match.homeScore != null && match.awayScore != null;
   const withDouble = predictions.filter((p) => p.prediction?.isDouble).length;
   const withBold = predictions.filter((p) => p.boldScorerBet).length;
+  const withOctopus = predictions.filter((p) => p.octopusGoalkeeperBet).length;
   const hasScoringContext =
     match.homeScore != null &&
     match.awayScore != null &&
@@ -242,7 +243,7 @@ export default function LeagueMatchPredictionsPage() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-1.5 border-t border-card-border/60 pt-3 text-center md:mt-6 md:gap-2 md:pt-4">
+        <div className="mt-4 grid grid-cols-2 gap-1.5 border-t border-card-border/60 pt-3 text-center md:mt-6 md:grid-cols-4 md:gap-2 md:pt-4">
           <div className="rounded-xl bg-background/40 px-2 py-2">
             <p className="text-lg font-bold text-primary">{predictions.length}</p>
             <p className="text-[10px] text-muted">
@@ -258,6 +259,10 @@ export default function LeagueMatchPredictionsPage() {
           <div className="rounded-xl border border-red-400/30 bg-gradient-to-br from-red-950/70 to-rose-500/10 px-2 py-2 shadow-lg shadow-red-950/20">
             <p className="text-lg font-black text-red-300">{withBold}</p>
             <p className="text-[10px] text-muted">{t.matches.featureBold}</p>
+          </div>
+          <div className="rounded-xl border border-sky-400/30 bg-gradient-to-br from-sky-950/70 to-cyan-500/10 px-2 py-2 shadow-lg shadow-sky-950/20">
+            <p className="text-lg font-black text-sky-300">{withOctopus}</p>
+            <p className="text-[10px] text-muted">{t.matches.featureOctopus}</p>
           </div>
         </div>
       </header>

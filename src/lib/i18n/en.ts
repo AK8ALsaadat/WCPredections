@@ -205,6 +205,7 @@ export const en = {
     viewAllPredictions: "League picks",
     viewAllPredictionsTitle: "Everyone's predictions",
     viewAllPredictionsHint: "Score · scorers · double & bet",
+    featureOctopus: "Octopus",
     allPredictionsTitle: "League prediction board",
     scoreboardPlayer: "Player",
     scoreboardScore: "Score",

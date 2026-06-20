@@ -207,6 +207,7 @@ export const ar = {
     scoreboardScore: "النتيجة",
     featureDouble: "مضاعفة",
     featureBold: "الرهان",
+    featureOctopus: "الأخطبوط",
     knockoutExtrasLegend: "الأدوار الإقصائية",
     backToMatch: "العودة للمباراة",
     noLeaguePredictions: "ما فيه توقعات مسجّلة لهالمباراة",
