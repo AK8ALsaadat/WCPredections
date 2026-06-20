@@ -193,14 +193,19 @@ function currentNightWindow(now = new Date()) {
   if (hour >= 19) {
     return {
       start: localUtc(day, 19),
-      end: localUtc(day + 1, 9),
+      end: localUtc(day + 1, 10),
     };
   }
 
   return {
     start: localUtc(day - 1, 19),
-    end: localUtc(day, 9),
+    end: localUtc(day, 10),
   };
+}
+
+function isNowInNightWindow(now = new Date()) {
+  const { start, end } = currentNightWindow(now);
+  return now >= start && now < end;
 }
 
 async function attachNightChampion(
@@ -265,6 +270,11 @@ export async function getOverallLeaderboard(options?: {
 }): Promise<LeaderboardEntry[]> {
   const withTrend = options?.withTrend ?? true;
   if (options?.fresh) {
+    return buildOverallLeaderboard(withTrend);
+  }
+
+  // If we're inside the night window, return fresh data so `isNightChampion` updates live.
+  if (isNowInNightWindow()) {
     return buildOverallLeaderboard(withTrend);
   }
 
