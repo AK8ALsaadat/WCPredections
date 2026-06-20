@@ -56,6 +56,7 @@ import type {
   LineupSource,
   MatchPlayerView,
 } from "@/services/match-players.service";
+import { PredictionFeatureTag } from '@/components/ui/PredictionFeatureTag';
 
 const LINEUP_FAST_POLL_MS = 45_000;
 const SCORE_OPTIONS = Array.from({ length: 10 }, (_, score) => score);
@@ -108,6 +109,7 @@ type MatchData = {
     points: number;
     player: { name: string };
   } | null;
+  octopusCount?: number;
   boldScorerRoundStatus?: {
     used: boolean;
     onThisMatch: boolean;
@@ -1323,6 +1325,15 @@ export default function PredictPage() {
         <p className="mt-2 text-center text-sm text-muted">
           {formatDate(match.matchTime, locale)}
         </p>
+        {typeof match.octopusCount === 'number' && (
+          <div className="mt-2 flex justify-center">
+            <PredictionFeatureTag
+              type="octopus"
+              label={`${octopusCopy.title}: ${match.octopusCount}`}
+              title={locale === 'ar' ? 'عدد مستخدمي الأخطبوط' : 'Octopus picks count'}
+            />
+          </div>
+        )}
         <div className="mt-4">
           <PredictionCountdown
             matchTime={match.matchTime}
