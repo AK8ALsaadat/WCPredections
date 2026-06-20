@@ -158,6 +158,10 @@ export default function MatchDetailPage() {
       goalsConceded?: number | null;
       player: { name: string };
     } | null;
+    octopusCount?: number;
+    predictionsCount?: number;
+    doublesCount?: number;
+    boldCount?: number;
   };
 
   const canPredict = isPredictionAllowed(m.matchTime, m.status);
@@ -246,6 +250,22 @@ export default function MatchDetailPage() {
             <p className="mt-2 text-sm text-muted">
               {formatDate(m.matchTime, locale)}
             </p>
+            {typeof m.predictionsCount === 'number' && (
+              <div className="mt-4 grid w-full grid-cols-3 gap-3">
+                <div className="rounded-lg border border-red-500/20 bg-red-950/5 p-4 text-center">
+                  <div className="text-2xl font-bold text-primary">{m.boldCount ?? 0}</div>
+                  <div className="mt-1 text-sm text-muted">{t.matches.featureBold}</div>
+                </div>
+                <div className="rounded-lg border border-amber-500/20 bg-amber-950/5 p-4 text-center">
+                  <div className="text-2xl font-bold text-primary">{m.octopusCount ?? 0}</div>
+                  <div className="mt-1 text-sm text-muted">{locale === 'ar' ? 'الأخطبوط' : 'Octopus'}</div>
+                </div>
+                <div className="rounded-lg border border-card-border bg-background p-4 text-center">
+                  <div className="text-2xl font-bold text-primary">{m.predictionsCount ?? 0}</div>
+                  <div className="mt-1 text-sm text-muted">{m.predictionsCount === 1 ? t.matches.predictorSingular : t.matches.predictorPlural}</div>
+                </div>
+              </div>
+            )}
             {canPredict && m.status !== "LIVE" && (
               <div className="mt-3 flex justify-center">
                 <PredictionCountdown matchTime={m.matchTime} />

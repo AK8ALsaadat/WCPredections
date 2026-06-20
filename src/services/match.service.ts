@@ -940,11 +940,19 @@ export async function getMatchById(
     octopusRoundStatus,
     roundUsageLimits,
     octopusCount: 0,
+    predictionsCount: 0,
+    doublesCount: 0,
+    boldCount: 0,
   };
 
   if (!options?.includeLineup) {
-    const octopusCount = await prisma.octopusGoalkeeperBet.count({ where: { matchId } });
-    return { ...base, octopusCount };
+    const [octopusCount, predictionsCount, doublesCount, boldCount] = await Promise.all([
+      prisma.octopusGoalkeeperBet.count({ where: { matchId } }),
+      prisma.prediction.count({ where: { matchId } }),
+      prisma.prediction.count({ where: { matchId, isDouble: true } }),
+      prisma.boldScorerBet.count({ where: { matchId } }),
+    ]);
+    return { ...base, octopusCount, predictionsCount, doublesCount, boldCount };
   }
 
   const lineup = await getMatchLineup(matchId);
