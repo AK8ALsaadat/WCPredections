@@ -261,7 +261,10 @@ export default function LeagueMatchPredictionsPage() {
             <p className="text-[10px] text-muted">{t.matches.featureBold}</p>
           </div>
           <div className="rounded-xl border border-sky-400/30 bg-gradient-to-br from-sky-950/70 to-cyan-500/10 px-2 py-2 shadow-lg shadow-sky-950/20">
-            <p className="text-lg font-black text-sky-300">{withOctopus}</p>
+            <div className="flex items-center justify-center gap-1">
+              <span className="text-base">🐙</span>
+              <p className="text-lg font-black text-sky-300">{withOctopus}</p>
+            </div>
             <p className="text-[10px] text-muted">{t.matches.featureOctopus}</p>
           </div>
         </div>
