@@ -790,6 +790,13 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
     }
   }
 
+  const [octopusCount, predictionsCount, doublesCount, boldCount] = await Promise.all([
+    prisma.octopusGoalkeeperBet.count({ where: { matchId } }),
+    prisma.prediction.count({ where: { matchId } }),
+    prisma.prediction.count({ where: { matchId, isDouble: true } }),
+    prisma.boldScorerBet.count({ where: { matchId } }),
+  ]);
+
   return {
     ...match,
     userPrediction,
@@ -799,6 +806,10 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
     boldScorerRoundStatus,
     octopusRoundStatus,
     roundUsageLimits,
+    octopusCount,
+    predictionsCount,
+    doublesCount,
+    boldCount,
   };
 }
 
