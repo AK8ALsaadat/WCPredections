@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { FEATURE_FLAGS } from "@/lib/feature-flags";
 
 export function ErrorMessage({
   message,
@@ -7,6 +8,7 @@ export function ErrorMessage({
   message: string;
   className?: string;
 }) {
+  if (!FEATURE_FLAGS.showNotifications) return null;
   return (
     <div
       className={cn(

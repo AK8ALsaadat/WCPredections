@@ -38,6 +38,7 @@ import {
   msUntilMatchKickoff,
 } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import { FEATURE_FLAGS } from '@/lib/feature-flags';
 import { mergeLineupData } from "@/lib/lineup-state";
 import { isGoalkeeperPosition } from "@/lib/goalkeeper";
 import {
@@ -1344,7 +1345,7 @@ export default function PredictPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && <ErrorMessage message={error} />}
-        {success && (
+        {FEATURE_FLAGS.showNotifications && success && (
           <div className="rounded-lg border border-primary/50 bg-primary/10 px-4 py-3 text-sm text-primary">
             {success}
           </div>
