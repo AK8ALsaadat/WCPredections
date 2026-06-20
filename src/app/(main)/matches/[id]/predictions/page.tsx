@@ -280,25 +280,6 @@ export default function LeagueMatchPredictionsPage() {
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted md:gap-3 md:text-xs">
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 ring-1 ring-card-border">
-          <span className="rounded bg-orange-500/25 px-1.5 text-[10px] font-black text-orange-200 ring-1 ring-orange-300/60">
-            2×
-          </span>
-          {t.matches.featureDouble}
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 ring-1 ring-card-border">
-          <span className="text-amber-400">✦</span>
-          {t.matches.featureBold}
-        </span>
-        {match.isKnockout && (
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 ring-1 ring-card-border">
-            <span className="text-accent">ET / PK</span>
-            {t.matches.knockoutExtrasLegend}
-          </span>
-        )}
-      </div>
-
       <LeaguePredictionsList
         rows={predictions}
         homeTeamId={match.homeTeam.id}
