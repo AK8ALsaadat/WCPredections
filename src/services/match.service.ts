@@ -939,9 +939,13 @@ export async function getMatchById(
     boldScorerRoundStatus,
     octopusRoundStatus,
     roundUsageLimits,
+    octopusCount: 0,
   };
 
-  if (!options?.includeLineup) return base;
+  if (!options?.includeLineup) {
+    const octopusCount = await prisma.octopusGoalkeeperBet.count({ where: { matchId } });
+    return { ...base, octopusCount };
+  }
 
   const lineup = await getMatchLineup(matchId);
   return { ...base, ...lineup };
