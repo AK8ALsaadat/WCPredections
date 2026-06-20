@@ -152,8 +152,8 @@ function sortFormationLine(
     .sort((left, right) => {
       const rankDifference =
         side === "home"
-          ? right.rank - left.rank
-          : left.rank - right.rank;
+          ? left.rank - right.rank
+          : right.rank - left.rank;
       return rankDifference || left.index - right.index;
     })
     .map(({ player }) => player);
