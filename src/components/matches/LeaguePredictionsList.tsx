@@ -86,8 +86,8 @@ function FeatureBadges({
       {hasOctopus && (
         <PredictionFeatureTag
           type="octopus"
-          icon="GK"
-          title={`Octopus: ${row.octopusGoalkeeperBet!.player.name}`}
+          icon="🐙"
+          title={`${t.matches.featureOctopus}: ${row.octopusGoalkeeperBet!.player.name}`}
           label={shortPlayerName(row.octopusGoalkeeperBet!.player.name)}
           className="max-w-[5.5rem]"
         />

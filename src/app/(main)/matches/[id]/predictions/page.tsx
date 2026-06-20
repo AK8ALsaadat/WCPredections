@@ -253,11 +253,21 @@ export default function LeagueMatchPredictionsPage() {
             </p>
           </div>
           <div className="rounded-xl border border-orange-400/30 bg-gradient-to-br from-orange-950/70 to-amber-500/10 px-2 py-2 shadow-lg shadow-orange-950/20">
-            <p className="text-lg font-black text-orange-300">{withDouble}</p>
+            <div className="mb-1 flex items-center justify-center gap-2">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-orange-300/15 text-[11px] font-black text-orange-300">
+                2×
+              </span>
+              <p className="text-lg font-black text-orange-300">{withDouble}</p>
+            </div>
             <p className="text-[10px] text-muted">{t.matches.featureDouble}</p>
           </div>
           <div className="rounded-xl border border-red-400/30 bg-gradient-to-br from-red-950/70 to-rose-500/10 px-2 py-2 shadow-lg shadow-red-950/20">
-            <p className="text-lg font-black text-red-300">{withBold}</p>
+            <div className="mb-1 flex items-center justify-center gap-2">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-400/15 text-[11px] font-black text-red-300">
+                ✦
+              </span>
+              <p className="text-lg font-black text-red-300">{withBold}</p>
+            </div>
             <p className="text-[10px] text-muted">{t.matches.featureBold}</p>
           </div>
           <div className="rounded-xl border border-sky-400/30 bg-gradient-to-br from-sky-950/70 to-cyan-500/10 px-2 py-2 shadow-lg shadow-sky-950/20">
