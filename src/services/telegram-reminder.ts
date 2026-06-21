@@ -58,7 +58,7 @@ async function checkMatchesAndNotify() {
   for (const match of upcomingMatches) {
     if (notifiedMatches.has(match.id)) continue;
 
-    const message = `🚨 <b>تذكير بإغلاق التوقعات!</b> 🚨\n\n⚽️ ${match.homeTeam.name} 🆚 ${match.awayTeam.name}\n⏳ باقي 10 دقائق فقط ويقفل التوقع قبل البداية بـ 10 دقائق!\n\nلا تفوت الفرصة، ادخل وتوقع الحين 👇`;
+    const message = `🚨 <b>تذكير بإغلاق التوقعات!</b> 🚨\n\n⚽️ ${match.homeTeam.name} 🆚 ${match.awayTeam.name}\n⏳ الديدلاين يبقى قبل بداية المباراة.\n\nلا تفوت الفرصة، ادخل وتوقع الحين 👇`;
     await sendTelegramMessage(message);
     notifiedMatches.add(match.id);
   }

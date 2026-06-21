@@ -54,7 +54,7 @@ export async function GET() {
       const predictedUserIds = new Set(predictions.map(p => p.userId));
       const missingUsers = allUsers.filter(u => !predictedUserIds.has(u.id));
       const missingText = missingUsers.length > 0 ? "\n\nالشباب اللي نايمين وما توقعوا للحين 😴:\n" + missingUsers.map(u => `@${u.username}`).join(" ، ") : "\n\nكفو! كل الشباب توقعوا هالمباراة 🔥";
-      const message = `🚨 <b>تذكير بإغلاق التوقعات!</b> 🚨\n\n⚽️ ${match.homeTeam.name} 🆚 ${match.awayTeam.name}\n⏳ باقي 10 دقائق فقط ويقفل التوقع قبل البداية!\n\nلا تفوت الفرصة، ادخل وتوقع الحين 👇${missingText}`;
+      const message = `🚨 <b>تذكير بإغلاق التوقعات!</b> 🚨\n\n⚽️ ${match.homeTeam.name} 🆚 ${match.awayTeam.name}\n⏳ الديدلاين يبقى قبل بداية المباراة.\n\nلا تفوت الفرصة، ادخل وتوقع الحين 👇${missingText}`;
       await sendTelegramMessage(message);
     }
     return NextResponse.json({ success: true, notified: upcomingMatches.length });
