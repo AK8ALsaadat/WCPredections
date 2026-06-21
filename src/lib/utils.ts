@@ -67,10 +67,10 @@ export function isMatchStarted(matchTime: Date | string): boolean {
   return new Date(matchTime) <= new Date();
 }
 
-/** تقفل التوقعات قبل انطلاق المباراة بساعة ونصف. */
-export const PREDICTION_LOCK_BEFORE_KICKOFF_MS = 90 * 60 * 1000;
+/** تقفل التوقعات قبل انطلاق المباراة بـ 10 دقائق. */
+export const PREDICTION_LOCK_BEFORE_KICKOFF_MS = 10 * 60 * 1000;
 
-/** اللحظة التي تُقفل فيها التوقعات لهذه المباراة (90 دقيقة قبل الانطلاق). */
+/** اللحظة التي تُقفل فيها التوقعات لهذه المباراة (10 دقائق قبل الانطلاق). */
 export function getPredictionLockTime(matchTime: Date | string): Date {
   return new Date(
     new Date(matchTime).getTime() - PREDICTION_LOCK_BEFORE_KICKOFF_MS
@@ -177,7 +177,7 @@ function getZonedMidnight(calendarDay: string, timeZone: string): Date {
   return new Date(`${calendarDay}T00:00:00Z`);
 }
 
-/** آخر موعد لإرسال التوقع = 90 دقيقة قبل انطلاق المباراة. */
+/** آخر موعد لإرسال التوقع = 10 دقائق قبل انطلاق المباراة. */
 export function getPredictionDeadline(matchTime: Date | string): Date | null {
   if (isPredictionLocked(matchTime) || !isPredictionAllowed(matchTime)) {
     return null;

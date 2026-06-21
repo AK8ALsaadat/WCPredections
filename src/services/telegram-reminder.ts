@@ -6,9 +6,9 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8866001197:AAHY3Ju
 // معرف القروب الخاص بك
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "-5422156036"; 
 
-const PREDICTION_DEADLINE_MINUTES = 90;
+const PREDICTION_DEADLINE_MINUTES = 10;
 const REMINDER_MINUTES_BEFORE_DEADLINE = 15;
-// التذكير بيكون قبل المباراة بـ 105 دقائق
+// التذكير بيكون قبل المباراة بـ 25 دقيقة
 const NOTIFY_MINUTES_BEFORE_MATCH = PREDICTION_DEADLINE_MINUTES + REMINDER_MINUTES_BEFORE_DEADLINE; 
 
 // نحفظ المباريات اللي أرسلنا لها تنبيه عشان ما نزعج الناس ونرسل مرتين
@@ -58,7 +58,7 @@ async function checkMatchesAndNotify() {
   for (const match of upcomingMatches) {
     if (notifiedMatches.has(match.id)) continue;
 
-    const message = `🚨 <b>تذكير بإغلاق التوقعات!</b> 🚨\n\n⚽️ ${match.homeTeam.name} 🆚 ${match.awayTeam.name}\n⏳ باقي 15 دقيقة فقط ويقفل التوقع على هذه المباراة!\n\nلا تفوت الفرصة، ادخل وتوقع الحين 👇`;
+    const message = `🚨 <b>تذكير بإغلاق التوقعات!</b> 🚨\n\n⚽️ ${match.homeTeam.name} 🆚 ${match.awayTeam.name}\n⏳ باقي 10 دقائق فقط ويقفل التوقع قبل البداية بـ 10 دقائق!\n\nلا تفوت الفرصة، ادخل وتوقع الحين 👇`;
     await sendTelegramMessage(message);
     notifiedMatches.add(match.id);
   }
