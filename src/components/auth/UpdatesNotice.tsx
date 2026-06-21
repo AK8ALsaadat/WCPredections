@@ -36,27 +36,18 @@ export function UpdatesNotice() {
           تحديث
         </h2>
 
-        <p className="relative mt-2 text-sm leading-7 text-muted">
-          نتيجة التصويت صارت نهائية: الديدلاين يبقى قبل بداية المباراة.
-          يعني إذا المباراة تبدأ الساعة 9:00، يغلق التوقع الساعة 8:50.
+        <p className="relative text-sm leading-7 text-muted">
+          السلام عليكم جميعًا،
         </p>
-
-        <div className="relative mt-4 rounded-xl border border-primary/25 bg-primary/10 px-4 py-3 text-start">
-          <p className="text-sm font-bold text-primary">
-            صوتكم يفرق
-          </p>
-          <p className="mt-1 text-sm leading-7 text-foreground">
-            من الآن، التوقع يظل مفتوح حتى 10 دقائق قبل انطلاق المباراة.
-            دخّل وعلّم أصحابك بالقرار الجديد.
-          </p>
-        </div>
-
-        <div className="relative mt-4 rounded-xl border border-amber-300/25 bg-amber-400/10 px-4 py-3 text-start text-sm leading-7 text-muted">
-          <p>
-            الديدلاين صار أقرب للمباراة، فخلك مستعد قبل 10 دقائق من الوقت.
-            إذا حاب تغير توقعك، سويها قبل أن يغلق.
-          </p>
-        </div>
+        <p className="mt-3 text-sm leading-7 text-muted">
+          بما أن أساسنا هو الديمقراطية واحترام رأي الأغلبية، تم طرح موضوع ديدلاين التوقعات وقت المباراة للتصويت، وبعد جمع الآراء وصلنا إلى القرار النهائي بناءً على نتيجة التصويت:
+        </p>
+        <p className="mt-4 text-sm font-black leading-7 text-amber-100">
+          سيكون الديدلاين قبل بداية المباراة بـ 10 دقائق.
+        </p>
+        <p className="mt-2 text-sm font-black leading-7 text-amber-100">
+          #صوتكم_يفرق
+        </p>
 
         <Button className="mt-6 w-full" onClick={close}>
           فهمت
