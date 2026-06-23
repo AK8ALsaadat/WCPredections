@@ -994,7 +994,7 @@ async function fetchLeagueMatchPredictions(matchId: string) {
   }
 
   // Exclude QA/test/demo accounts from match-level predictions shown to users
-  const nonQaUserFilter = {
+  const nonQaUserFilter: Record<string, unknown> = {
     user: {
       NOT: [
         { username: { startsWith: "qa_" } },
@@ -1006,7 +1006,7 @@ async function fetchLeagueMatchPredictions(matchId: string) {
         { username: { contains: "_test", mode: "insensitive" } },
       ],
     },
-  } as any;
+  };
 
   const [predictions, scorerPredictions, boldBets, octopusBets, goalkeeperStats] =
     await Promise.all([
