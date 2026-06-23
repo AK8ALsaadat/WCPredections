@@ -797,7 +797,7 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
     prisma.boldScorerBet.count({ where: { matchId } }),
   ]);
 
-  return {
+  const baseResult = {
     ...match,
     userPrediction,
     userScorerPredictions,
@@ -811,6 +811,22 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
     doublesCount,
     boldCount,
   };
+
+  // If a user is present, include a lightweight fast lineup so the client
+  // can show predicted player names and enable interaction immediately
+  // while the full lineup is fetched in the background.
+  if (userId) {
+    try {
+      const fastLineup = await getCachedFastMatchLineup(matchId);
+      if (fastLineup) {
+        return { ...baseResult, ...fastLineup };
+      }
+    } catch {
+      // best-effort only; fallthrough to baseResult
+    }
+  }
+
+  return baseResult;
 }
 
 export async function getMatchById(
