@@ -298,7 +298,7 @@ export function MatchCard({
                 className="mt-1"
               />
             )}
-            {match.userOctopusBet && !isFinished && (
+            {match.userOctopusBet && !isFinished && (match.userOctopusBet.points ?? 0) > 0 && (
               <PredictionFeatureTag
                 type="octopus"
                 icon="GK"
