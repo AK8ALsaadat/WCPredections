@@ -124,6 +124,18 @@ function LeaderTag() {
   );
 }
 
+function FireStreakTag({ days }: { days: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-red-300/40 bg-gradient-to-br from-red-500/10 to-red-900/5 px-2 py-1 text-[10px] font-black text-red-100 shadow-[0_0_14px_rgba(239,68,68,0.12)]">
+      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" aria-hidden>
+        <path d="M12 2s1.5 2 1.5 3.5S13 8 12 9s-1.5-1.5-1.5-3.5S12 2 12 2z" fill="currentColor" />
+        <path d="M12 9c2 0 4 2 4 4a4 4 0 1 1-8 0c0-2 2-4 4-4z" stroke="currentColor" strokeWidth="0" />
+      </svg>
+      <span>{days}</span>
+    </span>
+  );
+}
+
 function NightChampionTag({ points }: { points?: number }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-300/60 bg-orange-500/20 px-2.5 py-1 text-[10px] font-black text-orange-100 shadow-[0_0_22px_rgba(249,115,22,0.25)]">
@@ -203,6 +215,9 @@ function LeaderSpotlight({
                 <NightChampionTag points={entry.nightWindowPoints} />
               )}
               <LeaderTag />
+              {entry.streakDays && entry.streakDays >= 3 ? (
+                <FireStreakTag days={entry.streakDays} />
+              ) : null}
               {isMe && (
                 <span className="rounded-full bg-primary/15 px-2 py-1 text-[10px] font-bold text-primary ring-1 ring-primary/30">
                   {t.matches.you}

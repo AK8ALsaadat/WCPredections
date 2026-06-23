@@ -77,6 +77,8 @@ export type LeaderboardEntry = {
   isNightChampion?: boolean;
   /** موجب = تحسّن الترتيب، سالب = تراجع مقارنة بالأسبوع الماضي */
   rankChange?: number;
+  /** عدد الأيام المتتالية في الصدارة (يظهر فقط إذا >= 3) */
+  streakDays?: number;
 };
 
 export type UserProfile = Pick<User, "id" | "username" | "createdAt"> & {

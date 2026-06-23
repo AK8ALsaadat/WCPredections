@@ -264,6 +264,31 @@ async function attachNightChampion(
   });
 }
 
+function startOfDayUTC(d: Date) {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0));
+}
+
+function startOfNextDayUTC(d: Date) {
+  return new Date(startOfDayUTC(d).getTime() + 24 * 60 * 60 * 1000);
+}
+
+async function computeLeaderStreakDays(leaderUserId: string, maxDays = 365) {
+  if (!leaderUserId) return 0;
+  const today = new Date();
+  let streak = 0;
+  for (let i = 0; i < maxDays; i++) {
+    const day = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
+    const before = startOfNextDayUTC(day);
+    const pointsMap = await getUserPointsMap({ before });
+    const entries = buildLeaderboard(pointsMap);
+    const top = entries[0];
+    if (!top) break;
+    if (top.userId === leaderUserId) streak++;
+    else break;
+  }
+  return streak;
+}
+
 async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardEntry[]> {
   if (!withTrend) {
     return attachNightChampion(buildLeaderboard(await getUserPointsMap()));
@@ -275,10 +300,27 @@ async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardE
     getUserPointsMap({ before: weekAgo }),
   ]);
 
-  return attachNightChampion(attachRankChange(
-    buildLeaderboard(currentMap),
-    buildLeaderboard(previousMap)
-  ));
+  const current = buildLeaderboard(currentMap);
+  const previous = buildLeaderboard(previousMap);
+  const withRank = attachRankChange(current, previous);
+  const withNight = await attachNightChampion(withRank);
+
+  // حساب الستريك لمستخدم الصدارة (إن وُجد) — يظهر فقط إذا تساوى أو تجاوز 3 أيام
+  if (withNight.length > 0) {
+    try {
+      const leader = withNight[0];
+      const streak = await computeLeaderStreakDays(leader.userId);
+      if (streak >= 3) {
+        leader.streakDays = streak;
+      }
+    } catch (err) {
+      // لا نفشل بناء الليدربورد بسبب فشل حساب الستريك
+      // eslint-disable-next-line no-console
+      console.warn("[leader-streak] compute failed:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  return withNight;
 }
 
 async function buildRoundLeaderboard(roundId: string): Promise<LeaderboardEntry[]> {
