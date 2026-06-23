@@ -63,8 +63,23 @@ async function main() {
   const secret = process.env.CRON_SECRET;
   if (secret) {
     try {
-      const res = await (await import('node-fetch')).default(`${base}/api/cron/revalidate-leaderboard`, { method: 'POST', headers: { Authorization: `Bearer ${secret}` } });
-      console.log('Revalidate leaderboard status:', res.status);
+      // Prefer global fetch (Node 18+); fall back to node-fetch only if necessary
+      let fetchFn = typeof fetch === 'function' ? fetch.bind(globalThis) : null;
+      if (!fetchFn) {
+        try {
+          const mod = await import('node-fetch');
+          fetchFn = mod.default || mod;
+        } catch (e) {
+          console.warn('node-fetch not available, cannot revalidate leaderboard:', e.message || e);
+        }
+      }
+
+      if (fetchFn) {
+        const res = await fetchFn(`${base}/api/cron/revalidate-leaderboard`, { method: 'POST', headers: { Authorization: `Bearer ${secret}` } });
+        console.log('Revalidate leaderboard status:', res.status);
+      } else {
+        console.log('Fetch unavailable — skipped leaderboard revalidate.');
+      }
     } catch (err) {
       console.warn('Revalidate failed:', err.message || err);
     }
