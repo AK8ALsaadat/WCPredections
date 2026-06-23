@@ -272,20 +272,82 @@ function startOfNextDayUTC(d: Date) {
   return new Date(startOfDayUTC(d).getTime() + 24 * 60 * 60 * 1000);
 }
 
-async function computeLeaderStreakDays(leaderUserId: string, maxDays = 365) {
+async function computeLeaderStreakDays(
+  leaderUserId: string,
+  maxDays = 365,
+  currentMap?: Map<string, PointsRow>
+) {
   if (!leaderUserId) return 0;
+  // Bound maxDays for safety/performace
+  const cappedMax = Math.min(maxDays, 365);
+
   const today = new Date();
+
+  // helper to get top user before a cutoff date using a single aggregated SQL query
+  async function getTopUserBefore(cutoff: Date): Promise<string | null> {
+    const res: Array<{ user_id: string } & Record<string, any>> = await prisma.$queryRawUnsafe(
+      `
+      SELECT t.user_id
+      FROM (
+        SELECT p.user_id, SUM(p.points + COALESCE(p.double_bonus,0) + COALESCE(p.finish_type_points,0) + COALESCE(p.penalty_winner_points,0)) AS total
+        FROM predictions p
+        JOIN matches m ON p.match_id = m.id
+        WHERE m.match_time < $1
+        GROUP BY p.user_id
+        UNION ALL
+        SELECT sp.user_id, SUM(sp.points) AS total
+        FROM scorer_predictions sp
+        JOIN matches m ON sp.match_id = m.id
+        WHERE m.match_time < $1
+        GROUP BY sp.user_id
+        UNION ALL
+        SELECT b.user_id, SUM(b.points) AS total
+        FROM bold_scorer_bets b
+        JOIN matches m ON b.match_id = m.id
+        WHERE m.match_time < $1
+        GROUP BY b.user_id
+        UNION ALL
+        SELECT o.user_id, SUM(o.points) AS total
+        FROM octopus_goalkeeper_bets o
+        JOIN matches m ON o.match_id = m.id
+        WHERE m.match_time < $1
+        GROUP BY o.user_id
+      ) t
+      GROUP BY t.user_id
+      ORDER BY SUM(t.total) DESC, t.user_id ASC
+      LIMIT 1
+      `,
+      cutoff
+    );
+
+    if (!res || res.length === 0) return null;
+    return res[0].user_id;
+  }
+
   let streak = 0;
-  for (let i = 0; i < maxDays; i++) {
+
+  for (let i = 0; i < cappedMax; i++) {
     const day = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
-    const before = startOfNextDayUTC(day);
-    const pointsMap = await getUserPointsMap({ before });
-    const entries = buildLeaderboard(pointsMap);
-    const top = entries[0];
-    if (!top) break;
-    if (top.userId === leaderUserId) streak++;
+    const cutoff = startOfNextDayUTC(day);
+
+    // for today's snapshot reuse currentMap if provided
+    if (i === 0 && currentMap) {
+      const entries = buildLeaderboard(currentMap);
+      const top = entries[0];
+      if (!top) break;
+      if (top.userId === leaderUserId) {
+        streak++;
+        continue;
+      }
+      break;
+    }
+
+    const topUser = await getTopUserBefore(cutoff);
+    if (!topUser) break;
+    if (topUser === leaderUserId) streak++;
     else break;
   }
+
   return streak;
 }
 
@@ -309,7 +371,8 @@ async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardE
   if (withNight.length > 0) {
     try {
       const leader = withNight[0];
-      const streak = await computeLeaderStreakDays(leader.userId);
+      // Compute streak capped to 7 days for performance and UX
+      const streak = await computeLeaderStreakDays(leader.userId, 7, currentMap);
       if (streak >= 3) {
         leader.streakDays = streak;
       }
