@@ -126,7 +126,7 @@ export default function ProfilePage() {
         if (!cached) setError(t.errors.loadFailed);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [t.errors.loadFailed]);
 
   async function handleUsernameSubmit(e: React.FormEvent) {
     e.preventDefault();
