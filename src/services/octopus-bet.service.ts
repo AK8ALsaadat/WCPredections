@@ -7,6 +7,7 @@ import {
 } from "@/lib/octopus-points";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason } from "@/lib/utils";
+import { revalidateTag } from "next/cache";
 import { ApiFootballProvider } from "@/services/football-api/api-football.provider";
 import { getFootballApiProvider } from "@/services/football-api";
 import type {
@@ -29,6 +30,7 @@ type MatchForGoalkeeperStats = {
 
 const matchForGoalkeeperStatsSelect = {
   matchTime: true,
+  roundId: true,
   homeTeam: { select: { id: true, apiTeamId: true, name: true } },
   awayTeam: { select: { id: true, apiTeamId: true, name: true } },
 } as const;
@@ -148,6 +150,26 @@ export async function replaceGoalkeeperSaves(
       });
     }
   });
+
+  // بعد إدخال/تحديث إحصائيات تصديات الحراس، أعد حساب نقاط الأخطبوط للمباراة
+  try {
+    await calculateOctopusPointsForMatch(matchId);
+  } catch (err) {
+    // لا نفشل العملية بسبب خطأ إعادة الحساب
+    // eslint-disable-next-line no-console
+    console.warn("[octopus] calculateOctopusPointsForMatch failed:", err instanceof Error ? err.message : err);
+  }
+
+  // حاول إعادة تهيئة كاش الليدربورد وصفحة المباراة
+  try {
+    revalidateTag("leaderboard-overall");
+    revalidateTag(`match-${matchId}`);
+    if (match?.roundId) revalidateTag(`leaderboard-round-${match.roundId}`);
+  } catch (err) {
+    // Ignore revalidation failures in background contexts
+    // eslint-disable-next-line no-console
+    console.warn("[revalidate] skipped due to missing store:", err instanceof Error ? err.message : err);
+  }
 
   return resolved.size;
 }

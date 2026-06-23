@@ -132,7 +132,35 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
 }
 
 function buildLeaderboard(pointsMap: Map<string, PointsRow>): LeaderboardEntry[] {
+  // استبعد حسابات الاختبار وبعض المستخدمين بحسب القواعد
+  const EXCLUDED_USERNAMES = new Set(["mmg"]);
+  const EXCLUDE_PATTERNS: RegExp[] = [
+    /^qa_/i,
+    /^ui_qa_/i,
+    /^test/i,
+    /tester/i,
+    /^demo/i,
+    /^sample/i,
+    /^tmp/i,
+    /_test/i,
+  ];
+
+  function shouldExcludeFromLeaderboard(username: string | undefined, points: number) {
+    if (!username) return false;
+    const raw = username.trim();
+    if (!raw) return false;
+    const lower = raw.toLowerCase();
+    if (EXCLUDED_USERNAMES.has(lower)) return true;
+    // اخفي ali حتى يجيب نقطته الأولى
+    if (lower === "ali" && points <= 0) return true;
+    for (const p of EXCLUDE_PATTERNS) {
+      if (p.test(raw)) return true;
+    }
+    return false;
+  }
+
   const entries = Array.from(pointsMap.entries())
+    .filter(([, data]) => !shouldExcludeFromLeaderboard(data.username, data.points))
     .map(([userId, data]) => ({
       userId,
       username: data.username,
