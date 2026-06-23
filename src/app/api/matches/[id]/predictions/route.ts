@@ -17,16 +17,15 @@ export async function GET(
       return apiError("Match not found", 404);
     }
 
-    const missingPredictors = await getMatchMissingPredictors(id);
-
     return apiSuccess(
-      { ...data, currentUserId: user.userId, missingPredictors },
+      { ...data, currentUserId: user.userId },
       200,
       {
-      headers: {
-        "Cache-Control": "private, max-age=15, stale-while-revalidate=45",
-      },
-    });
+        headers: {
+          "Cache-Control": "private, max-age=15, stale-while-revalidate=45",
+        },
+      }
+    );
   } catch (error) {
     if (error instanceof Error && error.message === "Predictions still open") {
       return apiError(error.message, 403);
