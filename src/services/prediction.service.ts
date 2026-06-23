@@ -993,36 +993,51 @@ async function fetchLeagueMatchPredictions(matchId: string) {
     throw new Error("Predictions still open");
   }
 
+  // Exclude QA/test/demo accounts from match-level predictions shown to users
+  const nonQaUserFilter = {
+    user: {
+      NOT: [
+        { username: { startsWith: "qa_" } },
+        { username: { startsWith: "ui_qa_" } },
+        { username: { startsWith: "test" } },
+        { username: { contains: "tester", mode: "insensitive" } },
+        { username: { startsWith: "demo" } },
+        { username: { startsWith: "sample" } },
+        { username: { contains: "_test", mode: "insensitive" } },
+      ],
+    },
+  } as any;
+
   const [predictions, scorerPredictions, boldBets, octopusBets, goalkeeperStats] =
     await Promise.all([
-    prisma.prediction.findMany({
-      where: { matchId },
-      select: {
-        userId: true,
-        predHome: true,
-        predAway: true,
-        isDouble: true,
-        predictedFinishType: true,
-        predictedPenaltyWinnerTeamId: true,
-        points: true,
-        doubleBonus: true,
-        finishTypePoints: true,
-        penaltyWinnerPoints: true,
-        user: { select: { username: true } },
-      },
-    }),
-    prisma.scorerPrediction.findMany({
-      where: { matchId },
-      select: {
-        userId: true,
-        predictedGoals: true,
-        points: true,
-        user: { select: { username: true } },
-        player: { select: { id: true, name: true, teamId: true, position: true } },
-      },
-    }),
+      prisma.prediction.findMany({
+        where: { matchId, ...nonQaUserFilter },
+        select: {
+          userId: true,
+          predHome: true,
+          predAway: true,
+          isDouble: true,
+          predictedFinishType: true,
+          predictedPenaltyWinnerTeamId: true,
+          points: true,
+          doubleBonus: true,
+          finishTypePoints: true,
+          penaltyWinnerPoints: true,
+          user: { select: { username: true } },
+        },
+      }),
+      prisma.scorerPrediction.findMany({
+        where: { matchId, ...nonQaUserFilter },
+        select: {
+          userId: true,
+          predictedGoals: true,
+          points: true,
+          user: { select: { username: true } },
+          player: { select: { id: true, name: true, teamId: true, position: true } },
+        },
+      }),
       prisma.boldScorerBet.findMany({
-        where: { matchId },
+        where: { matchId, ...nonQaUserFilter },
         select: {
           userId: true,
           points: true,
@@ -1031,7 +1046,7 @@ async function fetchLeagueMatchPredictions(matchId: string) {
         },
       }),
       prisma.octopusGoalkeeperBet.findMany({
-        where: { matchId },
+        where: { matchId, ...nonQaUserFilter },
         select: {
           userId: true,
           points: true,
