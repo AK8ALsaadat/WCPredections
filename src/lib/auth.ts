@@ -30,8 +30,24 @@ export async function createUser(
   username: string,
   password: string
 ): Promise<UserSession> {
+  const normalized = username.toLowerCase().trim();
+
+  // Block obvious QA/test/demo usernames
+  const forbidden = [
+    /^qa_/i,
+    /^ui_qa_/i,
+    /^test/i,
+    /tester/i,
+    /^demo/i,
+    /^sample/i,
+    /_test/i,
+  ];
+  for (const rx of forbidden) {
+    if (rx.test(normalized)) throw new Error("اسم المستخدم محظور");
+  }
+
   const existing = await prisma.user.findUnique({
-    where: { username: username.toLowerCase() },
+    where: { username: normalized },
   });
 
   if (existing) {
@@ -39,11 +55,11 @@ export async function createUser(
   }
 
   const passwordHash = await hashPassword(password);
-  const isAdmin = isAdminUsername(username);
+  const isAdmin = isAdminUsername(normalized);
 
   const user = await prisma.user.create({
     data: {
-      username: username.toLowerCase(),
+      username: normalized,
       passwordHash,
       isAdmin,
     },
@@ -69,7 +85,7 @@ export async function updateUserUsername(
   userId: string,
   newUsername: string
 ): Promise<UserSession> {
-  const normalized = newUsername.toLowerCase();
+  const normalized = newUsername.toLowerCase().trim();
 
   const current = await prisma.user.findUnique({
     where: { id: userId },
@@ -103,6 +119,20 @@ export async function updateUserUsername(
 
   if (taken) {
     throw new Error("اسم المستخدم مأخوذ — جرّب اسم ثاني");
+  }
+
+  // Block obvious QA/test/demo usernames on update as well
+  const forbidden = [
+    /^qa_/i,
+    /^ui_qa_/i,
+    /^test/i,
+    /tester/i,
+    /^demo/i,
+    /^sample/i,
+    /_test/i,
+  ];
+  for (const rx of forbidden) {
+    if (rx.test(normalized)) throw new Error("اسم المستخدم محظور");
   }
 
   const isAdmin = isAdminUsername(normalized);
