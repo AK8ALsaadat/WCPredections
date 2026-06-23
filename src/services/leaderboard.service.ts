@@ -8,7 +8,10 @@ export { getUserTotalPoints } from "@/services/user-points.service";
 
 type PointsRow = { username: string; points: number };
 
-const LB_CACHE_SECONDS = 120;
+const LB_CACHE_SECONDS = 300;
+
+// Riyadh timezone offset (UTC+3) used for day boundaries and night window logic
+const RIYADH_OFFSET_MS = 3 * 60 * 60 * 1000;
 
 type PointsFilter = {
   roundId?: string;
@@ -280,8 +283,11 @@ async function computeLeaderStreakDays(
   if (!leaderUserId) return 0;
   // Bound maxDays for safety/performace
   const cappedMax = Math.min(maxDays, 365);
-
-  const today = new Date();
+  // Use Riyadh-local day boundaries so streaks align with the app's night-window
+  const local = new Date(Date.now() + RIYADH_OFFSET_MS);
+  const year = local.getUTCFullYear();
+  const month = local.getUTCMonth();
+  const day = local.getUTCDate();
 
   // helper to get top user before a cutoff date using a single aggregated SQL query
   async function getTopUserBefore(cutoff: Date): Promise<string | null> {
@@ -327,8 +333,10 @@ async function computeLeaderStreakDays(
   let streak = 0;
 
   for (let i = 0; i < cappedMax; i++) {
-    const day = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
-    const cutoff = startOfNextDayUTC(day);
+    // compute Riyadh-local day d = (today - i)
+    const d = day - i;
+    // cutoff = start of next day in Riyadh expressed as UTC time
+    const cutoff = new Date(Date.UTC(year, month, d + 1, 0, 0, 0, 0) - RIYADH_OFFSET_MS);
 
     // for today's snapshot reuse currentMap if provided
     if (i === 0 && currentMap) {
