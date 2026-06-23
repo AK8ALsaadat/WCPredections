@@ -141,6 +141,19 @@ export async function submitBoldScorerBet(
     if (!existing) return null;
     if (existing.matchId !== matchId) return null;
 
+    // For the active round we do NOT delete the row so the user can't reuse
+    // the bet in the same usage key. Instead, keep the record and reset
+    // points to 0. For non-active rounds allow deletion as before.
+    const now = new Date();
+    const isActiveRound = await prisma.round.findFirst({
+      where: { id: match.roundId, startsAt: { lte: now }, endsAt: { gte: now } },
+      select: { id: true },
+    });
+    if (isActiveRound) {
+      await prisma.boldScorerBet.update({ where: { id: existing.id }, data: { points: 0 } });
+      return null;
+    }
+
     // allow cancellation prior to lock (lockReason was checked above)
     await prisma.boldScorerBet.delete({ where: { id: existing.id } });
     return null;
