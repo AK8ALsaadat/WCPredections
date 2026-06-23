@@ -285,7 +285,7 @@ async function computeLeaderStreakDays(
 
   // helper to get top user before a cutoff date using a single aggregated SQL query
   async function getTopUserBefore(cutoff: Date): Promise<string | null> {
-    const res: Array<{ user_id: string } & Record<string, any>> = await prisma.$queryRawUnsafe(
+    const res: Array<{ user_id: string } & Record<string, unknown>> = await prisma.$queryRawUnsafe(
       `
       SELECT t.user_id
       FROM (
@@ -371,8 +371,8 @@ async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardE
   if (withNight.length > 0) {
     try {
       const leader = withNight[0];
-      // Compute streak capped to 7 days for performance and UX
-      const streak = await computeLeaderStreakDays(leader.userId, 7, currentMap);
+      // Compute streak (no artificial 7-day cap). Bounded to 365 days internally for safety.
+      const streak = await computeLeaderStreakDays(leader.userId, 365, currentMap);
       if (streak >= 3) {
         leader.streakDays = streak;
       }
