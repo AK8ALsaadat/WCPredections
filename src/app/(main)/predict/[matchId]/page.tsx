@@ -613,6 +613,35 @@ export default function PredictPage() {
     };
   }, [matchId]);
 
+  // If the lineup finishes loading and there's no local draft, make sure
+  // saved scorer picks and bets from the server are applied so the UI
+  // highlights the players the user previously selected.
+  useEffect(() => {
+    if (!lineup || !match) return;
+    const draft = readPredictDraft<FormState>(matchId);
+    if (draft) return; // user has a local draft — do not overwrite
+
+    const hasServerScorers = (match.userScorerPredictions?.length ?? 0) > 0;
+    const hasLocalScorers = Object.keys(scorerPicks).length > 0;
+    const hasServerBold = Boolean(match.userBoldScorerBet?.playerId);
+    const hasLocalBold = Boolean(boldPlayerId);
+
+    if (!hasLocalScorers && !hasLocalBold && hasServerScorers) {
+      applySavedPrediction(match, {
+        setPredHome,
+        setPredAway,
+        setIsDouble,
+        setFinishType,
+        setPenaltyWinner,
+        setScorerPicks,
+        setBoldPlayerId,
+        setBoldEnabled,
+        setOctopusPlayerId,
+        setOctopusEnabled,
+      });
+    }
+  }, [lineup, match, matchId, scorerPicks, boldPlayerId]);
+
   useEffect(() => {
     const matchTime = match?.matchTime;
     if (!matchTime || lineup?.lineupStatus === "official") return;
