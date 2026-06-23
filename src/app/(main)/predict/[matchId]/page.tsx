@@ -611,7 +611,7 @@ export default function PredictPage() {
       cancelled = true;
       abort.abort();
     };
-  }, [matchId]);
+  }, [matchId, match?.matchTime, lineup?.lineupStatus, t.errors.loadFailed]);
 
   // If the lineup finishes loading and there's no local draft, make sure
   // saved scorer picks and bets from the server are applied so the UI
@@ -623,7 +623,6 @@ export default function PredictPage() {
 
     const hasServerScorers = (match.userScorerPredictions?.length ?? 0) > 0;
     const hasLocalScorers = Object.keys(scorerPicks).length > 0;
-    const hasServerBold = Boolean(match.userBoldScorerBet?.playerId);
     const hasLocalBold = Boolean(boldPlayerId);
 
     if (!hasLocalScorers && !hasLocalBold && hasServerScorers) {
