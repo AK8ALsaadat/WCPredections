@@ -379,8 +379,12 @@ async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardE
   if (withNight.length > 0) {
     try {
       const leader = withNight[0];
-      // Compute streak (no artificial 7-day cap). Bounded to 365 days internally for safety.
-      const streak = await computeLeaderStreakDays(leader.userId, 365, currentMap);
+      // Cache the (expensive) streak calculation per-leader for a short time
+      const streak = await unstable_cache(
+        () => computeLeaderStreakDays(leader.userId, 365, currentMap),
+        ["leader-streak", leader.userId],
+        { revalidate: 60 }
+      )();
       if (streak >= 3) {
         leader.streakDays = streak;
       }
