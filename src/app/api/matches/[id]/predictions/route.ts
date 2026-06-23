@@ -17,7 +17,12 @@ export async function GET(
       return apiError("Match not found", 404);
     }
 
-    return apiSuccess({ ...data, currentUserId: user.userId }, 200, {
+    const missingPredictors = await getMatchMissingPredictors(id);
+
+    return apiSuccess(
+      { ...data, currentUserId: user.userId, missingPredictors },
+      200,
+      {
       headers: {
         "Cache-Control": "private, max-age=15, stale-while-revalidate=45",
       },

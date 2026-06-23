@@ -113,21 +113,6 @@ function RelegationTag() {
   );
 }
 
-function isMohannad(username: string) {
-  return username.trim().toLocaleLowerCase("en-US") === "mohannad";
-}
-
-function MohannadYellowTag() {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-300/45 bg-lime-500/15 px-2.5 py-1 text-[10px] font-black text-lime-100 shadow-[0_0_18px_rgba(132,204,22,0.18)]">
-      <span className="inline-flex h-4 w-4 items-center justify-center rounded-[4px] border border-lime-100/60 bg-gradient-to-br from-lime-300 to-emerald-700 text-[7px] font-black text-emerald-950">
-        A
-      </span>
-      مو غريب على يلو عاد
-    </span>
-  );
-}
-
 function LeaderTag() {
   const { messages: t } = useI18n();
 
@@ -318,9 +303,6 @@ function MobileLeaderboardList({
                 ) : isRelegated ? (
                   <RelegationTag />
                 ) : null}
-                {isRelegated && isMohannad(entry.username) && (
-                  <MohannadYellowTag />
-                )}
                 <span className="truncate font-semibold">{entry.username}</span>
                 <RankBadge
                   rank={entry.rank}
@@ -543,9 +525,6 @@ export function LeaderboardTable({
                         ) : isRelegated ? (
                           <RelegationTag />
                         ) : null}
-                        {isRelegated && isMohannad(entry.username) && (
-                          <MohannadYellowTag />
-                        )}
                         <Link
                           href={`/user/${encodeURIComponent(entry.username)}`}
                           className="font-semibold text-foreground transition-colors hover:text-primary"

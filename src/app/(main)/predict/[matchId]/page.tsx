@@ -667,26 +667,33 @@ export default function PredictPage() {
   }, [matchId, match?.matchTime, lineup?.lineupStatus]);
 
   function toggleScorer(playerId: string) {
-    setScorerPicks((prev) => {
-      if (playerId in prev) {
+    if (playerId in scorerPicks) {
+      setScorerPicks((prev) => {
         const next = { ...prev };
         delete next[playerId];
         return next;
+      });
+      if (playerId === boldPlayerId) {
+        setBoldPlayerId("");
+        setBoldEnabled(false);
       }
-      if (
-        !canAddScorer(
-          prev,
-          playerId,
-          teamSets.home,
-          teamSets.away,
-          predHome,
-          predAway
-        )
-      ) {
-        return prev;
-      }
-      return { ...prev, [playerId]: 1 };
-    });
+      return;
+    }
+
+    if (
+      !canAddScorer(
+        scorerPicks,
+        playerId,
+        teamSets.home,
+        teamSets.away,
+        predHome,
+        predAway
+      )
+    ) {
+      return;
+    }
+
+    setScorerPicks((prev) => ({ ...prev, [playerId]: 1 }));
   }
 
   function setScorerGoals(playerId: string, goals: number) {
