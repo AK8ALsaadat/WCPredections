@@ -459,7 +459,7 @@ export default function PredictPage() {
       setOctopusEnabled(false);
       setFormReady(false);
     }
-  }, [matchId]);
+  }, [matchId, match?.matchTime, lineup?.lineupStatus, t.errors.loadFailed]);
 
   useEffect(() => {
     if (draftMatchIdRef.current !== matchId) {
