@@ -450,39 +450,18 @@ export async function submitMatchPredictionBundle(
   if (data.boldPlayerId) {
     const boldAlreadyPicked = picks.some(
       (pick) => pick.playerId === data.boldPlayerId
-              throw new Error(
-                "لازم لاعب الرهان يكون من الهدافين اللي اخترتهم في نفس التوقع"
-              );
+    );
+    if (!boldAlreadyPicked) {
+      if (boldPlayer && picks.length === 0 && predHome === 0 && predAway === 0) {
         if (boldPlayer.teamId === match.homeTeamId) {
           predHome = 1;
         } else {
-
-        // منع استخدام الرهان أو الأخطبوط أكثر من مرة خلال نفس الجولة (حسب roundId)
-        if (data.boldPlayerId) {
-          const otherBoldInRound = await prisma.boldScorerBet.findFirst({
-            where: { userId, roundId: match.roundId },
-            select: { id: true, matchId: true },
-          });
-          if (otherBoldInRound && otherBoldInRound.matchId !== data.matchId) {
-            throw new Error("استخدمت الرهان في مباراة ثانية هالجولة — مرة واحدة بس");
-          }
-        }
-
-        if (data.octopusPlayerId) {
-          const otherOctopusInRound = await prisma.octopusGoalkeeperBet.findFirst({
-            where: { userId, roundId: match.roundId },
-            select: { id: true, matchId: true },
-          });
-          if (otherOctopusInRound && otherOctopusInRound.matchId !== data.matchId) {
-            throw new Error("استخدمت الأخطبوط في مباراة ثانية هالجولة — مرة واحدة بس");
-          }
-        }
           predAway = 1;
         }
         picks = [{ playerId: data.boldPlayerId, goals: 1 }];
       } else {
         throw new Error(
-          "Ù„Ø§Ø²Ù… Ù„Ø§Ø¹Ø¨ Ø§Ù„Ø±Ù‡Ø§Ù† ÙŠÙƒÙˆÙ† Ù…Ù† Ø§Ù„Ù‡Ø¯Ø§ÙÙŠÙ† Ø§Ù„Ù„ÙŠ Ø§Ø®ØªØ±ØªÙ‡Ù… ÙÙŠ Ù†ÙØ³ Ø§Ù„ØªÙˆÙ‚Ø¹"
+          "لازم لاعب الرهان يكون من الهدافين اللي اخترتهم في نفس التوقع"
         );
       }
     }

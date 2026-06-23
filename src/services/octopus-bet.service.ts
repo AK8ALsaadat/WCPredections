@@ -24,6 +24,7 @@ export { calculateOctopusPoints, getOctopusConcededCapPoints, OCTOPUS_POINTS };
 
 type MatchForGoalkeeperStats = {
   matchTime?: Date | null;
+  roundId?: string;
   homeTeam: { id: string; apiTeamId: string | null; name: string };
   awayTeam: { id: string; apiTeamId: string | null; name: string };
 };
