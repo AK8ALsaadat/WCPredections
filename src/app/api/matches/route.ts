@@ -14,6 +14,7 @@ import {
   enrichMatchesWithUserPredictions,
   prewarmFastMatchLineups,
 } from "@/services/match.service";
+import { matchIdentityKey } from "@/lib/team-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,45 @@ export async function GET(request: Request) {
       getCurrentUser(),
       rawPromise,
     ]);
+
+    function dedupeRawMatches(rawMatches: any[]) {
+      if (!Array.isArray(rawMatches)) return rawMatches ?? [];
+      const groups = new Map<string, any[]>();
+      for (const m of rawMatches) {
+        const key = `${matchIdentityKey(m.homeTeam?.name, m.awayTeam?.name)}|${new Date(
+          m.matchTime
+        ).getTime()}`;
+        const arr = groups.get(key) ?? [];
+        arr.push(m);
+        groups.set(key, arr);
+      }
+
+      const out: any[] = [];
+      for (const [, arr] of groups) {
+        if (arr.length === 1) {
+          out.push(arr[0]);
+          continue;
+        }
+
+        // Prefer candidates that include a lineup (if present), otherwise fallback.
+        const withLineup = arr.filter(
+          (x) => (x.lineup && x.lineup.length > 0) || (x.homeTeam?.lineup && x.homeTeam.lineup.length > 0) || (x.awayTeam?.lineup && x.awayTeam.lineup.length > 0)
+        );
+        const candidates = withLineup.length > 0 ? withLineup : arr;
+
+        // Heuristic: prefer the candidate with longer team short names (more complete data)
+        candidates.sort((a, b) => {
+          const scoreA = (a.homeTeam?.shortName?.length ?? 0) + (a.awayTeam?.shortName?.length ?? 0);
+          const scoreB = (b.homeTeam?.shortName?.length ?? 0) + (b.awayTeam?.shortName?.length ?? 0);
+          return scoreB - scoreA;
+        });
+        out.push(candidates[0]);
+      }
+
+      return out;
+    }
+
+    const dedupedRaw = dedupeRawMatches(raw);
 
     if ((schedule || upcoming || completed) && paginated) {
       const { items, meta } = paginateSchedule(raw, page, pageSize);
