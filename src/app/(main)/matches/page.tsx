@@ -251,6 +251,14 @@ export default function MatchesPage() {
         if (data.success) {
           const resolvedPage = data.data.page as number;
           function dedupeMatches(rawMatches: Match[]) {
+            function hasLineup(m: Match) {
+              return !!(
+                (m as any).lineup?.length > 0 ||
+                (m as any).homeLineup?.length > 0 ||
+                (m as any).awayLineup?.length > 0
+              );
+            }
+
             const groups = new Map<string, Match[]>();
             for (const m of rawMatches) {
               const key = `${matchIdentityKey(
@@ -264,18 +272,23 @@ export default function MatchesPage() {
             const result: Match[] = [];
             for (const [, arr] of groups) {
               if (arr.length === 1) {
-                result.push(arr[0]);
+                if (hasLineup(arr[0])) result.push(arr[0]);
                 continue;
               }
-              // choose best candidate: prefer longer shortNames (official/full) and prefer ones with scorer picks/predictions
-              arr.sort((a, b) => {
-                const scoreA = (a.homeTeam.shortName?.length ?? 0) + (a.awayTeam.shortName?.length ?? 0) +
-                  (a.userScorerPredictions?.length ?? 0) * 10 + (a.userPrediction ? 5 : 0);
-                const scoreB = (b.homeTeam.shortName?.length ?? 0) + (b.awayTeam.shortName?.length ?? 0) +
-                  (b.userScorerPredictions?.length ?? 0) * 10 + (b.userPrediction ? 5 : 0);
+
+              // If any candidate has a lineup prefer those and drop empty-lineup variants
+              const withLineup = arr.filter((m) => hasLineup(m));
+              const candidates = withLineup.length > 0 ? withLineup : arr;
+
+              // choose best candidate: prefer ones with scorer picks/predictions and longer shortNames
+              candidates.sort((a, b) => {
+                const scoreA = (a.userScorerPredictions?.length ?? 0) * 10 + (a.userPrediction ? 5 : 0) +
+                  (a.homeTeam.shortName?.length ?? 0) + (a.awayTeam.shortName?.length ?? 0);
+                const scoreB = (b.userScorerPredictions?.length ?? 0) * 10 + (b.userPrediction ? 5 : 0) +
+                  (b.homeTeam.shortName?.length ?? 0) + (b.awayTeam.shortName?.length ?? 0);
                 return scoreB - scoreA;
               });
-              result.push(arr[0]);
+              result.push(candidates[0]);
             }
             return result;
           }
