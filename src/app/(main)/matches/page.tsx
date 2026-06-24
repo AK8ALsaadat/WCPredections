@@ -293,9 +293,24 @@ export default function MatchesPage() {
             return result;
           }
 
+          const rawMatchesArr: Match[] = data.data.matches ?? [];
+          const rawPinnedArr: Match[] = data.data.pinnedMatches ?? [];
+
+          const dedupedPinned = dedupeMatches(rawPinnedArr);
+          const pinnedKeys = new Set(
+            dedupedPinned.map(
+              (m) => `${matchIdentityKey(m.homeTeam.name, m.awayTeam.name)}|${new Date(m.matchTime).getTime()}`
+            )
+          );
+
+          const dedupedMatchesArr = dedupeMatches(rawMatchesArr).filter((m) => {
+            const key = `${matchIdentityKey(m.homeTeam.name, m.awayTeam.name)}|${new Date(m.matchTime).getTime()}`;
+            return !pinnedKeys.has(key);
+          });
+
           const payload: MatchesPageCache = {
-            matches: dedupeMatches(data.data.matches),
-            pinnedMatches: data.data.pinnedMatches ?? [],
+            matches: dedupedMatchesArr,
+            pinnedMatches: dedupedPinned,
             meta: {
               page: resolvedPage,
               totalPages: data.data.totalPages,
