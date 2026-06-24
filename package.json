@@ -1,0 +1,12 @@
+{
+  "name": "wcpredections-dedupe",
+  "version": "1.0.0",
+  "description": "Utility to dedupe and filter match cards (remove duplicates and empty lineups)",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node test/run-tests.js",
+    "start": "node src/index.js"
+  },
+  "author": "",
+  "license": "MIT"
+}
