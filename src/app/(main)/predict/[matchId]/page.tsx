@@ -57,7 +57,6 @@ import type {
   LineupSource,
   MatchPlayerView,
 } from "@/services/match-players.service";
-import { PredictionFeatureTag } from '@/components/ui/PredictionFeatureTag';
 
 const LINEUP_FAST_POLL_MS = 45_000;
 const SCORE_OPTIONS = Array.from({ length: 10 }, (_, score) => score);
@@ -763,13 +762,6 @@ export default function PredictPage() {
   }
 
   function handleDoubleToggle(checked: boolean) {
-    // Allow unchecking anytime, but prevent enabling if another feature is active.
-    if (checked && (boldEnabled || octopusEnabled)) {
-      setError(
-        octopusEnabled ? octopusCopy.conflict : t.predict.doubleAndBoldConflict
-      );
-      return;
-    }
     const limits = match?.roundUsageLimits?.doubles;
     if (checked && limits && !limits.canEnable && !limits.onThisMatch) {
       setError(t.predict.doubleExhausted);
@@ -777,18 +769,15 @@ export default function PredictPage() {
     }
     setError("");
     setIsDouble(checked);
+    if (checked) {
+      setBoldEnabled(false);
+      setBoldPlayerId("");
+      setOctopusEnabled(false);
+      setOctopusPlayerId("");
+    }
   }
 
   function handleBoldToggle(checked: boolean) {
-    // Allow unchecking anytime, but prevent enabling if another feature is active.
-    if (checked && isDouble) {
-      setError(t.predict.doubleAndBoldConflict);
-      return;
-    }
-    if (checked && octopusEnabled) {
-      setError(octopusCopy.conflict);
-      return;
-    }
     const limits = match?.roundUsageLimits?.boldScorer;
     if (
       checked &&
@@ -810,6 +799,11 @@ export default function PredictPage() {
     setError("");
     setBoldEnabled(checked);
     if (!checked) setBoldPlayerId("");
+    if (checked) {
+      setIsDouble(false);
+      setOctopusEnabled(false);
+      setOctopusPlayerId("");
+    }
   }
 
   function handleBoldPlayerChange(playerId: string) {
@@ -899,10 +893,6 @@ export default function PredictPage() {
   }
 
   function handleOctopusToggle(checked: boolean) {
-    if (checked && (isDouble || boldEnabled)) {
-      setError(octopusCopy.conflict);
-      return;
-    }
     const limits = match?.roundUsageLimits?.octopus;
     if (checked && limits && !limits.canUse && !limits.onThisMatch) {
       setError(octopusCopy.usedElsewhere);
@@ -911,6 +901,11 @@ export default function PredictPage() {
     setError("");
     setOctopusEnabled(checked);
     if (!checked) setOctopusPlayerId("");
+    if (checked) {
+      setIsDouble(false);
+      setBoldEnabled(false);
+      setBoldPlayerId("");
+    }
   }
 
   function handleOctopusPlayerChange(playerId: string) {
@@ -1244,31 +1239,23 @@ export default function PredictPage() {
     match.octopusRoundStatus?.onOtherMatch ??
     false;
   const matchLockReason = getPredictionLockReason(match.matchTime, match.status);
-  const boldCheckboxLockedBySelection = boldEnabled && Boolean(boldPlayerId);
-  const octopusCheckboxLockedBySelection =
-    octopusEnabled && Boolean(octopusPlayerId);
-  // Once a bold player is selected, changing/removing happens from the player controls.
   const boldCheckboxDisabled =
     loading || !match.roundUsageLimits ||
     Boolean(matchLockReason) ||
-    boldCheckboxLockedBySelection ||
     (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
-    (isDouble && !boldEnabled) ||
     (octopusEnabled && !boldEnabled);
   const octopusCheckboxDisabled =
     loading || !match.roundUsageLimits ||
     Boolean(matchLockReason) ||
-    octopusCheckboxLockedBySelection ||
     (octopusLimits != null &&
       !octopusLimits.canUse &&
       !octopusLimits.onThisMatch) ||
-    ((isDouble || boldEnabled) && !octopusEnabled);
+    (boldEnabled && !octopusEnabled);
   const doubleCheckboxDisabled =
     loading || !match.roundUsageLimits ||
     (doubleLimits != null &&
       !doubleLimits.canEnable &&
-      !doubleLimits.onThisMatch) ||
-    ((boldEnabled || octopusEnabled) && !isDouble); // disable enabling only, allow unchecking
+      !doubleLimits.onThisMatch);
   const predictedScorerIds = new Set(Object.keys(scorerPicks));
   const hasPredictedScorers = predictedScorerIds.size > 0;
   const toBoldPlayerOption = (player: MatchPlayerView) => ({
@@ -1361,15 +1348,6 @@ export default function PredictPage() {
         <p className="mt-2 text-center text-sm text-muted">
           {formatDate(match.matchTime, locale)}
         </p>
-        {typeof match.octopusCount === 'number' && (
-          <div className="mt-2 flex justify-center">
-            <PredictionFeatureTag
-              type="octopus"
-              label={`${octopusCopy.title}: ${match.octopusCount}`}
-              title={locale === 'ar' ? 'عدد مستخدمي الأخطبوط' : 'Octopus picks count'}
-            />
-          </div>
-        )}
         <div className="mt-4">
           <PredictionCountdown
             matchTime={match.matchTime}

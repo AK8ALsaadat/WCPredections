@@ -542,13 +542,12 @@ export async function submitMatchPredictionBundle(
     storedBoldActive && storedBold.matchId === data.matchId;
   const storedOctopusActiveOnThisMatch =
     storedOctopusActive && storedOctopus.matchId === data.matchId;
+  const nextBoldActiveOnThisMatch = Boolean(data.boldPlayerId);
+  const nextOctopusActiveOnThisMatch = Boolean(data.octopusPlayerId);
 
   if (
     isDouble &&
-    (data.boldPlayerId ||
-      data.octopusPlayerId ||
-      storedBoldActiveOnThisMatch ||
-      storedOctopusActiveOnThisMatch)
+    (nextBoldActiveOnThisMatch || nextOctopusActiveOnThisMatch)
   ) {
     throw new Error(
       "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
@@ -556,15 +555,15 @@ export async function submitMatchPredictionBundle(
   }
 
   if (
-    data.boldPlayerId &&
-    (data.octopusPlayerId || storedOctopusActiveOnThisMatch)
+    nextBoldActiveOnThisMatch &&
+    nextOctopusActiveOnThisMatch
   ) {
     throw new Error("ما تقدر تستخدم الرهان والأخطبوط معاً على نفس المباراة");
   }
 
   if (
-    data.octopusPlayerId &&
-    (data.boldPlayerId || storedBoldActiveOnThisMatch)
+    nextOctopusActiveOnThisMatch &&
+    nextBoldActiveOnThisMatch
   ) {
     throw new Error("ما تقدر تستخدم الأخطبوط مع الرهان على نفس المباراة");
   }
@@ -587,42 +586,14 @@ export async function submitMatchPredictionBundle(
     throw new Error("استخدمت الأخطبوط في مباراة ثانية هالجولة — مرة واحدة بس");
   }
 
-  if (data.boldPlayerId && storedBold?.cancelledAt) {
-    throw new Error("Bold scorer bet already used this round");
-  }
-
-  if (data.octopusPlayerId && storedOctopus?.cancelledAt) {
-    throw new Error("Octopus already used this round");
-  }
-
-  const now = new Date();
-  const isActiveRound = await prisma.round.findFirst({
-    where: { id: match.roundId, startsAt: { lte: now }, endsAt: { gte: now } },
-    select: { id: true },
-  });
-
   const result = await prisma.$transaction(async (tx) => {
     if (storedBoldActiveOnThisMatch && !data.boldPlayerId) {
-      if (isActiveRound) {
-        await tx.boldScorerBet.update({
-          where: { id: storedBold.id },
-          data: { points: 0, cancelledAt: new Date() },
-        });
-      } else {
-        await tx.boldScorerBet.delete({ where: { id: storedBold.id } });
-      }
+      await tx.boldScorerBet.delete({ where: { id: storedBold.id } });
     }
     if (storedOctopusActiveOnThisMatch && !data.octopusPlayerId) {
-      if (isActiveRound) {
-        await tx.octopusGoalkeeperBet.update({
-          where: { id: storedOctopus.id },
-          data: { points: 0, cancelledAt: new Date() },
-        });
-      } else {
-        await tx.octopusGoalkeeperBet.delete({
-          where: { id: storedOctopus.id },
-        });
-      }
+      await tx.octopusGoalkeeperBet.delete({
+        where: { id: storedOctopus.id },
+      });
     }
 
     const prediction = await tx.prediction.upsert({

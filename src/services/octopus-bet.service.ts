@@ -302,12 +302,13 @@ export async function getOctopusBetStatus(
   const existing = await getOctopusBetForUserRound(userId, scope.key);
   const isCancelled = !!existing?.cancelledAt;
   const activeOnThisMatch = existing?.matchId === matchId && !isCancelled;
+  const activeOnOtherMatch = !!existing && existing.matchId !== matchId && !isCancelled;
 
   return {
     roundId: scope.key,
-    used: !!existing,
+    used: !isCancelled && !!existing,
     onThisMatch: activeOnThisMatch,
-    onOtherMatch: !!existing && existing.matchId !== matchId && !isCancelled,
+    onOtherMatch: activeOnOtherMatch,
     bet:
       activeOnThisMatch
         ? {
@@ -317,7 +318,7 @@ export async function getOctopusBetStatus(
           }
         : null,
     otherMatchId:
-      existing && existing.matchId !== matchId && !isCancelled
+      activeOnOtherMatch
         ? existing.matchId
         : null,
   };
@@ -351,31 +352,11 @@ export async function submitOctopusBet(
   if (!playerId) {
     if (!existing || existing.matchId !== matchId) return null;
 
-    // For the active round we do NOT delete the row so the user can't reuse
-    // the octopus in the same usage key. Instead, keep the record and reset
-    // points to 0. For non-active rounds allow deletion as before.
-    const now = new Date();
-    const isActiveRound = await prisma.round.findFirst({
-      where: { id: match.roundId, startsAt: { lte: now }, endsAt: { gte: now } },
-      select: { id: true },
-    });
-    if (isActiveRound) {
-      await prisma.octopusGoalkeeperBet.update({
-        where: { id: existing.id },
-        data: { points: 0, cancelledAt: new Date() },
-      });
-      return null;
-    }
-
     await prisma.octopusGoalkeeperBet.delete({ where: { id: existing.id } });
     return null;
   }
 
-  if (existing?.cancelledAt) {
-    throw new Error("Octopus already used this round");
-  }
-
-  if (existing && existing.matchId !== matchId) {
+  if (existing && !existing.cancelledAt && existing.matchId !== matchId) {
     throw new Error("استخدمت الأخطبوط في مباراة ثانية هالجولة — مرة واحدة بس");
   }
 
