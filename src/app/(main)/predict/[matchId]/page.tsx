@@ -1195,7 +1195,7 @@ export default function PredictPage() {
       clearPredictDraft(matchId);
       invalidateMatchesListCaches();
       setSuccess(t.matches.predictionSubmitted);
-      setTimeout(() => router.push(`/matches/${matchId}`), 250);
+      router.push(`/matches/${matchId}`);
     } catch {
       setError(t.errors.generic);
     } finally {

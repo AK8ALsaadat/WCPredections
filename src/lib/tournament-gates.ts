@@ -36,10 +36,8 @@ export async function canShowKnockoutFeatures() {
   return isGroupStageComplete();
 }
 
-export async function filterVisibleMatches<T extends { isKnockout: boolean }>(
+export function filterVisibleMatches<T extends { isKnockout: boolean }>(
   matches: T[]
-): Promise<T[]> {
-  if (!matches.some((match) => match.isKnockout)) return matches;
-  if (await canShowKnockoutFeatures()) return matches;
-  return matches.filter((match) => !match.isKnockout);
+): T[] {
+  return matches;
 }

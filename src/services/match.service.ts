@@ -397,7 +397,7 @@ export async function getUpcomingMatches(roundId?: string) {
   )();
   const now = Date.now();
   // dedupe server-side to reduce client overhead
-  const deduped = await filterVisibleMatches(dedupeMatches(rows));
+  const deduped = filterVisibleMatches(dedupeMatches(rows));
   return deduped.filter(
     (match) =>
       match.status === "LIVE" ||
@@ -837,7 +837,6 @@ export async function getMatchById(
   const match = await getCachedMatchDetailBase(matchId);
 
   if (!match) return null;
-  if (match.isKnockout && !(await canShowKnockoutFeatures())) return null;
 
   let userPrediction = null;
   let userScorerPredictions = null;

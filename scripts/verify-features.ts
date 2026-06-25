@@ -45,6 +45,7 @@ import {
   getOctopusSaveTierPoints,
 } from "../src/lib/octopus-points";
 import { aggregateGoalsFromEvents } from "../src/lib/fixture-events";
+import { filterVisibleMatches } from "../src/lib/tournament-gates";
 import type { LeaderboardEntry } from "../src/types";
 
 let passed = 0;
@@ -468,6 +469,16 @@ ok(
 ok(
   "عدد هدافي المنتخب",
   countTeamScorers({ p1: 1, p2: 1 }, home, away).homeCount === 2
+);
+
+const visibleMatchList = filterVisibleMatches([
+  { id: "group", isKnockout: false },
+  { id: "knockout", isKnockout: true },
+]);
+ok(
+  "API match list keeps knockout matches visible",
+  visibleMatchList.length === 2 &&
+    visibleMatchList.some((match) => match.id === "knockout")
 );
 
 console.log("\n=== ترتيب الجولة ===");
