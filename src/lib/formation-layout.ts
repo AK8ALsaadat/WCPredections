@@ -69,6 +69,23 @@ function spreadLine(
   return spreadFormationRow(players, y);
 }
 
+function spreadOrdinalLine(
+  players: MatchPlayerView[],
+  y: number,
+  lineIndex: number,
+  lineCount: number,
+  formationRows: number[]
+) {
+  const isTwoPlayerAttack = players.length === 2 && lineIndex === lineCount - 1;
+  const isCompactBackThree =
+    players.length === 3 &&
+    lineIndex === 0 &&
+    formationRows[0] === 3;
+  if (isTwoPlayerAttack) return spreadRow(players, y, 36, 64);
+  if (isCompactBackThree) return spreadRow(players, y, 24, 76);
+  return spreadRow(players, y, 10, 90);
+}
+
 function isGoalkeeper(player: MatchPlayerView) {
   return isGoalkeeperPosition(player.position);
 }
@@ -186,6 +203,87 @@ function sortStartersByRole(starters: MatchPlayerView[]) {
   return { gk: gkPick ? [gkPick] : [], outfield: sortedOutfield };
 }
 
+function ordinalGridPlace(player: MatchPlayerView) {
+  return /^\d+$/.test(player.grid ?? "")
+    ? Number.parseInt(player.grid!, 10)
+    : null;
+}
+
+function layoutFromOrdinalGrid(
+  lineup: MatchPlayerView[],
+  formation: string | null | undefined,
+  side: "home" | "away"
+): PitchSlot[] | null {
+  const starters = lineup.slice(0, 11);
+  const withOrdinal = starters.filter(
+    (player) => ordinalGridPlace(player) != null
+  );
+  if (withOrdinal.length < 10) return null;
+
+  const rows = parseFormation(formation);
+  const goalkeeper =
+    starters.find((player) => ordinalGridPlace(player) === 1) ??
+    starters.find(isGoalkeeper);
+  if (!goalkeeper) return null;
+
+  const outfield = starters
+    .filter((player) => player.id !== goalkeeper.id)
+    .map((player, index) => ({
+      player,
+      index,
+      place: ordinalGridPlace(player),
+    }))
+    .sort((left, right) => {
+      if (left.place != null && right.place != null) {
+        return left.place - right.place;
+      }
+      if (left.place != null) return -1;
+      if (right.place != null) return 1;
+      return (
+        positionRank(left.player) - positionRank(right.player) ||
+        left.index - right.index
+      );
+    })
+    .map(({ player }) => player);
+
+  let index = 0;
+  const lines = rows.map((count) => {
+    const line = outfield.slice(index, index + count);
+    index += count;
+    return line;
+  });
+
+  while (index < outfield.length) {
+    lines[lines.length - 1]?.push(outfield[index++]);
+  }
+
+  const homeLineYs = lines.length === 3 ? [18, 31, 44] : null;
+  const awayLineYs = lines.length === 3 ? [82, 69, 56] : null;
+  const slots: PitchSlot[] = [
+    ...spreadRow([goalkeeper], side === "home" ? 7 : 93),
+  ];
+
+  lines.forEach((players, lineIndex) => {
+    const y =
+      side === "home"
+        ? homeLineYs?.[lineIndex] ??
+          12 + ((lineIndex + 1) / (lines.length + 1)) * 36
+        : awayLineYs?.[lineIndex] ??
+          88 - ((lineIndex + 1) / (lines.length + 1)) * 36;
+    slots.push(
+      ...spreadOrdinalLine(
+        sortFormationLine(players, side),
+        y,
+        lineIndex,
+        lines.length,
+        rows
+      )
+    );
+  });
+
+  return slots;
+}
+
 /** توزيع من grid الفعلي (مثل 1:1 للحارس من API-Football) */
 export function layoutFromGrid(
   lineup: MatchPlayerView[],
@@ -251,6 +349,8 @@ export function layoutFormation(
   const starters = lineup.slice(0, 11);
   const gridSlots = layoutFromGrid(starters, side);
   if (gridSlots) return gridSlots;
+  const ordinalSlots = layoutFromOrdinalGrid(starters, formation, side);
+  if (ordinalSlots) return ordinalSlots;
 
   const { gk, outfield } = sortStartersByRole(starters);
   const rows = parseFormation(formation);

@@ -504,4 +504,34 @@ check(
     ordinalSlots.find((slot) => slot.player.id === "d3")?.y === 18
 );
 
+const exactOrdinalWideSlots = layoutFormation(
+  [
+    { id: "gk", name: "GK", position: "Goalkeeper", section: "lineup" as const, grid: "1" },
+    { id: "rb", name: "RB", position: "Right Back", section: "lineup" as const, grid: "2" },
+    { id: "lb", name: "LB", position: "Left Back", section: "lineup" as const, grid: "3" },
+    { id: "cb1", name: "CB1", position: "Center Defender", section: "lineup" as const, grid: "4" },
+    { id: "cb2", name: "CB2", position: "Center Defender", section: "lineup" as const, grid: "5" },
+    { id: "cm", name: "CM", position: "Center Midfielder", section: "lineup" as const, grid: "6" },
+    { id: "rm", name: "RM", position: "Right Midfielder", section: "lineup" as const, grid: "7" },
+    { id: "lm", name: "LM", position: "Left Midfielder", section: "lineup" as const, grid: "8" },
+    { id: "st", name: "ST", position: "Forward", section: "lineup" as const, grid: "9" },
+    { id: "rw-as-mid", name: "RW", position: "Right Midfielder", section: "lineup" as const, grid: "10" },
+    { id: "lw-as-mid", name: "LW", position: "Left Midfielder", section: "lineup" as const, grid: "11" },
+  ],
+  "4-3-3",
+  "home"
+);
+check(
+  "ordinal wide forwards stay on the forward line even when labelled midfielders",
+  exactOrdinalWideSlots.find((slot) => slot.player.id === "lw-as-mid")?.y === 44 &&
+    exactOrdinalWideSlots.find((slot) => slot.player.id === "rw-as-mid")?.y === 44
+);
+check(
+  "ordinal right and left midfielders stay on their exact wide edges",
+  exactOrdinalWideSlots.find((slot) => slot.player.id === "rm")?.x === 10 &&
+    exactOrdinalWideSlots.find((slot) => slot.player.id === "lm")?.x === 90 &&
+    exactOrdinalWideSlots.find((slot) => slot.player.id === "rw-as-mid")?.x === 10 &&
+    exactOrdinalWideSlots.find((slot) => slot.player.id === "lw-as-mid")?.x === 90
+);
+
 process.exit(failures === 0 ? 0 : 1);
