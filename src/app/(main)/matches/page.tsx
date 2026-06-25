@@ -95,6 +95,17 @@ function matchesApiUrl(
   return `/api/matches?${params}`;
 }
 
+function scheduleFallbackApiUrl(targetPage: number, targetRound: string) {
+  const params = new URLSearchParams({
+    paginated: "true",
+    page: String(targetPage),
+    light: "1",
+    schedule: "true",
+  });
+  if (targetRound) params.set("roundId", targetRound);
+  return `/api/matches?${params}`;
+}
+
 const matchesPrefetchInFlight = new Set<string>();
 
 async function prefetchMatchesPage(
@@ -113,7 +124,8 @@ async function prefetchMatchesPage(
   matchesPrefetchInFlight.add(requestKey);
   try {
     const response = await clientFetch(
-      matchesApiUrl(targetPage, targetRound, targetType)
+      matchesApiUrl(targetPage, targetRound, targetType),
+      { cache: "no-store" }
     );
     const data = response ? await response.json() : null;
     if (!data?.success) return;
@@ -213,7 +225,14 @@ export default function MatchesPage() {
       const requestKey = matchesCacheKey(targetRound, targetPage, matchType);
       const seq = ++loadSeq.current;
 
-      const cached = readClientCache<MatchesPageCache>(requestKey);
+      const cachedEntry = readClientCache<MatchesPageCache>(requestKey);
+      const cached =
+        matchType === "upcoming" &&
+        cachedEntry &&
+        cachedEntry.matches.length === 0 &&
+        cachedEntry.pinnedMatches.length === 0
+          ? null
+          : cachedEntry;
       if (cached && seq === loadSeq.current) {
         applyCache(cached, targetPage);
       }
@@ -244,16 +263,41 @@ export default function MatchesPage() {
         const res = await clientFetch(
           matchesApiUrl(targetPage, targetRound, matchType),
           {
+            cache: "no-store",
             signal: opts?.signal,
           }
         );
         if (!res) throw new Error("NetworkError");
         if (seq !== loadSeq.current) return;
 
-        const data = await res.json();
+        let data = await res.json();
         if (seq !== loadSeq.current) return;
 
         if (data.success) {
+          const emptyUpcoming =
+            matchType === "upcoming" &&
+            (data.data.matches?.length ?? 0) === 0 &&
+            (data.data.pinnedMatches?.length ?? 0) === 0;
+          if (emptyUpcoming) {
+            const fallbackRes = await clientFetch(
+              scheduleFallbackApiUrl(targetPage, targetRound),
+              {
+                cache: "no-store",
+                signal: opts?.signal,
+              }
+            );
+            if (fallbackRes) {
+              const fallbackData = await fallbackRes.json();
+              const fallbackHasMatches =
+                fallbackData?.success &&
+                ((fallbackData.data.matches?.length ?? 0) > 0 ||
+                  (fallbackData.data.pinnedMatches?.length ?? 0) > 0);
+              if (fallbackHasMatches) {
+                data = fallbackData;
+              }
+            }
+            if (seq !== loadSeq.current) return;
+          }
           const resolvedPage = data.data.page as number;
           const rawMatchesArr: Match[] = data.data.matches ?? [];
           const rawPinnedArr: Match[] = data.data.pinnedMatches ?? [];
@@ -364,7 +408,14 @@ export default function MatchesPage() {
 
   useEffect(() => {
     const abort = new AbortController();
-    const cached = readClientCache<MatchesPageCache>(cacheKey);
+    const cachedEntry = readClientCache<MatchesPageCache>(cacheKey);
+    const cached =
+      matchType === "upcoming" &&
+      cachedEntry &&
+      cachedEntry.matches.length === 0 &&
+      cachedEntry.pinnedMatches.length === 0
+        ? null
+        : cachedEntry;
 
     if (cached) {
       applyCache(cached, cached.meta.page);

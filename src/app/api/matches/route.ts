@@ -46,10 +46,14 @@ export async function GET(request: Request) {
         : upcoming
           ? getUpcomingMatches(roundId)
           : getAllMatches(roundId);
-    const [user, raw] = await Promise.all([
+    const [user, initialRaw] = await Promise.all([
       getCurrentUser(),
       rawPromise,
     ]);
+    let raw = initialRaw;
+    if (upcoming && Array.isArray(raw) && raw.length === 0) {
+      raw = await getScheduleMatches(roundId);
+    }
 
     function dedupeRawMatches(rawMatches: any[]) {
       if (!Array.isArray(rawMatches)) return rawMatches ?? [];
