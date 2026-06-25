@@ -929,6 +929,13 @@ export default function PredictPage() {
     setOctopusPlayerId(playerId);
   }
 
+  function handleFinishTypeChange(value: string) {
+    setFinishType(value);
+    if (value !== "PENALTIES") {
+      setPenaltyWinner("");
+    }
+  }
+
   async function handleClearOctopusBet() {
     setError("");
     setSuccess("");
@@ -1168,7 +1175,8 @@ export default function PredictPage() {
           predAway,
           isDouble,
           predictedFinishType: finishType || null,
-          predictedPenaltyWinnerTeamId: penaltyWinner || null,
+          predictedPenaltyWinnerTeamId:
+            finishType === "PENALTIES" ? penaltyWinner || null : null,
           picks: picksToArray(scorerPicks),
           boldPlayerId: boldEnabled ? boldPlayerId || null : null,
           octopusPlayerId: octopusEnabled ? octopusPlayerId || null : null,
@@ -1846,7 +1854,7 @@ export default function PredictPage() {
             <Select
               label={t.predict.finishTypeLabel}
               value={finishType}
-              onChange={(e) => setFinishType(e.target.value)}
+              onChange={(e) => handleFinishTypeChange(e.target.value)}
               options={[
                 { value: "", label: t.predict.selectFinish },
                 { value: "NINETY_MINUTES", label: t.predict.ninety },

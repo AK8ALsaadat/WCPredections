@@ -20,7 +20,7 @@ import { getUsageRoundScope } from "@/services/usage-round.service";
 import {
   calculateDoubleBonus,
   calculateFinishTypePoints,
-  calculatePenaltyWinnerPoints,
+  calculateKnockoutPenaltyWinnerPoints,
   calculatePerfectPredictionBonus,
   calculatePerfectPredictionBonusWithMinute,
   calculateScorePredictionPoints,
@@ -161,15 +161,19 @@ export async function submitPrediction(
     throw new Error("توقع طريقة الإنهاء مطلوب للمباريات الإقصائية");
   }
 
-  if (
-    data.predictedFinishType === "PENALTIES" &&
-    data.predictedPenaltyWinnerTeamId
-  ) {
+  if (data.predictedFinishType === "PENALTIES") {
+    if (!data.predictedPenaltyWinnerTeamId) {
+      throw new Error("يجب اختيار أحد فريقي المباراة كفائز بركلات الترجيح");
+    }
     const validTeams = [match.homeTeamId, match.awayTeamId];
     if (!validTeams.includes(data.predictedPenaltyWinnerTeamId)) {
       throw new Error("يجب اختيار أحد فريقي المباراة كفائز بركلات الترجيح");
     }
   }
+  const predictedPenaltyWinnerTeamId =
+    data.predictedFinishType === "PENALTIES"
+      ? data.predictedPenaltyWinnerTeamId ?? null
+      : null;
 
   return prisma.prediction.upsert({
     where: {
@@ -182,14 +186,14 @@ export async function submitPrediction(
       predAway: data.predAway,
       isDouble,
       predictedFinishType: data.predictedFinishType ?? null,
-      predictedPenaltyWinnerTeamId: data.predictedPenaltyWinnerTeamId ?? null,
+      predictedPenaltyWinnerTeamId,
     },
     update: {
       predHome: data.predHome,
       predAway: data.predAway,
       isDouble,
       predictedFinishType: data.predictedFinishType ?? null,
-      predictedPenaltyWinnerTeamId: data.predictedPenaltyWinnerTeamId ?? null,
+      predictedPenaltyWinnerTeamId,
     },
     include: {
       match: {
@@ -432,15 +436,19 @@ export async function submitMatchPredictionBundle(
     throw new Error("توقع طريقة الإنهاء مطلوب للمباريات الإقصائية");
   }
 
-  if (
-    data.predictedFinishType === "PENALTIES" &&
-    data.predictedPenaltyWinnerTeamId
-  ) {
+  if (data.predictedFinishType === "PENALTIES") {
+    if (!data.predictedPenaltyWinnerTeamId) {
+      throw new Error("يجب اختيار أحد فريقي المباراة كفائز بركلات الترجيح");
+    }
     const validTeams = [match.homeTeamId, match.awayTeamId];
     if (!validTeams.includes(data.predictedPenaltyWinnerTeamId)) {
       throw new Error("يجب اختيار أحد فريقي المباراة كفائز بركلات الترجيح");
     }
   }
+  const predictedPenaltyWinnerTeamId =
+    data.predictedFinishType === "PENALTIES"
+      ? data.predictedPenaltyWinnerTeamId ?? null
+      : null;
 
   if (data.boldPlayerId) {
     const eligibility = await getBoldScorerBetEligibility(userId);
@@ -607,16 +615,14 @@ export async function submitMatchPredictionBundle(
         predAway,
         isDouble,
         predictedFinishType: data.predictedFinishType ?? null,
-        predictedPenaltyWinnerTeamId:
-          data.predictedPenaltyWinnerTeamId ?? null,
+        predictedPenaltyWinnerTeamId,
       },
       update: {
         predHome,
         predAway,
         isDouble,
         predictedFinishType: data.predictedFinishType ?? null,
-        predictedPenaltyWinnerTeamId:
-          data.predictedPenaltyWinnerTeamId ?? null,
+        predictedPenaltyWinnerTeamId,
       },
       select: { id: true },
     });
@@ -875,8 +881,9 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
       : 0;
 
     const penaltyWinnerPoints =
-      (shouldAwardBasePoints && match.isKnockout && match.actualFinishType === "PENALTIES")
-        ? calculatePenaltyWinnerPoints(
+      shouldAwardBasePoints && match.isKnockout && match.actualFinishType === "PENALTIES"
+        ? calculateKnockoutPenaltyWinnerPoints(
+            prediction.predictedFinishType,
             prediction.predictedPenaltyWinnerTeamId,
             match.penaltyWinnerTeamId
           )

@@ -8,6 +8,7 @@ import {
   calculateBoldScorerBetPoints,
   calculateDoubleBonus,
   calculateFinishTypePoints,
+  calculateKnockoutPenaltyWinnerPoints,
   calculatePenaltyWinnerPoints,
   calculatePerfectPredictionBonus,
   calculateScorePredictionPoints,
@@ -128,6 +129,21 @@ ok(
   "ركلات خطأ = 0",
   calculatePenaltyWinnerPoints("team-a", "team-b") === 0
 );
+ok(
+  "all wrong knockout finish type combinations = 0",
+  (["NINETY_MINUTES", "EXTRA_TIME", "PENALTIES"] as const).every((predicted) =>
+    (["NINETY_MINUTES", "EXTRA_TIME", "PENALTIES"] as const).every((actual) =>
+      predicted === actual || calculateFinishTypePoints(predicted, actual) === 0
+    )
+  )
+);
+ok(
+  "penalty winner point requires a penalties prediction",
+  calculateKnockoutPenaltyWinnerPoints("PENALTIES", "team-a", "team-a") === 1 &&
+    calculateKnockoutPenaltyWinnerPoints("PENALTIES", "team-a", "team-b") === 0 &&
+    calculateKnockoutPenaltyWinnerPoints("EXTRA_TIME", "team-a", "team-a") === 0 &&
+    calculateKnockoutPenaltyWinnerPoints("NINETY_MINUTES", "team-a", "team-a") === 0
+);
 
 console.log("\n=== تفصيل نقاط المباراة ===");
 const breakdown = buildMatchPointsBreakdown({
@@ -145,7 +161,7 @@ const breakdown = buildMatchPointsBreakdown({
     isDouble: false,
     points: 5,
     doubleBonus: 0,
-    finishTypePoints: 1,
+    finishTypePoints: 4,
     penaltyWinnerPoints: 1,
     predictedFinishType: "PENALTIES",
     predictedPenaltyWinnerTeamId: "home-id",
@@ -154,11 +170,36 @@ const breakdown = buildMatchPointsBreakdown({
     { predictedGoals: 2, points: 1, player: { name: "سالم" } },
   ],
 }, ar);
-ok("مجموع التفصيل = 8", breakdown.total === 8);
+ok("match breakdown total with penalties = 11", breakdown.total === 11);
 ok(
   "عدد بنود التفصيل = 4",
   breakdown.lines.length === 4,
   `got ${breakdown.lines.length}`
+);
+const stalePenaltyBreakdown = buildMatchPointsBreakdown({
+  homeScore: 1,
+  awayScore: 1,
+  isKnockout: true,
+  actualFinishType: "PENALTIES",
+  penaltyWinnerTeamId: "home-id",
+  homeTeamName: "home",
+  awayTeamName: "away",
+  penaltyWinnerName: "home",
+  userPrediction: {
+    predHome: 1,
+    predAway: 1,
+    isDouble: false,
+    points: 5,
+    doubleBonus: 0,
+    finishTypePoints: 0,
+    penaltyWinnerPoints: 0,
+    predictedFinishType: "EXTRA_TIME",
+    predictedPenaltyWinnerTeamId: "home-id",
+  },
+}, ar, { showMisses: true });
+ok(
+  "stale penalty winner is hidden unless penalties were predicted",
+  !stalePenaltyBreakdown.lines.some((line) => line.id === "penalty")
 );
 
 console.log("\n=== بونص التوقع المثالي ضمن تفصيل المباراة ===");

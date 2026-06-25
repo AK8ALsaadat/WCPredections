@@ -185,7 +185,12 @@ function penaltyLine(
   showMisses: boolean
 ): PointsBreakdownLine | null {
   const p = input.userPrediction;
-  if (!p?.predictedPenaltyWinnerTeamId) return null;
+  if (
+    p?.predictedFinishType !== "PENALTIES" ||
+    !p.predictedPenaltyWinnerTeamId
+  ) {
+    return null;
+  }
   if (!showMisses && !p.penaltyWinnerPoints) return null;
 
   const hit = p.penaltyWinnerPoints > 0;
@@ -409,7 +414,10 @@ export function buildLeaguePendingBreakdown(
     });
   }
 
-  if (p?.predictedPenaltyWinnerTeamId) {
+  if (
+    p?.predictedFinishType === "PENALTIES" &&
+    p.predictedPenaltyWinnerTeamId
+  ) {
     const penaltyShort =
       p.predictedPenaltyWinnerTeamId === options.homeTeamId
         ? options.homeShortName

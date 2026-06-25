@@ -81,6 +81,15 @@ export function calculatePenaltyWinnerPoints(
   return predictedTeamId === actualTeamId ? 1 : 0;
 }
 
+export function calculateKnockoutPenaltyWinnerPoints(
+  predictedFinishType: FinishType | null | undefined,
+  predictedTeamId: string | null | undefined,
+  actualTeamId: string | null | undefined
+): number {
+  if (predictedFinishType !== "PENALTIES") return 0;
+  return calculatePenaltyWinnerPoints(predictedTeamId, actualTeamId);
+}
+
 export function isMatchFinishedForScoring(match: Match): boolean {
   return (
     match.status === "FINISHED" &&

@@ -79,14 +79,14 @@ export default function KnockoutTutorialPage() {
             <div className="rounded-lg border border-card-border p-3">
               <p className="text-lg font-bold text-primary">+4</p>
               <p className="text-xs text-muted">
-                {isArabic ? "بلنتيات" : "Penalties"}
+                {isArabic ? "ركلات ترجيح" : "Penalties"}
               </p>
             </div>
           </div>
 
           <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">
             {isArabic
-              ? "إذا اخترت بلنتيات، لازم تختار الفريق اللي يفوز بالترجيح."
+              ? "إذا اخترت ركلات الترجيح، لازم تختار الفريق اللي يفوز بالترجيح."
               : "If you pick penalties, you also choose the team that wins the shootout."}
           </p>
 
