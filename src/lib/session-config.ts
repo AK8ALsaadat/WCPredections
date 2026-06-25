@@ -14,7 +14,8 @@ const sessionSecret = process.env.SESSION_SECRET;
 
 export function assertSessionSecretConfigured() {
   const isProductionBuild =
-    process.env.NEXT_PHASE === "phase-production-build";
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.npm_lifecycle_event === "build";
   if (!sessionSecret && process.env.NODE_ENV === "production" && !isProductionBuild) {
     throw new Error("SESSION_SECRET must be set in production");
   }
