@@ -2,11 +2,16 @@ import { cache } from "react";
 import { getIronSession } from "iron-session";
 import { cookies } from "next/headers";
 import type { UserSession } from "@/types";
-import { sessionOptions, type SessionData } from "@/lib/session-config";
+import {
+  assertSessionSecretConfigured,
+  sessionOptions,
+  type SessionData,
+} from "@/lib/session-config";
 
 export type { SessionData };
 
 export const getSession = cache(async () => {
+  assertSessionSecretConfigured();
   const cookieStore = await cookies();
   return getIronSession<SessionData>(cookieStore, sessionOptions);
 });

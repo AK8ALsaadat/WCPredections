@@ -11,8 +11,13 @@ const SESSION_DAYS = Number(process.env.SESSION_MAX_AGE_DAYS ?? "365");
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * SESSION_DAYS;
 
 const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret && process.env.NODE_ENV === "production") {
-  throw new Error("SESSION_SECRET must be set in production");
+
+export function assertSessionSecretConfigured() {
+  const isProductionBuild =
+    process.env.NEXT_PHASE === "phase-production-build";
+  if (!sessionSecret && process.env.NODE_ENV === "production" && !isProductionBuild) {
+    throw new Error("SESSION_SECRET must be set in production");
+  }
 }
 
 export const sessionOptions: SessionOptions = {
