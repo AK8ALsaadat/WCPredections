@@ -178,13 +178,19 @@ async function findExistingMatch(
   homeTeamId: string,
   awayTeamId: string
 ) {
+  const matchTime = mapped.matchTime;
+  const timeWindow = {
+    gte: new Date(matchTime.getTime() - 30 * 60 * 1000),
+    lte: new Date(matchTime.getTime() + 30 * 60 * 1000),
+  };
+
   let existing = await prisma.match.findUnique({
     where: { apiMatchId: mapped.apiId },
   });
   if (existing) return existing;
 
   existing = await prisma.match.findFirst({
-    where: { roundId, homeTeamId, awayTeamId },
+    where: { roundId, homeTeamId, awayTeamId, matchTime: timeWindow },
   });
   if (existing) return existing;
 
@@ -192,6 +198,7 @@ async function findExistingMatch(
     existing = await prisma.match.findFirst({
       where: {
         roundId,
+        matchTime: timeWindow,
         homeTeam: {
           name: { equals: mapped.homeTeamName },
         },
@@ -250,10 +257,49 @@ async function mergeMatchIntoCanonical(canonicalId: string, duplicateId: string)
     }
   }
 
-  await prisma.boldScorerBet.updateMany({
+  const dupBoldBets = await prisma.boldScorerBet.findMany({
     where: { matchId: duplicateId },
-    data: { matchId: canonicalId },
   });
+  for (const bet of dupBoldBets) {
+    const conflict = await prisma.boldScorerBet.findUnique({
+      where: {
+        userId_usageRoundKey: {
+          userId: bet.userId,
+          usageRoundKey: bet.usageRoundKey,
+        },
+      },
+    });
+    if (conflict && conflict.matchId !== duplicateId) {
+      await prisma.boldScorerBet.delete({ where: { id: bet.id } });
+    } else {
+      await prisma.boldScorerBet.update({
+        where: { id: bet.id },
+        data: { matchId: canonicalId },
+      });
+    }
+  }
+
+  const dupOctopusBets = await prisma.octopusGoalkeeperBet.findMany({
+    where: { matchId: duplicateId },
+  });
+  for (const bet of dupOctopusBets) {
+    const conflict = await prisma.octopusGoalkeeperBet.findUnique({
+      where: {
+        userId_usageRoundKey: {
+          userId: bet.userId,
+          usageRoundKey: bet.usageRoundKey,
+        },
+      },
+    });
+    if (conflict && conflict.matchId !== duplicateId) {
+      await prisma.octopusGoalkeeperBet.delete({ where: { id: bet.id } });
+    } else {
+      await prisma.octopusGoalkeeperBet.update({
+        where: { id: bet.id },
+        data: { matchId: canonicalId },
+      });
+    }
+  }
 
   const dupMatchScorers = await prisma.matchScorer.findMany({
     where: { matchId: duplicateId },
@@ -269,6 +315,32 @@ async function mergeMatchIntoCanonical(canonicalId: string, duplicateId: string)
     } else {
       await prisma.matchScorer.update({
         where: { id: ms.id },
+        data: { matchId: canonicalId },
+      });
+    }
+  }
+
+  const dupGoalkeeperStats = await prisma.matchGoalkeeperStat.findMany({
+    where: { matchId: duplicateId },
+  });
+  for (const stat of dupGoalkeeperStats) {
+    const conflict = await prisma.matchGoalkeeperStat.findUnique({
+      where: {
+        matchId_playerId: { matchId: canonicalId, playerId: stat.playerId },
+      },
+    });
+    if (conflict) {
+      await prisma.matchGoalkeeperStat.update({
+        where: { id: conflict.id },
+        data: {
+          saves: Math.max(conflict.saves, stat.saves),
+          source: stat.source,
+        },
+      });
+      await prisma.matchGoalkeeperStat.delete({ where: { id: stat.id } });
+    } else {
+      await prisma.matchGoalkeeperStat.update({
+        where: { id: stat.id },
         data: { matchId: canonicalId },
       });
     }

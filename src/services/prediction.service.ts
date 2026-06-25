@@ -313,6 +313,20 @@ async function replaceScorerPredictions(
   picks: { playerId: string; goals: number }[],
   client: Pick<typeof prisma, "scorerPrediction"> = prisma
 ) {
+  const existing = await client.scorerPrediction.findMany({
+    where: { userId, matchId },
+    select: { playerId: true, predictedGoals: true },
+  });
+  const currentKey = existing
+    .map((pick) => `${pick.playerId}:${pick.predictedGoals}`)
+    .sort()
+    .join("|");
+  const nextKey = picks
+    .map((pick) => `${pick.playerId}:${pick.goals}`)
+    .sort()
+    .join("|");
+  if (currentKey === nextKey) return;
+
   await client.scorerPrediction.deleteMany({
     where: { userId, matchId },
   });
@@ -565,7 +579,7 @@ export async function submitMatchPredictionBundle(
     throw new Error("استخدمت الأخطبوط في مباراة ثانية هالجولة — مرة واحدة بس");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     if (storedBold?.matchId === data.matchId && !data.boldPlayerId) {
       await tx.boldScorerBet.delete({ where: { id: storedBold.id } });
     }
@@ -656,6 +670,15 @@ export async function submitMatchPredictionBundle(
 
     return { prediction, scorers: picks.length, boldBet, octopusBet };
   });
+
+  try {
+    revalidateTag(`match-${data.matchId}`);
+    revalidateTag("matches-schedule");
+  } catch {
+    // Background/test contexts may not have a Next cache store.
+  }
+
+  return result;
 }
 
 type ScorerPredictionWithPlayer = {

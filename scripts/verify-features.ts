@@ -42,6 +42,7 @@ import {
   getOctopusCleanSheetBonus,
   getOctopusSaveTierPoints,
 } from "../src/lib/octopus-points";
+import { aggregateGoalsFromEvents } from "../src/lib/fixture-events";
 import type { LeaderboardEntry } from "../src/types";
 
 let passed = 0;
@@ -378,6 +379,21 @@ ok("octopus clean sheet with 10 saves = 11", calculateOctopusPoints(10, 0) === 1
 ok("octopus 10 saves conceded 1 = 5", calculateOctopusPoints(10, 1) === 5);
 ok("octopus 10 saves conceded 2 = 3", calculateOctopusPoints(10, 2) === 3);
 ok("octopus 10 saves conceded 3 = 1", calculateOctopusPoints(10, 3) === 1);
+
+console.log("\n=== Cancelled/offside goals ===");
+ok(
+  "offside goal is not counted for scorer points",
+  (aggregateGoalsFromEvents([
+    { type: "Goal", detail: "Goal Disallowed - offside", playerApiId: "p1" },
+  ]).get("p1") ?? 0) === 0
+);
+ok(
+  "VAR offside removes a previously counted goal",
+  (aggregateGoalsFromEvents([
+    { type: "Goal", detail: "Normal Goal", playerApiId: "p1" },
+    { type: "Var", detail: "Goal Disallowed - offside", playerApiId: "p1" },
+  ]).get("p1") ?? 0) === 0
+);
 
 console.log("\n=== توقع الهدافين ===");
 const home = new Set(["p1", "p2"]);

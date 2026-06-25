@@ -2,10 +2,27 @@
  * إعادة احتساب نقاط الهدافين والنتائج لكل المباريات الجاهزة
  * تشغيل: npx tsx scripts/recalculate-all-points.ts
  */
+import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
+import { reconcileDuplicateMatchesInRound } from "../src/services/football-api";
 import { recalculateMatchScoring } from "../src/services/prediction.service";
 
 async function main() {
+  const rounds = await prisma.round.findMany({
+    select: { id: true, name: true },
+  });
+
+  let mergedDuplicates = 0;
+  for (const round of rounds) {
+    const result = await reconcileDuplicateMatchesInRound(round.id);
+    mergedDuplicates += result.merged;
+    if (result.merged > 0) {
+      console.log(
+        `Merged ${result.merged} duplicate matches in round ${round.name}`
+      );
+    }
+  }
+
   const matches = await prisma.match.findMany({
     where: {
       status: { in: ["LIVE", "FINISHED"] },
@@ -20,6 +37,9 @@ async function main() {
     },
     orderBy: { matchTime: "asc" },
   });
+
+  console.log(`Merged duplicate matches: ${mergedDuplicates}`);
+  console.log(`Scorable matches: ${matches.length}`);
 
   console.log(`مباريات جاهزة للاحتساب: ${matches.length}`);
 

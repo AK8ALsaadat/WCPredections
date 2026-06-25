@@ -91,7 +91,7 @@ export async function GET(request: Request) {
     const dedupedRaw = dedupeRawMatches(raw);
 
     if ((schedule || upcoming || completed) && paginated) {
-      const { items, meta } = paginateSchedule(raw, page, pageSize);
+      const { items, meta } = paginateSchedule(dedupedRaw, page, pageSize);
       
       if (light && !completed) {
         const matches = await enrichMatchesWithUserPredictions(items, user?.userId);
@@ -113,7 +113,7 @@ export async function GET(request: Request) {
     }
 
     if (light && !completed) {
-      const lite = raw.map((m: any) => ({
+      const lite = dedupedRaw.map((m: any) => ({
         id: m.id,
         matchTime: m.matchTime,
         status: m.status,
@@ -130,7 +130,7 @@ export async function GET(request: Request) {
       return apiSuccess(lite, 200, PRIVATE_SHORT_CACHE);
     }
 
-    const matches = await enrichMatchesWithUserPredictions(raw, user?.userId);
+    const matches = await enrichMatchesWithUserPredictions(dedupedRaw, user?.userId);
     prewarmFastMatchLineups(matches.map((match) => match.id));
 
     return apiSuccess(matches, 200, PRIVATE_SHORT_CACHE);

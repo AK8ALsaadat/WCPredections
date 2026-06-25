@@ -25,6 +25,7 @@ import { enqueueBackgroundPrefetch } from "@/lib/prefetch-queue";
 import { matchIdentityKey } from "@/lib/team-identity";
 
 type Round = { id: string; name: string };
+type MatchLineupMarker = { lineup?: unknown[] };
 type Match = {
   id: string;
   matchTime: string | Date;
@@ -33,8 +34,11 @@ type Match = {
   awayScore: number | null;
   isKnockout: boolean;
   stageName?: string | null;
-  homeTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
-  awayTeam: { id: string; name: string; shortName: string; logoUrl?: string | null };
+  lineup?: unknown[];
+  homeLineup?: unknown[];
+  awayLineup?: unknown[];
+  homeTeam: { id: string; name: string; shortName: string; logoUrl?: string | null } & MatchLineupMarker;
+  awayTeam: { id: string; name: string; shortName: string; logoUrl?: string | null } & MatchLineupMarker;
   round: { id: string; name: string };
   actualFinishType?: string | null;
   penaltyWinnerTeamId?: string | null;
@@ -253,9 +257,11 @@ export default function MatchesPage() {
           function dedupeMatches(rawMatches: Match[]) {
             function hasLineup(m: Match) {
               return !!(
-                (m as any).lineup?.length > 0 ||
-                (m as any).homeLineup?.length > 0 ||
-                (m as any).awayLineup?.length > 0
+                m.lineup?.length ||
+                m.homeLineup?.length ||
+                m.awayLineup?.length ||
+                m.homeTeam.lineup?.length ||
+                m.awayTeam.lineup?.length
               );
             }
 

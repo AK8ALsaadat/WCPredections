@@ -4,6 +4,19 @@ export type ParsedFixtureEvent = {
   playerApiId: string | null;
 };
 
+function isCancelledGoalDetail(detail: string) {
+  const text = detail.trim().toLowerCase();
+  return (
+    text.includes("cancelled") ||
+    text.includes("canceled") ||
+    text.includes("disallowed") ||
+    text.includes("offside") ||
+    text.includes("goal cancelled") ||
+    text.includes("goal canceled") ||
+    text.includes("goal disallowed")
+  );
+}
+
 /** تجميع أهداف كل لاعب من أحداث المباراة — يدعم إلغاء الهدف بالـ VAR */
 export function aggregateGoalsFromEvents(
   events: ParsedFixtureEvent[]
@@ -18,14 +31,14 @@ export function aggregateGoalsFromEvents(
 
     if (event.type === "Goal") {
       if (detail.includes("missed penalty")) continue;
-      if (detail.includes("cancelled") || detail.includes("disallowed")) continue;
+      if (isCancelledGoalDetail(detail)) continue;
 
       goals.set(playerApiId, (goals.get(playerApiId) ?? 0) + 1);
       continue;
     }
 
     if (event.type === "Var") {
-      if (!detail.includes("cancelled") && !detail.includes("disallowed")) {
+      if (!isCancelledGoalDetail(detail)) {
         continue;
       }
 

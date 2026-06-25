@@ -214,6 +214,7 @@ export async function calculateOctopusPointsForMatch(matchId: string) {
     prisma.match.findUnique({
       where: { id: matchId },
       select: {
+        apiMatchId: true,
         status: true,
         homeTeamId: true,
         awayTeamId: true,
@@ -232,7 +233,31 @@ export async function calculateOctopusPointsForMatch(matchId: string) {
   ]);
 
   if (!match || bets.length === 0) return;
-  const savesByPlayer = new Map(stats.map((row) => [row.playerId, row.saves]));
+  let goalkeeperStats = stats;
+  const apiMatchId = match.apiMatchId;
+  const missingSavedStats =
+    match.status === "FINISHED" &&
+    apiMatchId != null &&
+    bets.some((bet) => !goalkeeperStats.some((row) => row.playerId === bet.playerId));
+
+  if (missingSavedStats) {
+    try {
+      await syncGoalkeeperSavesFromApi(matchId, apiMatchId);
+      goalkeeperStats = await prisma.matchGoalkeeperStat.findMany({
+        where: { matchId },
+        select: { playerId: true, saves: true },
+      });
+    } catch (err) {
+      console.warn(
+        "[octopus] goalkeeper saves refresh failed:",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  const savesByPlayer = new Map(
+    goalkeeperStats.map((row) => [row.playerId, row.saves])
+  );
   const goalsConcededByTeam = new Map<string, number | null>([
     [match.homeTeamId, match.awayScore],
     [match.awayTeamId, match.homeScore],
