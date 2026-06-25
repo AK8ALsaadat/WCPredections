@@ -22,6 +22,7 @@ import {
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { clientFetch } from "@/lib/client-fetch";
 import { enqueueBackgroundPrefetch } from "@/lib/prefetch-queue";
+import { dedupeDisplayMatches } from "@/lib/match-list-dedupe";
 import { matchIdentityKey } from "@/lib/team-identity";
 
 type Round = { id: string; name: string };
@@ -254,62 +255,17 @@ export default function MatchesPage() {
 
         if (data.success) {
           const resolvedPage = data.data.page as number;
-          function dedupeMatches(rawMatches: Match[]) {
-            function hasLineup(m: Match) {
-              return !!(
-                m.lineup?.length ||
-                m.homeLineup?.length ||
-                m.awayLineup?.length ||
-                m.homeTeam.lineup?.length ||
-                m.awayTeam.lineup?.length
-              );
-            }
-
-            const groups = new Map<string, Match[]>();
-            for (const m of rawMatches) {
-              const key = `${matchIdentityKey(
-                m.homeTeam.name,
-                m.awayTeam.name
-              )}|${new Date(m.matchTime).getTime()}`;
-              const arr = groups.get(key) ?? [];
-              arr.push(m);
-              groups.set(key, arr);
-            }
-            const result: Match[] = [];
-            for (const [, arr] of groups) {
-              if (arr.length === 1) {
-                if (hasLineup(arr[0])) result.push(arr[0]);
-                continue;
-              }
-
-              // If any candidate has a lineup prefer those and drop empty-lineup variants
-              const withLineup = arr.filter((m) => hasLineup(m));
-              const candidates = withLineup.length > 0 ? withLineup : arr;
-
-              // choose best candidate: prefer ones with scorer picks/predictions and longer shortNames
-              candidates.sort((a, b) => {
-                const scoreA = (a.userScorerPredictions?.length ?? 0) * 10 + (a.userPrediction ? 5 : 0) +
-                  (a.homeTeam.shortName?.length ?? 0) + (a.awayTeam.shortName?.length ?? 0);
-                const scoreB = (b.userScorerPredictions?.length ?? 0) * 10 + (b.userPrediction ? 5 : 0) +
-                  (b.homeTeam.shortName?.length ?? 0) + (b.awayTeam.shortName?.length ?? 0);
-                return scoreB - scoreA;
-              });
-              result.push(candidates[0]);
-            }
-            return result;
-          }
-
           const rawMatchesArr: Match[] = data.data.matches ?? [];
           const rawPinnedArr: Match[] = data.data.pinnedMatches ?? [];
 
-          const dedupedPinned = dedupeMatches(rawPinnedArr);
+          const dedupedPinned = dedupeDisplayMatches(rawPinnedArr);
           const pinnedKeys = new Set(
             dedupedPinned.map(
               (m) => `${matchIdentityKey(m.homeTeam.name, m.awayTeam.name)}|${new Date(m.matchTime).getTime()}`
             )
           );
 
-          const dedupedMatchesArr = dedupeMatches(rawMatchesArr).filter((m) => {
+          const dedupedMatchesArr = dedupeDisplayMatches(rawMatchesArr).filter((m) => {
             const key = `${matchIdentityKey(m.homeTeam.name, m.awayTeam.name)}|${new Date(m.matchTime).getTime()}`;
             return !pinnedKeys.has(key);
           });

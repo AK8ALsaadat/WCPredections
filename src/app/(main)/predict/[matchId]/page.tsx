@@ -1107,11 +1107,9 @@ export default function PredictPage() {
       return;
     }
 
-    if (hasAnyGoals && !budget.isComplete) {
+    if (hasAnyGoals && hasPlayers && !budget.isComplete) {
       setError(
-        hasPlayers
-          ? t.predict.scorersIncomplete
-          : t.predict.scorersNeedLineup
+        t.predict.scorersIncomplete
       );
       return;
     }

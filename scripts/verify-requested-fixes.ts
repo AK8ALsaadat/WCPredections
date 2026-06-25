@@ -10,6 +10,8 @@ import { playerNamesMatch } from "../src/lib/player-matching";
 import { matchIdentityKey } from "../src/lib/team-identity";
 import { layoutFormation } from "../src/lib/formation-layout";
 import { mergeLineupData } from "../src/lib/lineup-state";
+import { dedupeDisplayMatches } from "../src/lib/match-list-dedupe";
+import { isPredictionAllowed } from "../src/lib/utils";
 import {
   calculateScorerPredictionPoints,
   getPositionPointsMultiplier,
@@ -395,6 +397,32 @@ check(
     (player) => player.id === "yamal" && player.section === "bench"
   )
 );
+
+const lightMatchesWithoutLineup = dedupeDisplayMatches([
+  {
+    matchTime: "2026-06-26T02:00:00.000Z",
+    homeTeam: { name: "Turkey", shortName: "Turkey" },
+    awayTeam: { name: "USA", shortName: "USA" },
+  },
+  {
+    matchTime: "2026-06-26T02:00:00.000Z",
+    homeTeam: { name: "Paraguay", shortName: "Paraguay" },
+    awayTeam: { name: "Australia", shortName: "Australia" },
+  },
+]);
+check(
+  "light upcoming matches stay visible without lineup data",
+  lightMatchesWithoutLineup.length === 2
+);
+
+const now = Date.now;
+Date.now = () => new Date("2026-06-25T17:43:00.000Z").getTime();
+const fiveAmRiyadhMatch = "2026-06-26T02:00:00.000Z";
+check(
+  "5am Riyadh matches remain inside prediction window",
+  isPredictionAllowed(fiveAmRiyadhMatch, "SCHEDULED")
+);
+Date.now = now;
 
 const fiveHome = new Set(["h1", "h2", "h3", "h4", "h5"]);
 const oneAway = new Set(["a1"]);

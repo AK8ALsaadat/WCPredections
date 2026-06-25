@@ -218,6 +218,8 @@ async function validateScorerPicks(
   predAway: number,
   picks: { playerId: string; goals: number }[]
 ) {
+  if (picks.length === 0) return;
+
   const playerIds = picks.map((p) => p.playerId);
   const uniquePlayerIds = [...new Set(playerIds)];
   if (uniquePlayerIds.length !== playerIds.length) {
