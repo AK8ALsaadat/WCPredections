@@ -152,8 +152,8 @@ function sortFormationLine(
     .sort((left, right) => {
       const rankDifference =
         side === "home"
-          ? left.rank - right.rank
-          : right.rank - left.rank;
+          ? right.rank - left.rank
+          : left.rank - right.rank;
       return rankDifference || left.index - right.index;
     })
     .map(({ player }) => player);
@@ -269,8 +269,8 @@ export function layoutFormation(
   }
 
   const slots: PitchSlot[] = [];
-  const homeLineYs = lines.length === 3 ? [16, 29, 42] : null;
-  const awayLineYs = lines.length === 3 ? [84, 71, 58] : null;
+  const homeLineYs = lines.length === 3 ? [18, 31, 44] : null;
+  const awayLineYs = lines.length === 3 ? [82, 69, 56] : null;
 
   if (side === "home") {
     slots.push(...spreadRow(gk, 7));

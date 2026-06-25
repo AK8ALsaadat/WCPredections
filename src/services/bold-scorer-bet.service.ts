@@ -74,7 +74,7 @@ export async function getBoldScorerBetForUserRound(
 export async function getBoldScorerBetForMatch(userId: string, matchId: string) {
   const scope = await getUsageRoundScope(matchId);
   const bet = await getBoldScorerBetForUserRound(userId, scope.key);
-  if (bet?.matchId === matchId) return bet;
+  if (bet?.matchId === matchId && !bet.cancelledAt) return bet;
   return null;
 }
 
@@ -89,21 +89,26 @@ export async function getBoldScorerBetStatus(
     userId,
     scope.key
   );
+  const isCancelled = !!existing?.cancelledAt;
+  const activeOnThisMatch = existing?.matchId === matchId && !isCancelled;
 
   return {
     roundId: scope.key,
     used: !!existing,
-    onThisMatch: existing?.matchId === matchId,
-    onOtherMatch: !!existing && existing.matchId !== matchId,
+    onThisMatch: activeOnThisMatch,
+    onOtherMatch: !!existing && existing.matchId !== matchId && !isCancelled,
     bet:
-      existing?.matchId === matchId
+      activeOnThisMatch
         ? {
             playerId: existing.playerId,
             playerName: existing.player.name,
             points: existing.points,
           }
         : null,
-    otherMatchId: existing && existing.matchId !== matchId ? existing.matchId : null,
+    otherMatchId:
+      existing && existing.matchId !== matchId && !isCancelled
+        ? existing.matchId
+        : null,
   };
 }
 
@@ -150,7 +155,10 @@ export async function submitBoldScorerBet(
       select: { id: true },
     });
     if (isActiveRound) {
-      await prisma.boldScorerBet.update({ where: { id: existing.id }, data: { points: 0 } });
+      await prisma.boldScorerBet.update({
+        where: { id: existing.id },
+        data: { points: 0, cancelledAt: new Date() },
+      });
       return null;
     }
 
@@ -168,6 +176,10 @@ export async function submitBoldScorerBet(
     }
   }
 
+  if (existing?.cancelledAt) {
+    throw new Error("Bold scorer bet already used this round");
+  }
+
   const [prediction, octopusBet] = await Promise.all([
     prisma.prediction.findUnique({
       where: { userId_matchId: { userId, matchId } },
@@ -177,7 +189,7 @@ export async function submitBoldScorerBet(
       where: {
         userId_usageRoundKey: { userId, usageRoundKey: scope.key },
       },
-      select: { matchId: true },
+      select: { matchId: true, cancelledAt: true },
     }),
   ]);
   if (prediction?.isDouble) {
@@ -186,7 +198,7 @@ export async function submitBoldScorerBet(
     );
   }
 
-  if (octopusBet?.matchId === matchId) {
+  if (octopusBet?.matchId === matchId && !octopusBet.cancelledAt) {
     throw new Error(
       "Ù…Ø§ ØªÙ‚Ø¯Ø± ØªØ³ØªØ®Ø¯Ù… Ø§Ù„Ø±Ù‡Ø§Ù† ÙˆØ§Ù„Ø£Ø®Ø·Ø¨ÙˆØ· Ù…Ø¹Ø§Ù‹ Ø¹Ù„Ù‰ Ù†ÙØ³ Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©"
     );
@@ -248,6 +260,7 @@ export async function submitBoldScorerBet(
       matchId,
       playerId,
       points: 0,
+      cancelledAt: null,
     },
     include: {
       player: { select: { id: true, name: true } },
@@ -269,7 +282,7 @@ export async function calculateBoldScorerBetPointsForMatch(
       select: { status: true },
     }),
     prisma.boldScorerBet.findMany({
-      where: { matchId },
+      where: { matchId, cancelledAt: null },
       include: {
         player: { select: { name: true, teamId: true } },
       },

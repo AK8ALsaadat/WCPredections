@@ -158,6 +158,14 @@ export function calculatePerfectPredictionBonusWithMinute(
   return PERFECT_PREDICTION_BONUS_POINTS;
 }
 
+export function hasRequiredScorerPicksForPerfectBonus(
+  predHome: number,
+  predAway: number,
+  scorerPickCount: number
+): boolean {
+  return predHome + predAway === 0 || scorerPickCount > 0;
+}
+
 /** نقاط الهدافين والبطاقة الجريئة — أثناء المباراة أو بعدها */
 export function isMatchEligibleForScorerPoints(match: Match): boolean {
   return (

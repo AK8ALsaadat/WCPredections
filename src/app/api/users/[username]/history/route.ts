@@ -77,7 +77,11 @@ export async function GET(
           },
         }),
         prisma.boldScorerBet.findMany({
-          where: { userId: user.id, matchId: { in: matchIds } },
+          where: {
+            userId: user.id,
+            matchId: { in: matchIds },
+            cancelledAt: null,
+          },
           include: {
             player: true,
             match: {
@@ -90,7 +94,11 @@ export async function GET(
           },
         }),
         prisma.octopusGoalkeeperBet.findMany({
-          where: { userId: user.id, matchId: { in: matchIds } },
+          where: {
+            userId: user.id,
+            matchId: { in: matchIds },
+            cancelledAt: null,
+          },
           include: {
             player: true,
             match: {

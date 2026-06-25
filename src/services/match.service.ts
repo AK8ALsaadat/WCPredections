@@ -100,7 +100,7 @@ export async function enrichMatchesWithUserPredictions<
       },
     }),
       prisma.boldScorerBet.findMany({
-        where: { userId, matchId: { in: matchIds } },
+        where: { userId, matchId: { in: matchIds }, cancelledAt: null },
         select: {
           matchId: true,
           points: true,
@@ -109,7 +109,7 @@ export async function enrichMatchesWithUserPredictions<
         },
       }),
       prisma.octopusGoalkeeperBet.findMany({
-        where: { userId, matchId: { in: matchIds } },
+        where: { userId, matchId: { in: matchIds }, cancelledAt: null },
         select: {
           matchId: true,
           points: true,
@@ -285,14 +285,14 @@ export async function getUserPinnedTodayMatches(
       },
     },
     boldScorerBets: {
-      where: { userId },
+      where: { userId, cancelledAt: null },
       select: {
         points: true,
         player: { select: { name: true } },
       },
     },
     octopusBets: {
-      where: { userId },
+      where: { userId, cancelledAt: null },
       select: {
         matchId: true,
         playerId: true,
@@ -791,10 +791,10 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
   }
 
   const [octopusCount, predictionsCount, doublesCount, boldCount] = await Promise.all([
-    prisma.octopusGoalkeeperBet.count({ where: { matchId } }),
+    prisma.octopusGoalkeeperBet.count({ where: { matchId, cancelledAt: null } }),
     prisma.prediction.count({ where: { matchId } }),
     prisma.prediction.count({ where: { matchId, isDouble: true } }),
-    prisma.boldScorerBet.count({ where: { matchId } }),
+    prisma.boldScorerBet.count({ where: { matchId, cancelledAt: null } }),
   ]);
 
   const baseResult = {
@@ -881,7 +881,7 @@ export async function getMatchById(
       predictionOpen
         ? Promise.resolve(null)
         : prisma.boldScorerBet.findFirst({
-            where: { userId, matchId },
+            where: { userId, matchId, cancelledAt: null },
           select: {
             playerId: true,
             points: true,
@@ -891,7 +891,7 @@ export async function getMatchById(
       predictionOpen
         ? Promise.resolve(null)
         : prisma.octopusGoalkeeperBet.findFirst({
-            where: { userId, matchId },
+            where: { userId, matchId, cancelledAt: null },
             select: {
               playerId: true,
               points: true,
@@ -974,10 +974,10 @@ export async function getMatchById(
 
   if (!options?.includeLineup) {
     const [octopusCount, predictionsCount, doublesCount, boldCount] = await Promise.all([
-      prisma.octopusGoalkeeperBet.count({ where: { matchId } }),
+      prisma.octopusGoalkeeperBet.count({ where: { matchId, cancelledAt: null } }),
       prisma.prediction.count({ where: { matchId } }),
       prisma.prediction.count({ where: { matchId, isDouble: true } }),
-      prisma.boldScorerBet.count({ where: { matchId } }),
+      prisma.boldScorerBet.count({ where: { matchId, cancelledAt: null } }),
     ]);
     return { ...base, octopusCount, predictionsCount, doublesCount, boldCount };
   }

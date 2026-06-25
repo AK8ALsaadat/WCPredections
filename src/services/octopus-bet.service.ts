@@ -223,7 +223,7 @@ export async function calculateOctopusPointsForMatch(matchId: string) {
       },
     }),
     prisma.octopusGoalkeeperBet.findMany({
-      where: { matchId },
+      where: { matchId, cancelledAt: null },
       include: { player: { select: { teamId: true } } },
     }),
     prisma.matchGoalkeeperStat.findMany({
@@ -300,21 +300,26 @@ export async function getOctopusBetStatus(
 ) {
   const scope = knownScope ?? (await getUsageRoundScope(matchId));
   const existing = await getOctopusBetForUserRound(userId, scope.key);
+  const isCancelled = !!existing?.cancelledAt;
+  const activeOnThisMatch = existing?.matchId === matchId && !isCancelled;
 
   return {
     roundId: scope.key,
     used: !!existing,
-    onThisMatch: existing?.matchId === matchId,
-    onOtherMatch: !!existing && existing.matchId !== matchId,
+    onThisMatch: activeOnThisMatch,
+    onOtherMatch: !!existing && existing.matchId !== matchId && !isCancelled,
     bet:
-      existing?.matchId === matchId
+      activeOnThisMatch
         ? {
             playerId: existing.playerId,
             playerName: existing.player.name,
             points: existing.points,
           }
         : null,
-    otherMatchId: existing && existing.matchId !== matchId ? existing.matchId : null,
+    otherMatchId:
+      existing && existing.matchId !== matchId && !isCancelled
+        ? existing.matchId
+        : null,
   };
 }
 
@@ -355,12 +360,19 @@ export async function submitOctopusBet(
       select: { id: true },
     });
     if (isActiveRound) {
-      await prisma.octopusGoalkeeperBet.update({ where: { id: existing.id }, data: { points: 0 } });
+      await prisma.octopusGoalkeeperBet.update({
+        where: { id: existing.id },
+        data: { points: 0, cancelledAt: new Date() },
+      });
       return null;
     }
 
     await prisma.octopusGoalkeeperBet.delete({ where: { id: existing.id } });
     return null;
+  }
+
+  if (existing?.cancelledAt) {
+    throw new Error("Octopus already used this round");
   }
 
   if (existing && existing.matchId !== matchId) {
@@ -374,7 +386,7 @@ export async function submitOctopusBet(
     }),
     prisma.boldScorerBet.findUnique({
       where: { userId_usageRoundKey: { userId, usageRoundKey: scope.key } },
-      select: { matchId: true },
+      select: { matchId: true, cancelledAt: true },
     }),
     prisma.player.findFirst({
       where: {
@@ -386,7 +398,7 @@ export async function submitOctopusBet(
     }),
   ]);
 
-  if (prediction?.isDouble || boldBet?.matchId === matchId) {
+  if (prediction?.isDouble || (boldBet?.matchId === matchId && !boldBet.cancelledAt)) {
     throw new Error("ما تقدر تستخدم الأخطبوط مع المضاعفة أو الرهان على نفس المباراة");
   }
 
@@ -407,6 +419,7 @@ export async function submitOctopusBet(
       matchId,
       playerId,
       points: 0,
+      cancelledAt: null,
     },
     include: {
       player: { select: { id: true, name: true } },

@@ -14,6 +14,7 @@ import {
   calculateScorerPredictionPoints,
   EXACT_SCORE_POINTS,
   getScorerGoalsForPoints,
+  hasRequiredScorerPicksForPerfectBonus,
   PERFECT_PREDICTION_BONUS_POINTS,
 } from "../src/services/scoring.service";
 import {
@@ -79,6 +80,14 @@ ok(
 ok(
   "نتيجة دقيقة بدون هدافين متوقعين (0-0) = بونص 3",
   calculatePerfectPredictionBonus(true, []) === 3
+);
+ok(
+  "0-0 فقط يسمح ببونص مثالي بدون هدافين",
+  hasRequiredScorerPicksForPerfectBonus(0, 0, 0)
+);
+ok(
+  "نتيجة فيها أهداف لا تأخذ بونص مثالي بدون هدافين",
+  !hasRequiredScorerPicksForPerfectBonus(1, 0, 0)
 );
 ok(
   "نتيجة دقيقة لكن هداف واحد خاطئ = بونص 0",

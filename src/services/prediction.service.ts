@@ -26,6 +26,7 @@ import {
   calculateScorePredictionPoints,
   calculateScorerPredictionPoints,
   getScorerGoalsForPoints,
+  hasRequiredScorerPicksForPerfectBonus,
   isExactScorePrediction,
   isMatchEligibleForScorerPoints,
   PERFECT_PREDICTION_MIN_MINUTE,
@@ -533,12 +534,21 @@ export async function submitMatchPredictionBundle(
   ]);
 
   // ✅ منع استخدام الـ Double والـ Bold معاً على نفس المباراة
+  const storedBoldActive =
+    storedBold != null && storedBold.cancelledAt == null;
+  const storedOctopusActive =
+    storedOctopus != null && storedOctopus.cancelledAt == null;
+  const storedBoldActiveOnThisMatch =
+    storedBoldActive && storedBold.matchId === data.matchId;
+  const storedOctopusActiveOnThisMatch =
+    storedOctopusActive && storedOctopus.matchId === data.matchId;
+
   if (
     isDouble &&
     (data.boldPlayerId ||
       data.octopusPlayerId ||
-      storedBold?.matchId === data.matchId ||
-      storedOctopus?.matchId === data.matchId)
+      storedBoldActiveOnThisMatch ||
+      storedOctopusActiveOnThisMatch)
   ) {
     throw new Error(
       "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
@@ -547,22 +557,21 @@ export async function submitMatchPredictionBundle(
 
   if (
     data.boldPlayerId &&
-    (data.octopusPlayerId || storedOctopus?.matchId === data.matchId)
+    (data.octopusPlayerId || storedOctopusActiveOnThisMatch)
   ) {
     throw new Error("ما تقدر تستخدم الرهان والأخطبوط معاً على نفس المباراة");
   }
 
   if (
     data.octopusPlayerId &&
-    (data.boldPlayerId || storedBold?.matchId === data.matchId)
+    (data.boldPlayerId || storedBoldActiveOnThisMatch)
   ) {
     throw new Error("ما تقدر تستخدم الأخطبوط مع الرهان على نفس المباراة");
   }
 
   if (
-    storedBold?.matchId !== data.matchId &&
     data.boldPlayerId &&
-    storedBold &&
+    storedBoldActive &&
     storedBold.matchId !== data.matchId
   ) {
     throw new Error(
@@ -571,22 +580,49 @@ export async function submitMatchPredictionBundle(
   }
 
   if (
-    storedOctopus?.matchId !== data.matchId &&
     data.octopusPlayerId &&
-    storedOctopus &&
+    storedOctopusActive &&
     storedOctopus.matchId !== data.matchId
   ) {
     throw new Error("استخدمت الأخطبوط في مباراة ثانية هالجولة — مرة واحدة بس");
   }
 
+  if (data.boldPlayerId && storedBold?.cancelledAt) {
+    throw new Error("Bold scorer bet already used this round");
+  }
+
+  if (data.octopusPlayerId && storedOctopus?.cancelledAt) {
+    throw new Error("Octopus already used this round");
+  }
+
+  const now = new Date();
+  const isActiveRound = await prisma.round.findFirst({
+    where: { id: match.roundId, startsAt: { lte: now }, endsAt: { gte: now } },
+    select: { id: true },
+  });
+
   const result = await prisma.$transaction(async (tx) => {
-    if (storedBold?.matchId === data.matchId && !data.boldPlayerId) {
-      await tx.boldScorerBet.delete({ where: { id: storedBold.id } });
+    if (storedBoldActiveOnThisMatch && !data.boldPlayerId) {
+      if (isActiveRound) {
+        await tx.boldScorerBet.update({
+          where: { id: storedBold.id },
+          data: { points: 0, cancelledAt: new Date() },
+        });
+      } else {
+        await tx.boldScorerBet.delete({ where: { id: storedBold.id } });
+      }
     }
-    if (storedOctopus?.matchId === data.matchId && !data.octopusPlayerId) {
-      await tx.octopusGoalkeeperBet.delete({
-        where: { id: storedOctopus.id },
-      });
+    if (storedOctopusActiveOnThisMatch && !data.octopusPlayerId) {
+      if (isActiveRound) {
+        await tx.octopusGoalkeeperBet.update({
+          where: { id: storedOctopus.id },
+          data: { points: 0, cancelledAt: new Date() },
+        });
+      } else {
+        await tx.octopusGoalkeeperBet.delete({
+          where: { id: storedOctopus.id },
+        });
+      }
     }
 
     const prediction = await tx.prediction.upsert({
@@ -635,6 +671,7 @@ export async function submitMatchPredictionBundle(
             matchId: data.matchId,
             playerId: data.boldPlayerId,
             points: 0,
+            cancelledAt: null,
           },
           include: {
             player: { select: { id: true, name: true } },
@@ -661,6 +698,7 @@ export async function submitMatchPredictionBundle(
             matchId: data.matchId,
             playerId: data.octopusPlayerId,
             points: 0,
+            cancelledAt: null,
           },
           include: {
             player: { select: { id: true, name: true } },
@@ -835,21 +873,27 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
       const picks = picksByUser.get(prediction.userId) ?? [];
       
       // استخدم الدالة الجديدة التي تتحقق من الدقيقة 75
-      bonusPoints = calculatePerfectPredictionBonusWithMinute(
-        isExact,
-        picks.map((sp) => ({
-          predictedGoals: sp.predictedGoals,
-          actualGoals: resolveScorerGoalsForPlayer(
-            sp.playerId,
-            sp.player,
-            scorerGoalsByPlayer,
-            match.matchScorers
-          ),
-          position: sp.player.position,
-        })),
-        match.matchTime,
-        match.status
-      );
+      bonusPoints = hasRequiredScorerPicksForPerfectBonus(
+        prediction.predHome,
+        prediction.predAway,
+        picks.length
+      )
+        ? calculatePerfectPredictionBonusWithMinute(
+            isExact,
+            picks.map((sp) => ({
+              predictedGoals: sp.predictedGoals,
+              actualGoals: resolveScorerGoalsForPlayer(
+                sp.playerId,
+                sp.player,
+                scorerGoalsByPlayer,
+                match.matchScorers
+              ),
+              position: sp.player.position,
+            })),
+            match.matchTime,
+            match.status
+          )
+        : 0;
     }
 
     const finishTypePoints = (shouldAwardBasePoints && match.isKnockout)
