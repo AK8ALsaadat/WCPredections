@@ -524,7 +524,7 @@ export async function submitMatchPredictionBundle(
     }
   }
 
-  const [storedBold, storedOctopus] = await Promise.all([
+  let [storedBold, storedOctopus] = await Promise.all([
     prisma.boldScorerBet.findUnique({
       where: {
         userId_usageRoundKey: {
@@ -543,15 +543,49 @@ export async function submitMatchPredictionBundle(
     }),
   ]);
 
+  if (!storedBold) {
+    const sameMatchBold = await prisma.boldScorerBet.findFirst({
+      where: { userId, matchId: data.matchId, cancelledAt: null },
+    });
+    if (sameMatchBold) {
+      storedBold =
+        sameMatchBold.usageRoundKey === usageScope.key
+          ? sameMatchBold
+          : await prisma.boldScorerBet
+              .update({
+                where: { id: sameMatchBold.id },
+                data: { usageRoundKey: usageScope.key },
+              })
+              .catch(() => sameMatchBold);
+    }
+  }
+
+  if (!storedOctopus) {
+    const sameMatchOctopus = await prisma.octopusGoalkeeperBet.findFirst({
+      where: { userId, matchId: data.matchId, cancelledAt: null },
+    });
+    if (sameMatchOctopus) {
+      storedOctopus =
+        sameMatchOctopus.usageRoundKey === usageScope.key
+          ? sameMatchOctopus
+          : await prisma.octopusGoalkeeperBet
+              .update({
+                where: { id: sameMatchOctopus.id },
+                data: { usageRoundKey: usageScope.key },
+              })
+              .catch(() => sameMatchOctopus);
+    }
+  }
+
   // ✅ منع استخدام الـ Double والـ Bold معاً على نفس المباراة
-  const storedBoldActive =
-    storedBold != null && storedBold.cancelledAt == null;
-  const storedOctopusActive =
-    storedOctopus != null && storedOctopus.cancelledAt == null;
   const storedBoldActiveOnThisMatch =
-    storedBoldActive && storedBold.matchId === data.matchId;
+    storedBold != null &&
+    storedBold.cancelledAt == null &&
+    storedBold.matchId === data.matchId;
   const storedOctopusActiveOnThisMatch =
-    storedOctopusActive && storedOctopus.matchId === data.matchId;
+    storedOctopus != null &&
+    storedOctopus.cancelledAt == null &&
+    storedOctopus.matchId === data.matchId;
   const nextBoldActiveOnThisMatch = Boolean(data.boldPlayerId);
   const nextOctopusActiveOnThisMatch = Boolean(data.octopusPlayerId);
 
@@ -580,7 +614,8 @@ export async function submitMatchPredictionBundle(
 
   if (
     data.boldPlayerId &&
-    storedBoldActive &&
+    storedBold != null &&
+    storedBold.cancelledAt == null &&
     storedBold.matchId !== data.matchId
   ) {
     throw new Error(
@@ -590,19 +625,27 @@ export async function submitMatchPredictionBundle(
 
   if (
     data.octopusPlayerId &&
-    storedOctopusActive &&
+    storedOctopus != null &&
+    storedOctopus.cancelledAt == null &&
     storedOctopus.matchId !== data.matchId
   ) {
     throw new Error("استخدمت الأخطبوط في مباراة ثانية هالجولة — مرة واحدة بس");
   }
 
+  const storedBoldOnThisMatchId = storedBoldActiveOnThisMatch
+    ? storedBold?.id ?? null
+    : null;
+  const storedOctopusOnThisMatchId = storedOctopusActiveOnThisMatch
+    ? storedOctopus?.id ?? null
+    : null;
+
   const result = await prisma.$transaction(async (tx) => {
-    if (storedBoldActiveOnThisMatch && !data.boldPlayerId) {
-      await tx.boldScorerBet.delete({ where: { id: storedBold.id } });
+    if (storedBoldOnThisMatchId && !data.boldPlayerId) {
+      await tx.boldScorerBet.delete({ where: { id: storedBoldOnThisMatchId } });
     }
-    if (storedOctopusActiveOnThisMatch && !data.octopusPlayerId) {
+    if (storedOctopusOnThisMatchId && !data.octopusPlayerId) {
       await tx.octopusGoalkeeperBet.delete({
-        where: { id: storedOctopus.id },
+        where: { id: storedOctopusOnThisMatchId },
       });
     }
 

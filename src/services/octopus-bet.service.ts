@@ -342,13 +342,46 @@ export async function getOctopusBetForUserRound(
   });
 }
 
+async function normalizeOctopusBetUsageKeyForMatch(
+  userId: string,
+  matchId: string,
+  scope: UsageRoundScope
+) {
+  const existing = await getOctopusBetForUserRound(userId, scope.key);
+  if (existing) return existing;
+
+  const sameMatch = await prisma.octopusGoalkeeperBet.findFirst({
+    where: { userId, matchId, cancelledAt: null },
+    include: {
+      player: { select: { id: true, name: true, teamId: true } },
+    },
+  });
+  if (!sameMatch || sameMatch.usageRoundKey === scope.key) return sameMatch;
+
+  try {
+    return await prisma.octopusGoalkeeperBet.update({
+      where: { id: sameMatch.id },
+      data: { usageRoundKey: scope.key },
+      include: {
+        player: { select: { id: true, name: true, teamId: true } },
+      },
+    });
+  } catch {
+    return sameMatch;
+  }
+}
+
 export async function getOctopusBetStatus(
   userId: string,
   matchId: string,
   knownScope?: UsageRoundScope
 ) {
   const scope = knownScope ?? (await getUsageRoundScope(matchId));
-  const existing = await getOctopusBetForUserRound(userId, scope.key);
+  const existing = await normalizeOctopusBetUsageKeyForMatch(
+    userId,
+    matchId,
+    scope
+  );
   const isCancelled = !!existing?.cancelledAt;
   const activeOnThisMatch = existing?.matchId === matchId && !isCancelled;
   const activeOnOtherMatch = !!existing && existing.matchId !== matchId && !isCancelled;
@@ -394,9 +427,11 @@ export async function submitOctopusBet(
   if (lockReason) throw new Error(lockReason);
 
   const scope = await getUsageRoundScope(matchId, match.roundId);
-  const existing = await prisma.octopusGoalkeeperBet.findUnique({
-    where: { userId_usageRoundKey: { userId, usageRoundKey: scope.key } },
-  });
+  const existing = await normalizeOctopusBetUsageKeyForMatch(
+    userId,
+    matchId,
+    scope
+  );
 
   if (!playerId) {
     if (!existing || existing.matchId !== matchId) return null;

@@ -71,9 +71,40 @@ export async function getBoldScorerBetForUserRound(
   });
 }
 
+async function normalizeBoldBetUsageKeyForMatch(
+  userId: string,
+  matchId: string,
+  scope: UsageRoundScope
+) {
+  const existing = await getBoldScorerBetForUserRound(userId, scope.key);
+  if (existing) return existing;
+
+  const sameMatch = await prisma.boldScorerBet.findFirst({
+    where: { userId, matchId, cancelledAt: null },
+    include: {
+      player: { select: { id: true, name: true, teamId: true } },
+      match: { select: { id: true, homeTeamId: true, awayTeamId: true } },
+    },
+  });
+  if (!sameMatch || sameMatch.usageRoundKey === scope.key) return sameMatch;
+
+  try {
+    return await prisma.boldScorerBet.update({
+      where: { id: sameMatch.id },
+      data: { usageRoundKey: scope.key },
+      include: {
+        player: { select: { id: true, name: true, teamId: true } },
+        match: { select: { id: true, homeTeamId: true, awayTeamId: true } },
+      },
+    });
+  } catch {
+    return sameMatch;
+  }
+}
+
 export async function getBoldScorerBetForMatch(userId: string, matchId: string) {
   const scope = await getUsageRoundScope(matchId);
-  const bet = await getBoldScorerBetForUserRound(userId, scope.key);
+  const bet = await normalizeBoldBetUsageKeyForMatch(userId, matchId, scope);
   if (bet?.matchId === matchId && !bet.cancelledAt) return bet;
   return null;
 }
@@ -85,10 +116,7 @@ export async function getBoldScorerBetStatus(
 ) {
   const scope = knownScope ?? (await getUsageRoundScope(matchId));
 
-  const existing = await getBoldScorerBetForUserRound(
-    userId,
-    scope.key
-  );
+  const existing = await normalizeBoldBetUsageKeyForMatch(userId, matchId, scope);
   const isCancelled = !!existing?.cancelledAt;
   const activeOnThisMatch = existing?.matchId === matchId && !isCancelled;
   const activeOnOtherMatch = !!existing && existing.matchId !== matchId && !isCancelled;
@@ -136,11 +164,7 @@ export async function submitBoldScorerBet(
   }
 
   const scope = await getUsageRoundScope(matchId, match.roundId);
-  const existing = await prisma.boldScorerBet.findUnique({
-    where: {
-      userId_usageRoundKey: { userId, usageRoundKey: scope.key },
-    },
-  });
+  const existing = await normalizeBoldBetUsageKeyForMatch(userId, matchId, scope);
 
   // If no playerId is provided, treat as a cancellation request.
   if (!playerId) {
