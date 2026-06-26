@@ -27,6 +27,10 @@ const PRIVATE_SHORT_CACHE = {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    const hasSessionCookie =
+      request.headers
+        .get("cookie")
+        ?.includes("football_predictions_session=") ?? false;
     const light = searchParams.get("light") === "1";
     const completed = searchParams.get("completed") === "true";
     const roundId = searchParams.get("roundId") ?? undefined;
@@ -47,7 +51,7 @@ export async function GET(request: Request) {
           ? getUpcomingMatches(roundId)
           : getAllMatches(roundId);
     const [user, initialRaw] = await Promise.all([
-      getCurrentUser(),
+      hasSessionCookie ? getCurrentUser() : Promise.resolve(null),
       rawPromise,
     ]);
     let raw = initialRaw;

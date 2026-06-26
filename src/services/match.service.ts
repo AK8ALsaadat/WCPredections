@@ -431,15 +431,20 @@ export async function getCompletedMatches(roundId?: string) {
 }
 
 export async function getAllMatches(roundId?: string) {
-  const rows = await prisma.match.findMany({
-    where: { roundId: roundId ?? undefined },
-    include: {
-      homeTeam: { select: teamSelect },
-      awayTeam: { select: teamSelect },
-      round: { select: { id: true, name: true } },
-    },
-    orderBy: { matchTime: "asc" },
-  });
+  const rows = await unstable_cache(
+    () =>
+      prisma.match.findMany({
+        where: { roundId: roundId ?? undefined },
+        include: {
+          homeTeam: { select: teamSelect },
+          awayTeam: { select: teamSelect },
+          round: { select: { id: true, name: true } },
+        },
+        orderBy: { matchTime: "asc" },
+      }),
+    ["all-matches", roundId ?? "all"],
+    { revalidate: 60, tags: ["matches-schedule"] }
+  )();
   return filterVisibleMatches(dedupeMatches(rows));
 }
 
