@@ -5,16 +5,24 @@ const prisma = new PrismaClient();
 async function main() {
   const qaUsers = await prisma.user.findMany({
     where: {
+      isAdmin: false,
       OR: [
         { username: { startsWith: "qa_" } },
         { username: { startsWith: "ui_qa_" } },
+        { username: { startsWith: "test" } },
+        { username: { contains: "tester", mode: "insensitive" } },
+        { username: { startsWith: "demo" } },
+        { username: { startsWith: "sample" } },
+        { username: { startsWith: "tmp" } },
+        { username: { contains: "_test", mode: "insensitive" } },
+        { username: "u446869" },
       ],
     },
     select: { id: true, username: true },
   });
 
   if (qaUsers.length === 0) {
-    console.log("No QA test users found.");
+    console.log("No QA/test users found.");
     return;
   }
 

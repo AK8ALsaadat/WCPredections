@@ -7,6 +7,7 @@ import type {
   FootballApiProvider,
   SyncOptions,
 } from "./types";
+import { isCancelledGoalDetail } from "@/lib/fixture-events";
 
 const GROUP_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
 
@@ -29,6 +30,8 @@ type SportScoreIncident = {
   side?: "home" | "away";
   player?: string;
   is_goal?: boolean;
+  detail?: string;
+  text?: string;
 };
 
 type SportScoreLineupPlayer = {
@@ -437,7 +440,10 @@ export class SportScoreProvider implements FootballApiProvider {
     const goals = new Map<string, ExternalMatchScorer>();
 
     for (const incident of match.incidents) {
-      if (incident.type !== "Goal" || incident.is_goal === false) continue;
+      const type = incident.type.trim().toLowerCase();
+      const detail = `${incident.detail ?? ""} ${incident.text ?? ""}`;
+      if (type !== "goal" || incident.is_goal === false) continue;
+      if (isCancelledGoalDetail(detail)) continue;
       if (!incident.player?.trim() || !incident.side) continue;
 
       const teamSlug = incident.side === "home" ? homeSlug : awaySlug;

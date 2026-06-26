@@ -4,13 +4,15 @@ export type ParsedFixtureEvent = {
   playerApiId: string | null;
 };
 
-function isCancelledGoalDetail(detail: string) {
+export function isCancelledGoalDetail(detail: string) {
   const text = detail.trim().toLowerCase();
   return (
     text.includes("cancelled") ||
     text.includes("canceled") ||
     text.includes("disallowed") ||
     text.includes("offside") ||
+    text.includes("no goal") ||
+    text.includes("goal not awarded") ||
     text.includes("goal cancelled") ||
     text.includes("goal canceled") ||
     text.includes("goal disallowed")
@@ -29,7 +31,9 @@ export function aggregateGoalsFromEvents(
 
     const detail = event.detail.trim().toLowerCase();
 
-    if (event.type === "Goal") {
+    const type = event.type.trim().toLowerCase();
+
+    if (type === "goal") {
       if (detail.includes("missed penalty")) continue;
       if (isCancelledGoalDetail(detail)) continue;
 
@@ -37,7 +41,7 @@ export function aggregateGoalsFromEvents(
       continue;
     }
 
-    if (event.type === "Var") {
+    if (type === "var") {
       if (!isCancelledGoalDetail(detail)) {
         continue;
       }

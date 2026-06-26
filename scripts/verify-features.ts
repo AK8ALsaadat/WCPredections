@@ -445,6 +445,19 @@ ok(
     { type: "Var", detail: "Goal Disallowed - offside", playerApiId: "p1" },
   ]).get("p1") ?? 0) === 0
 );
+ok(
+  "uppercase VAR offside removes a goal",
+  (aggregateGoalsFromEvents([
+    { type: "Goal", detail: "Normal Goal", playerApiId: "p1" },
+    { type: "VAR", detail: "No Goal - Offside", playerApiId: "p1" },
+  ]).get("p1") ?? 0) === 0
+);
+ok(
+  "no goal detail is not counted",
+  (aggregateGoalsFromEvents([
+    { type: "Goal", detail: "No Goal - offside", playerApiId: "p1" },
+  ]).get("p1") ?? 0) === 0
+);
 
 console.log("\n=== توقع الهدافين ===");
 const home = new Set(["p1", "p2"]);
