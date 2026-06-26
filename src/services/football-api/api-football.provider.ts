@@ -272,6 +272,11 @@ export class ApiFootballProvider implements FootballApiProvider {
     fixtureApiId: string,
     options: SyncOptions
   ): Promise<ExternalGoalkeeperSave[]> {
+    const resolvedBeforeDirect =
+      /^\d+$/.test(fixtureApiId)
+        ? fixtureApiId
+        : await this.resolveFixtureIdByMatchContext(options);
+    const lookupFixtureId = resolvedBeforeDirect ?? fixtureApiId;
     const response = await this.fetch<
       {
         team: { id: number; name: string };
@@ -283,7 +288,7 @@ export class ApiFootballProvider implements FootballApiProvider {
           }[];
         }[];
       }[]
-    >("/fixtures/players", { fixture: fixtureApiId });
+    >("/fixtures/players", { fixture: lookupFixtureId });
 
     const direct = response.flatMap((teamRow) =>
       (teamRow.players ?? []).flatMap((row) => {
@@ -313,7 +318,7 @@ export class ApiFootballProvider implements FootballApiProvider {
     if (direct.length > 0) return direct;
 
     const resolvedFixtureId = await this.resolveFixtureIdByMatchContext(options);
-    if (!resolvedFixtureId || resolvedFixtureId === fixtureApiId) return direct;
+    if (!resolvedFixtureId || resolvedFixtureId === lookupFixtureId) return direct;
 
     const resolvedResponse = await this.fetch<
       {

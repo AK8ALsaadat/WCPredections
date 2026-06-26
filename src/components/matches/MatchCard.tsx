@@ -23,6 +23,12 @@ import {
 } from "@/lib/predict-prefetch";
 import { prefetchMatchDetail } from "@/lib/match-detail-cache";
 import { getSaudiLossDisplayTeam } from "@/lib/saudi-kuwait-joke";
+import {
+  getOctopusCleanSheetBonus,
+  getOctopusConcededCapLabel,
+  getOctopusConcededCapPoints,
+  getOctopusSaveTierPoints,
+} from "@/lib/octopus-points";
 
 type ScorerPick = {
   predictedGoals: number;
@@ -97,6 +103,47 @@ function ScorerList({ scorers }: { scorers: ScorerPick[] }) {
       ))}
     </ul>
   );
+}
+
+function octopusSummary(
+  bet: NonNullable<MatchCardProps["match"]["userOctopusBet"]>,
+  locale: string
+) {
+  const saves = bet.saves ?? null;
+  const goalsConceded = bet.goalsConceded ?? null;
+  const saveTierPoints = getOctopusSaveTierPoints(saves);
+  const cleanSheetBonus = getOctopusCleanSheetBonus(goalsConceded);
+  const concededCap = getOctopusConcededCapPoints(goalsConceded);
+  const cappedByGoals = Number.isFinite(concededCap) && saveTierPoints > concededCap;
+  const isAr = locale === "ar";
+  const savesText =
+    saves == null
+      ? isAr ? "التصديات غير متاحة" : "saves unavailable"
+      : isAr ? `${saves} تصديات` : `${saves} saves`;
+  const pointsText = isAr ? `+${bet.points} نقطة` : `+${bet.points} pts`;
+  const detail = [
+    bet.player.name,
+    savesText,
+    isAr
+      ? `نقاط التصديات قبل السقف +${saveTierPoints}`
+      : `save tier before cap +${saveTierPoints}`,
+    cleanSheetBonus > 0
+      ? isAr ? `كلين شيت +${cleanSheetBonus}` : `clean sheet +${cleanSheetBonus}`
+      : null,
+    goalsConceded != null
+      ? isAr ? `استقبل ${goalsConceded}` : `conceded ${goalsConceded}`
+      : null,
+    getOctopusConcededCapLabel(goalsConceded),
+    cappedByGoals
+      ? isAr ? "سقف الأهداف خفض نقاط التصديات" : "goals-conceded cap reduced save points"
+      : null,
+    pointsText,
+  ].filter(Boolean).join(" • ");
+
+  return {
+    label: `${isAr ? "الأخطبوط" : "Octopus"} ${pointsText} • ${savesText}`,
+    title: detail,
+  };
 }
 
 export function MatchCard({
@@ -298,7 +345,7 @@ export function MatchCard({
                 className="mt-1"
               />
             )}
-            {match.userOctopusBet && !isFinished && (match.userOctopusBet.points ?? 0) > 0 && (
+            {false && (
               <PredictionFeatureTag
                 type="octopus"
                 icon="GK"
@@ -306,6 +353,18 @@ export function MatchCard({
                 className="mt-1"
               />
             )}
+            {match.userOctopusBet && showPredictionInfo && (() => {
+              const summary = octopusSummary(match.userOctopusBet!, locale);
+              return (
+                <PredictionFeatureTag
+                  type="octopus"
+                  icon="GK"
+                  label={summary.label}
+                  title={summary.title}
+                  className="mt-1 max-w-full"
+                />
+              );
+            })()}
             <span className="mt-1 text-xs text-muted">
               {formatDate(match.matchTime, locale)}
             </span>

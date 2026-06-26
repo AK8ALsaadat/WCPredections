@@ -142,7 +142,7 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
 
 function buildLeaderboard(pointsMap: Map<string, PointsRow>): LeaderboardEntry[] {
   // استبعد حسابات الاختبار وبعض المستخدمين بحسب القواعد
-  const EXCLUDED_USERNAMES = new Set(["mmg", "mhk"]);
+  const EXCLUDED_USERNAMES = new Set(["mmg", "mhk", "verifier"]);
   const EXCLUDE_PATTERNS: RegExp[] = [
     /^qa_/i,
     /^ui_qa_/i,
