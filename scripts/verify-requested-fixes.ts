@@ -646,4 +646,27 @@ check(
     exactOrdinalWideSlots.find((slot) => slot.player.id === "lw-as-mid")?.x === 90
 );
 
+const spainContradictingOrdinalSlots = layoutFormation(
+  [
+    { id: "gk", name: "GK", position: "Goalkeeper", section: "lineup" as const, grid: "1" },
+    { id: "cucurella", name: "Marc Cucurella", position: "Left Back", section: "lineup" as const, grid: "3" },
+    { id: "rodri", name: "Rodri", position: "Center Midfielder", section: "lineup" as const, grid: "4" },
+    { id: "porro", name: "Pedro Porro", position: "Right Back", section: "lineup" as const, grid: "2" },
+    { id: "laporte", name: "Aymeric Laporte", position: "Center Left Defender", section: "lineup" as const, grid: "6" },
+    { id: "cm1", name: "CM1", position: "Center Midfielder", section: "lineup" as const, grid: "7" },
+    { id: "cm2", name: "CM2", position: "Center Midfielder", section: "lineup" as const, grid: "8" },
+    { id: "rw", name: "RW", position: "Right Wing", section: "lineup" as const, grid: "10" },
+    { id: "st", name: "ST", position: "Forward", section: "lineup" as const, grid: "9" },
+    { id: "lw", name: "LW", position: "Left Wing", section: "lineup" as const, grid: "11" },
+    { id: "cb", name: "CB", position: "Center Defender", section: "lineup" as const, grid: "5" },
+  ],
+  "4-3-3",
+  "home"
+);
+check(
+  "contradicting ordinal places do not put Spain defender/midfielder on wrong lines",
+  spainContradictingOrdinalSlots.find((slot) => slot.player.id === "laporte")?.y === 18 &&
+    spainContradictingOrdinalSlots.find((slot) => slot.player.id === "rodri")?.y === 31
+);
+
 process.exit(failures === 0 ? 0 : 1);

@@ -208,39 +208,72 @@ const usageMatchSelect = {
   round: { select: { name: true } },
 } as const;
 
+const fetchUsageMatch = (matchId: string) =>
+  prisma.match.findUniqueOrThrow({
+    where: { id: matchId },
+    select: usageMatchSelect,
+  });
+
+const fetchUsageRoundMatches = (roundId: string) =>
+  prisma.match.findMany({
+    where: { roundId },
+    select: usageMatchSelect,
+  });
+
 const getCachedUsageMatch = unstable_cache(
-  (matchId: string) =>
-    prisma.match.findUniqueOrThrow({
-      where: { id: matchId },
-      select: usageMatchSelect,
-    }),
+  fetchUsageMatch,
   ["usage-match-v4"],
   { revalidate: 300, tags: ["matches-schedule"] }
 );
 
 const getCachedUsageRoundMatches = unstable_cache(
-  (roundId: string) =>
-    prisma.match.findMany({
-      where: { roundId },
-      select: usageMatchSelect,
-    }),
+  fetchUsageRoundMatches,
   ["usage-round-matches-v4"],
   { revalidate: 300, tags: ["matches-schedule"] }
 );
+
+function isMissingNextIncrementalCache(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("incrementalCache missing")
+  );
+}
+
+async function getUsageMatch(matchId: string) {
+  try {
+    return await getCachedUsageMatch(matchId);
+  } catch (error) {
+    if (isMissingNextIncrementalCache(error)) {
+      return fetchUsageMatch(matchId);
+    }
+    throw error;
+  }
+}
+
+async function getUsageRoundMatches(roundId: string) {
+  try {
+    return await getCachedUsageRoundMatches(roundId);
+  } catch (error) {
+    if (isMissingNextIncrementalCache(error)) {
+      return fetchUsageRoundMatches(roundId);
+    }
+    throw error;
+  }
+}
 
 export async function getUsageRoundScope(
   matchId: string,
   knownRoundId?: string
 ): Promise<UsageRoundScope> {
-  const matchPromise = getCachedUsageMatch(matchId);
+  const matchPromise = getUsageMatch(matchId);
   const [match, knownRoundMatches] = await Promise.all([
     matchPromise,
     knownRoundId
-      ? getCachedUsageRoundMatches(knownRoundId)
+      ? getUsageRoundMatches(knownRoundId)
       : Promise.resolve(null),
   ]);
   const roundMatches =
-    knownRoundMatches ?? (await getCachedUsageRoundMatches(match.roundId));
+    knownRoundMatches ?? (await getUsageRoundMatches(match.roundId));
   const key = buildUsageRoundKey(match, roundMatches);
   const matchIds = roundMatches
     .filter((candidate) => buildUsageRoundKey(candidate, roundMatches) === key)

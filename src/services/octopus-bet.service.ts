@@ -398,11 +398,11 @@ export async function submitOctopusBet(
   const [prediction, boldBet, player] = await Promise.all([
     prisma.prediction.findUnique({
       where: { userId_matchId: { userId, matchId } },
-      select: { isDouble: true },
+      select: { id: true, isDouble: true },
     }),
     prisma.boldScorerBet.findUnique({
       where: { userId_usageRoundKey: { userId, usageRoundKey: scope.key } },
-      select: { matchId: true, cancelledAt: true },
+      select: { id: true, matchId: true, cancelledAt: true },
     }),
     prisma.player.findFirst({
       where: {
@@ -414,7 +414,7 @@ export async function submitOctopusBet(
     }),
   ]);
 
-  if (prediction?.isDouble || (boldBet?.matchId === matchId && !boldBet.cancelledAt)) {
+  if (boldBet && !boldBet.cancelledAt && boldBet.matchId !== matchId) {
     throw new Error("ما تقدر تستخدم الأخطبوط مع المضاعفة أو الرهان على نفس المباراة");
   }
 
@@ -422,23 +422,36 @@ export async function submitOctopusBet(
     throw new Error("اختيار الحارس غير صالح للأخطبوط");
   }
 
-  return prisma.octopusGoalkeeperBet.upsert({
-    where: { userId_usageRoundKey: { userId, usageRoundKey: scope.key } },
-    create: {
-      userId,
-      roundId: match.roundId,
-      usageRoundKey: scope.key,
-      matchId,
-      playerId,
-    },
-    update: {
-      matchId,
-      playerId,
-      points: 0,
-      cancelledAt: null,
-    },
-    include: {
-      player: { select: { id: true, name: true } },
-    },
+  return prisma.$transaction(async (tx) => {
+    if (prediction?.isDouble) {
+      await tx.prediction.update({
+        where: { id: prediction.id },
+        data: { isDouble: false },
+      });
+    }
+
+    if (boldBet?.matchId === matchId && !boldBet.cancelledAt) {
+      await tx.boldScorerBet.delete({ where: { id: boldBet.id } });
+    }
+
+    return tx.octopusGoalkeeperBet.upsert({
+      where: { userId_usageRoundKey: { userId, usageRoundKey: scope.key } },
+      create: {
+        userId,
+        roundId: match.roundId,
+        usageRoundKey: scope.key,
+        matchId,
+        playerId,
+      },
+      update: {
+        matchId,
+        playerId,
+        points: 0,
+        cancelledAt: null,
+      },
+      include: {
+        player: { select: { id: true, name: true } },
+      },
+    });
   });
 }

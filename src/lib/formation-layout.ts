@@ -259,6 +259,58 @@ function ordinalGridPlace(player: MatchPlayerView) {
     : null;
 }
 
+function ordinalFormationLine(place: number, rows: number[]) {
+  if (place === 1) return -1;
+
+  let start = 2;
+  for (let lineIndex = 0; lineIndex < rows.length; lineIndex += 1) {
+    const end = start + rows[lineIndex] - 1;
+    if (place >= start && place <= end) return lineIndex;
+    start = end + 1;
+  }
+
+  return null;
+}
+
+function positionFormationLine(player: MatchPlayerView) {
+  const position = positionText(player);
+  if (isGoalkeeper(player)) return -1;
+  if (isDefenderText(position)) return 0;
+  if (isMidfielderText(position)) return 1;
+  if (isAttackerText(position)) return 2;
+  return null;
+}
+
+function isWideMidfielderUsedAsForward(player: MatchPlayerView, place: number) {
+  const position = positionText(player);
+  return (
+    place >= 9 &&
+    isMidfielderText(position) &&
+    hasAny(position, ["left", "right", "wide", "wing", "جناح", "يسار", "يمين"])
+  );
+}
+
+function hasContradictingOrdinalRows(
+  starters: MatchPlayerView[],
+  rows: number[]
+) {
+  const contradictions = starters.filter((player) => {
+    const place = ordinalGridPlace(player);
+    if (place == null) return false;
+    if (isWideMidfielderUsedAsForward(player, place)) return false;
+
+    const ordinalLine = ordinalFormationLine(place, rows);
+    const positionLine = positionFormationLine(player);
+    return (
+      ordinalLine != null &&
+      positionLine != null &&
+      ordinalLine !== positionLine
+    );
+  });
+
+  return contradictions.length >= 2;
+}
+
 function layoutFromOrdinalGrid(
   lineup: MatchPlayerView[],
   formation: string | null | undefined,
@@ -271,6 +323,10 @@ function layoutFromOrdinalGrid(
   if (withOrdinal.length < 10) return null;
 
   const rows = parseFormation(formation);
+  if (hasContradictingOrdinalRows(starters, rows)) {
+    return null;
+  }
+
   const goalkeeper =
     starters.find((player) => ordinalGridPlace(player) === 1) ??
     starters.find(isGoalkeeper);

@@ -163,22 +163,16 @@ export async function submitBoldScorerBet(
   const [prediction, octopusBet] = await Promise.all([
     prisma.prediction.findUnique({
       where: { userId_matchId: { userId, matchId } },
-      select: { isDouble: true },
+      select: { id: true, isDouble: true },
     }),
     prisma.octopusGoalkeeperBet.findUnique({
       where: {
         userId_usageRoundKey: { userId, usageRoundKey: scope.key },
       },
-      select: { matchId: true, cancelledAt: true },
+      select: { id: true, matchId: true, cancelledAt: true },
     }),
   ]);
-  if (prediction?.isDouble) {
-    throw new Error(
-      "ما تقدر تستخدم المضاعفة والرهان معاً على نفس المباراة"
-    );
-  }
-
-  if (octopusBet?.matchId === matchId && !octopusBet.cancelledAt) {
+  if (octopusBet && octopusBet.matchId !== matchId && !octopusBet.cancelledAt) {
     throw new Error(
       "Ù…Ø§ ØªÙ‚Ø¯Ø± ØªØ³ØªØ®Ø¯Ù… Ø§Ù„Ø±Ù‡Ø§Ù† ÙˆØ§Ù„Ø£Ø®Ø·Ø¨ÙˆØ· Ù…Ø¹Ø§Ù‹ Ø¹Ù„Ù‰ Ù†ÙØ³ Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©"
     );
@@ -228,26 +222,39 @@ export async function submitBoldScorerBet(
     );
   }
 
-  return prisma.boldScorerBet.upsert({
-    where: {
-      userId_usageRoundKey: { userId, usageRoundKey: scope.key },
-    },
-    create: {
-      userId,
-      roundId: match.roundId,
-      usageRoundKey: scope.key,
-      matchId,
-      playerId,
-    },
-    update: {
-      matchId,
-      playerId,
-      points: 0,
-      cancelledAt: null,
-    },
-    include: {
-      player: { select: { id: true, name: true } },
-    },
+  return prisma.$transaction(async (tx) => {
+    if (prediction?.isDouble) {
+      await tx.prediction.update({
+        where: { id: prediction.id },
+        data: { isDouble: false },
+      });
+    }
+
+    if (octopusBet?.matchId === matchId && !octopusBet.cancelledAt) {
+      await tx.octopusGoalkeeperBet.delete({ where: { id: octopusBet.id } });
+    }
+
+    return tx.boldScorerBet.upsert({
+      where: {
+        userId_usageRoundKey: { userId, usageRoundKey: scope.key },
+      },
+      create: {
+        userId,
+        roundId: match.roundId,
+        usageRoundKey: scope.key,
+        matchId,
+        playerId,
+      },
+      update: {
+        matchId,
+        playerId,
+        points: 0,
+        cancelledAt: null,
+      },
+      include: {
+        player: { select: { id: true, name: true } },
+      },
+    });
   });
 }
 
