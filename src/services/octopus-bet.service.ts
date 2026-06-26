@@ -194,15 +194,38 @@ export async function syncGoalkeeperSavesFromApi(
     homeTeamName: match.homeTeam.name,
     awayTeamName: match.awayTeam.name,
   };
-  let stats = await provider.fetchGoalkeeperSaves(fixtureApiId, providerOptions);
+  let stats: ExternalGoalkeeperSave[] = [];
+  let providerError: unknown = null;
+  try {
+    stats = await provider.fetchGoalkeeperSaves(fixtureApiId, providerOptions);
+  } catch (error) {
+    providerError = error;
+  }
   if (
     stats.length === 0 &&
     provider.name !== "api-football" &&
     process.env.API_FOOTBALL_KEY
   ) {
-    stats = await new ApiFootballProvider().fetchGoalkeeperSaves(
-      fixtureApiId,
-      providerOptions
+    try {
+      stats = await new ApiFootballProvider().fetchGoalkeeperSaves(
+        fixtureApiId,
+        providerOptions
+      );
+    } catch (error) {
+      if (providerError) {
+        console.warn(
+          "[octopus] goalkeeper saves provider fallback failed:",
+          error instanceof Error ? error.message : error
+        );
+      } else {
+        providerError = error;
+      }
+    }
+  }
+  if (stats.length === 0 && providerError) {
+    console.warn(
+      "[octopus] goalkeeper saves provider failed:",
+      providerError instanceof Error ? providerError.message : providerError
     );
   }
   if (stats.length === 0) return 0;

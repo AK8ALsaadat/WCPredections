@@ -8,6 +8,7 @@ import type {
   SyncOptions,
 } from "./types";
 import { isCancelledGoalDetail } from "@/lib/fixture-events";
+import { isGoalkeeperPosition } from "@/lib/goalkeeper";
 
 const GROUP_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
 
@@ -38,6 +39,27 @@ type SportScoreLineupPlayer = {
   name: string;
   number?: number;
   position?: string;
+};
+
+type SportScoreStatValue = string | number | null | undefined;
+
+type SportScoreStatRow = {
+  name?: string;
+  label?: string;
+  title?: string;
+  type?: string;
+  key?: string;
+  home?: SportScoreStatValue;
+  away?: SportScoreStatValue;
+  home_value?: SportScoreStatValue;
+  away_value?: SportScoreStatValue;
+  homeValue?: SportScoreStatValue;
+  awayValue?: SportScoreStatValue;
+  values?: Array<{
+    side?: "home" | "away";
+    team?: "home" | "away";
+    value?: SportScoreStatValue;
+  }>;
 };
 
 type SportScoreStandingsRow = {
@@ -79,6 +101,106 @@ function groupCodeFromName(group: string): string | null {
 
   const lettered = group.match(/Group\s+([A-L])/i);
   return lettered ? lettered[1].toUpperCase() : null;
+}
+
+function statLabel(stat: SportScoreStatRow) {
+  return [
+    stat.name,
+    stat.label,
+    stat.title,
+    stat.type,
+    stat.key,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" ")
+    .toLowerCase();
+}
+
+function isSavesStat(stat: SportScoreStatRow) {
+  const label = statLabel(stat);
+  return (
+    /\bsaves?\b/.test(label) ||
+    /\bgoalkeeper saves?\b/.test(label) ||
+    label.includes("تصدي") ||
+    label.includes("تصديات")
+  );
+}
+
+function numberFromStatValue(value: SportScoreStatValue) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+  const number = Number.parseInt(value.replace(/[^\d-]/g, ""), 10);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+function readSideStat(stat: SportScoreStatRow, side: "home" | "away") {
+  const direct =
+    side === "home"
+      ? stat.home ?? stat.home_value ?? stat.homeValue
+      : stat.away ?? stat.away_value ?? stat.awayValue;
+  const directValue = numberFromStatValue(direct);
+  if (directValue != null) return directValue;
+
+  const values = stat.values ?? [];
+  const sideValue = values.find(
+    (row) => row.side === side || row.team === side
+  )?.value;
+  return numberFromStatValue(sideValue);
+}
+
+function pickGoalkeeper(players: SportScoreLineupPlayer[] | undefined) {
+  if (!players?.length) return null;
+  return (
+    players.find((player) => isGoalkeeperPosition(player.position)) ??
+    players.find((player) => /\bgk\b|goal|keeper|حارس/i.test(player.position ?? "")) ??
+    null
+  );
+}
+
+export function parseSportScoreGoalkeeperSavesFromDetail(detail: {
+  match?: {
+    home?: string;
+    away?: string;
+    stats?: SportScoreStatRow[];
+    statistics?: SportScoreStatRow[];
+    lineups?: {
+      home_xi?: SportScoreLineupPlayer[];
+      away_xi?: SportScoreLineupPlayer[];
+    };
+  };
+}, homeSlug: string, awaySlug: string): ExternalGoalkeeperSave[] {
+  const match = detail.match;
+  const stats = match?.stats ?? match?.statistics ?? [];
+  const saveStat = stats.find(isSavesStat);
+  if (!match || !saveStat) return [];
+
+  const homeSaves = readSideStat(saveStat, "home");
+  const awaySaves = readSideStat(saveStat, "away");
+  const homeGoalkeeper = pickGoalkeeper(match.lineups?.home_xi);
+  const awayGoalkeeper = pickGoalkeeper(match.lineups?.away_xi);
+  const saves: ExternalGoalkeeperSave[] = [];
+
+  if (homeGoalkeeper?.name && homeSaves != null) {
+    saves.push({
+      playerApiId: playerApiId(homeSlug, homeGoalkeeper.name),
+      playerName: homeGoalkeeper.name,
+      teamApiId: homeSlug,
+      teamName: match.home,
+      saves: homeSaves,
+    });
+  }
+
+  if (awayGoalkeeper?.name && awaySaves != null) {
+    saves.push({
+      playerApiId: playerApiId(awaySlug, awayGoalkeeper.name),
+      playerName: awayGoalkeeper.name,
+      teamApiId: awaySlug,
+      teamName: match.away,
+      saves: awaySaves,
+    });
+  }
+
+  return saves;
 }
 
 function mapStatus(status: string): ExternalMatch["status"] {
@@ -462,9 +584,35 @@ export class SportScoreProvider implements FootballApiProvider {
   }
 
   async fetchGoalkeeperSaves(
-    _fixtureApiId: string,
+    fixtureApiId: string,
     _options: SyncOptions
   ): Promise<ExternalGoalkeeperSave[]> {
-    return [];
+    const detail = await this.fetch<{
+      match: {
+        home: string;
+        away: string;
+        stats?: SportScoreStatRow[];
+        statistics?: SportScoreStatRow[];
+        lineups?: {
+          home_xi?: SportScoreLineupPlayer[];
+          away_xi?: SportScoreLineupPlayer[];
+        };
+      };
+    }>("/api/widget/match/", {
+      sport: "football",
+      slug: fixtureApiId,
+    });
+
+    const { teamSlugByName } = await this.getStandingsMaps();
+    const match = detail.match;
+    if (!match) return [];
+
+    const homeSlug = teamSlugByName.get(match.home) ?? slugify(match.home);
+    const awaySlug = teamSlugByName.get(match.away) ?? slugify(match.away);
+    return parseSportScoreGoalkeeperSavesFromDetail(
+      detail,
+      homeSlug,
+      awaySlug
+    );
   }
 }

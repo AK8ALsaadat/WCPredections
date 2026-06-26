@@ -45,6 +45,7 @@ import {
   getOctopusSaveTierPoints,
 } from "../src/lib/octopus-points";
 import { aggregateGoalsFromEvents } from "../src/lib/fixture-events";
+import { parseSportScoreGoalkeeperSavesFromDetail } from "../src/services/football-api/sportscore.provider";
 import { filterVisibleMatches } from "../src/lib/tournament-gates";
 import type { LeaderboardEntry } from "../src/types";
 
@@ -430,6 +431,29 @@ ok("octopus clean sheet with 10 saves = 11", calculateOctopusPoints(10, 0) === 1
 ok("octopus 10 saves conceded 1 = 5", calculateOctopusPoints(10, 1) === 5);
 ok("octopus 10 saves conceded 2 = 3", calculateOctopusPoints(10, 2) === 3);
 ok("octopus 10 saves conceded 3 = 1", calculateOctopusPoints(10, 3) === 1);
+const sportScoreSaves = parseSportScoreGoalkeeperSavesFromDetail(
+  {
+    match: {
+      home: "Brazil",
+      away: "Belgium",
+      stats: [{ name: "Goalkeeper Saves", home: "5", away: 3 }],
+      lineups: {
+        home_xi: [{ name: "Alisson Becker", position: "Goalkeeper" }],
+        away_xi: [{ name: "Thibaut Courtois", position: "GK" }],
+      },
+    },
+  },
+  "brazil",
+  "belgium"
+);
+ok(
+  "SportScore goalkeeper saves are parsed from team stats and starting keepers",
+  sportScoreSaves.length === 2 &&
+    sportScoreSaves[0].playerName === "Alisson Becker" &&
+    sportScoreSaves[0].saves === 5 &&
+    sportScoreSaves[1].playerName === "Thibaut Courtois" &&
+    sportScoreSaves[1].saves === 3
+);
 
 console.log("\n=== Cancelled/offside goals ===");
 ok(
