@@ -151,6 +151,7 @@ function buildLeaderboard(pointsMap: Map<string, PointsRow>): LeaderboardEntry[]
     /^demo/i,
     /^sample/i,
     /^tmp/i,
+    /^verifier/i,
     /_test/i,
   ];
 
