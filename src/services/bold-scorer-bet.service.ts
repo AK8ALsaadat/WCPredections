@@ -33,11 +33,11 @@ export async function getBoldScorerBetEligibility(userId: string) {
       _sum: { points: true },
     }),
     prisma.boldScorerBet.aggregate({
-      where: { userId },
+      where: { userId, cancelledAt: null },
       _sum: { points: true },
     }),
     prisma.octopusGoalkeeperBet.aggregate({
-      where: { userId },
+      where: { userId, cancelledAt: null },
       _sum: { points: true },
     }),
   ]);

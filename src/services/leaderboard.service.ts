@@ -54,8 +54,14 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
   );
   const where = hasMatchFilter ? { match: matchWhere(filter) } : undefined;
 
-  const boldWhere = hasMatchFilter ? { match: matchWhere(filter) } : undefined;
-  const octopusWhere = hasMatchFilter ? { match: matchWhere(filter) } : undefined;
+  const boldWhere = {
+    ...(hasMatchFilter ? { match: matchWhere(filter) } : {}),
+    cancelledAt: null,
+  };
+  const octopusWhere = {
+    ...(hasMatchFilter ? { match: matchWhere(filter) } : {}),
+    cancelledAt: null,
+  };
 
   const [allUsers, predictionGroups, scorerGroups, boldGroups, octopusGroups] =
     await Promise.all([
@@ -311,12 +317,14 @@ async function computeLeaderStreakDays(
         FROM bold_scorer_bets b
         JOIN matches m ON b.match_id = m.id
         WHERE m.match_time < $1
+          AND b.cancelled_at IS NULL
         GROUP BY b.user_id
         UNION ALL
         SELECT o.user_id, SUM(o.points) AS total
         FROM octopus_goalkeeper_bets o
         JOIN matches m ON o.match_id = m.id
         WHERE m.match_time < $1
+          AND o.cancelled_at IS NULL
         GROUP BY o.user_id
       ) t
       GROUP BY t.user_id

@@ -216,6 +216,7 @@ export async function calculateOctopusPointsForMatch(matchId: string) {
       select: {
         apiMatchId: true,
         status: true,
+        roundId: true,
         homeTeamId: true,
         awayTeamId: true,
         homeScore: true,
@@ -279,6 +280,17 @@ export async function calculateOctopusPointsForMatch(matchId: string) {
       })
     )
   );
+
+  try {
+    revalidateTag("leaderboard-overall");
+    revalidateTag(`match-${matchId}`);
+    if (match.roundId) revalidateTag(`leaderboard-round-${match.roundId}`);
+  } catch (err) {
+    console.warn(
+      "[revalidate] skipped due to missing store:",
+      err instanceof Error ? err.message : err
+    );
+  }
 }
 
 export async function getOctopusBetForUserRound(

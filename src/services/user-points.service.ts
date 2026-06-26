@@ -18,11 +18,11 @@ export async function getUserTotalPoints(userId: string): Promise<number> {
       _sum: { points: true },
     }),
     prisma.boldScorerBet.aggregate({
-      where: { userId },
+      where: { userId, cancelledAt: null },
       _sum: { points: true },
     }),
     prisma.octopusGoalkeeperBet.aggregate({
-      where: { userId },
+      where: { userId, cancelledAt: null },
       _sum: { points: true },
     }),
   ]);
