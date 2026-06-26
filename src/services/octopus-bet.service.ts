@@ -138,11 +138,25 @@ export async function replaceGoalkeeperSaves(
     resolved.set(player.id, { playerId: player.id, saves });
   }
 
+  const manualStats = await prisma.matchGoalkeeperStat.findMany({
+    where: { matchId, source: { startsWith: "manual-source:" } },
+    select: { playerId: true },
+  });
+  const manualPlayerIds = new Set(manualStats.map((row) => row.playerId));
+  const apiRows = Array.from(resolved.values()).filter(
+    (row) => !manualPlayerIds.has(row.playerId)
+  );
+
   await prisma.$transaction(async (tx) => {
-    await tx.matchGoalkeeperStat.deleteMany({ where: { matchId } });
-    if (resolved.size > 0) {
+    await tx.matchGoalkeeperStat.deleteMany({
+      where: {
+        matchId,
+        source: { not: { startsWith: "manual-source:" } },
+      },
+    });
+    if (apiRows.length > 0) {
       await tx.matchGoalkeeperStat.createMany({
-        data: Array.from(resolved.values()).map((row) => ({
+        data: apiRows.map((row) => ({
           matchId,
           playerId: row.playerId,
           saves: row.saves,
