@@ -78,6 +78,27 @@ check(
   "expected lineup preserves 3-5-2",
   expected352.formation === "3-5-2" && expected352.lineup.length === 11
 );
+const mixedRoleExpected = buildExpectedLineup(
+  [
+    { id: 1, name: "GK", position: "Goalkeeper" },
+    { id: 2, name: "CB1", position: "Center Defender" },
+    { id: 3, name: "CB2", position: "Center Defender" },
+    { id: 4, name: "LB", position: "Left Back" },
+    { id: 5, name: "RB", position: "Right Back" },
+    { id: 6, name: "DM", position: "Defensive Midfielder" },
+    { id: 7, name: "CM", position: "Center Midfielder" },
+    { id: 8, name: "AM", position: "Attacking Midfielder" },
+    { id: 9, name: "LW", position: "Left Winger" },
+    { id: 10, name: "ST", position: "Striker" },
+    { id: 11, name: "RW", position: "Right Winger" },
+  ],
+  "4-3-3"
+);
+check(
+  "expected lineup keeps defensive and attacking midfielders in midfield",
+  mixedRoleExpected.lineup.slice(5, 8).map((player) => player.name).join("|") ===
+    "DM|CM|AM"
+);
 
 function compactAttackDistance(formation: "3-5-2" | "4-4-2") {
   const [defenders, midfielders] = formation.split("-").map(Number);
@@ -319,6 +340,69 @@ check(
     wingbackSlots.every((slot) => slot.y === 31) &&
     Math.min(...wingbackSlots.map((slot) => slot.x)) === 10 &&
     Math.max(...wingbackSlots.map((slot) => slot.x)) === 90
+);
+
+const mixedRoleSlots = layoutFormation(
+  [
+    { id: "gk", name: "GK", position: "Goalkeeper", section: "lineup" as const },
+    { id: "cb1", name: "CB1", position: "Center Defender", section: "lineup" as const },
+    { id: "cb2", name: "CB2", position: "Center Defender", section: "lineup" as const },
+    { id: "lb", name: "LB", position: "Left Back", section: "lineup" as const },
+    { id: "rb", name: "RB", position: "Right Back", section: "lineup" as const },
+    { id: "dm", name: "DM", position: "Defensive Midfielder", section: "lineup" as const },
+    { id: "cm", name: "CM", position: "Center Midfielder", section: "lineup" as const },
+    { id: "am", name: "AM", position: "Attacking Midfielder", section: "lineup" as const },
+    { id: "lw", name: "LW", position: "Left Winger", section: "lineup" as const },
+    { id: "st", name: "ST", position: "Striker", section: "lineup" as const },
+    { id: "rw", name: "RW", position: "Right Winger", section: "lineup" as const },
+  ],
+  "4-3-3",
+  "home"
+);
+check(
+  "midfield role names stay on midfield line",
+  mixedRoleSlots.find((slot) => slot.player.id === "dm")?.y === 31 &&
+    mixedRoleSlots.find((slot) => slot.player.id === "cm")?.y === 31 &&
+    mixedRoleSlots.find((slot) => slot.player.id === "am")?.y === 31
+);
+check(
+  "defenders and attackers stay on their own lines",
+  ["cb1", "cb2", "lb", "rb"].every(
+    (id) => mixedRoleSlots.find((slot) => slot.player.id === id)?.y === 18
+  ) &&
+    ["lw", "st", "rw"].every(
+      (id) => mixedRoleSlots.find((slot) => slot.player.id === id)?.y === 44
+    )
+);
+const arabicSideSlots = layoutFormation(
+  [
+    { id: "gk", name: "GK", position: "حارس", section: "lineup" as const },
+    ...Array.from({ length: 4 }, (_, index) => ({
+      id: `d${index}`,
+      name: `D${index}`,
+      position: "مدافع",
+      section: "lineup" as const,
+    })),
+    { id: "rm-ar", name: "RM", position: "وسط يمين", section: "lineup" as const },
+    { id: "cm-ar", name: "CM", position: "وسط", section: "lineup" as const },
+    { id: "lm-ar", name: "LM", position: "وسط يسار", section: "lineup" as const },
+    { id: "rw-ar", name: "RW", position: "جناح يمين", section: "lineup" as const },
+    { id: "st-ar", name: "ST", position: "مهاجم", section: "lineup" as const },
+    { id: "lw-ar", name: "LW", position: "جناح يسار", section: "lineup" as const },
+  ],
+  "4-3-3",
+  "home"
+);
+check(
+  "Arabic midfield and winger directions stay on exact lines and edges",
+  arabicSideSlots.find((slot) => slot.player.id === "rm-ar")?.y === 31 &&
+    arabicSideSlots.find((slot) => slot.player.id === "lm-ar")?.y === 31 &&
+    arabicSideSlots.find((slot) => slot.player.id === "rw-ar")?.y === 44 &&
+    arabicSideSlots.find((slot) => slot.player.id === "lw-ar")?.y === 44 &&
+    arabicSideSlots.find((slot) => slot.player.id === "rm-ar")?.x === 10 &&
+    arabicSideSlots.find((slot) => slot.player.id === "lm-ar")?.x === 90 &&
+    arabicSideSlots.find((slot) => slot.player.id === "rw-ar")?.x === 10 &&
+    arabicSideSlots.find((slot) => slot.player.id === "lw-ar")?.x === 90
 );
 
 const probableBench = mergeProbableBenchWithCurrentRoster(

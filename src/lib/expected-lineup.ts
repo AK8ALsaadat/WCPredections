@@ -14,8 +14,25 @@ type PositionBucket = "gk" | "def" | "mid" | "att" | "other";
 function getPositionBucket(position?: string | null): PositionBucket {
   const p = (position ?? "").toLowerCase();
   if (isGoalkeeperPosition(p)) return "gk";
-  if (/^(d|def)$/.test(p) || /\b(cb|lb|rb|lwb|rwb)\b/.test(p) || p.includes("defen") || p.includes("back")) return "def";
-  if (/^(m|mid)$/.test(p) || /\b(cm|dm|am|lm|rm)\b/.test(p) || p.includes("mid")) return "mid";
+  const isMid =
+    /^(m|mid)$/.test(p) ||
+    /\b(cm|dm|am|lm|rm|cdm|cam)\b/.test(p) ||
+    p.includes("mid") ||
+    p.includes("وسط") ||
+    p.includes("محور") ||
+    p.includes("ارتكاز");
+  if (isMid) return "mid";
+  if (
+    /^(d|def)$/.test(p) ||
+    /\b(cb|lb|rb|lwb|rwb)\b/.test(p) ||
+    p.includes("defender") ||
+    p.includes("defence") ||
+    p.includes("defense") ||
+    p.includes("back") ||
+    p.includes("مدافع") ||
+    p.includes("دفاع") ||
+    p.includes("ظهير")
+  ) return "def";
   if (
     /^(f|for|att)$/.test(p) ||
     /\b(fw|st|cf|lw|rw)\b/.test(p) ||
@@ -24,7 +41,10 @@ function getPositionBucket(position?: string | null): PositionBucket {
     p.includes("offense") ||
     p.includes("forward") ||
     p.includes("wing") ||
-    p.includes("striker")
+    p.includes("striker") ||
+    p.includes("مهاجم") ||
+    p.includes("هجوم") ||
+    p.includes("جناح")
   ) {
     return "att";
   }

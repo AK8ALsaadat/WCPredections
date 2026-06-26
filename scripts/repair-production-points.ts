@@ -4,6 +4,14 @@ import { recalculateMatchScoring } from "../src/services/prediction.service";
 import { syncMatchScorersFromApi } from "../src/services/match-scorers.service";
 
 type PointsSnapshot = Map<string, { username: string; points: number }>;
+type MatchPointsSnapshot = Map<
+  string,
+  {
+    username: string;
+    match: string;
+    points: number;
+  }
+>;
 
 async function pointsSnapshot(): Promise<PointsSnapshot> {
   const [users, predictionGroups, scorerGroups, boldGroups, octopusGroups] =
@@ -77,6 +85,119 @@ function diffSnapshots(before: PointsSnapshot, after: PointsSnapshot) {
     })
     .filter((row) => row.delta !== 0)
     .sort((a, b) => a.username.localeCompare(b.username));
+}
+
+async function matchPointsSnapshot(matchIds: string[]): Promise<MatchPointsSnapshot> {
+  if (matchIds.length === 0) return new Map();
+
+  const [
+    predictions,
+    scorerPredictions,
+    boldBets,
+    octopusBets,
+  ] = await Promise.all([
+    prisma.prediction.findMany({
+      where: { matchId: { in: matchIds } },
+      include: {
+        user: { select: { username: true } },
+        match: {
+          select: {
+            homeTeam: { select: { name: true } },
+            awayTeam: { select: { name: true } },
+          },
+        },
+      },
+    }),
+    prisma.scorerPrediction.findMany({
+      where: { matchId: { in: matchIds } },
+      include: {
+        user: { select: { username: true } },
+        match: {
+          select: {
+            homeTeam: { select: { name: true } },
+            awayTeam: { select: { name: true } },
+          },
+        },
+      },
+    }),
+    prisma.boldScorerBet.findMany({
+      where: { matchId: { in: matchIds }, cancelledAt: null },
+      include: {
+        user: { select: { username: true } },
+        match: {
+          select: {
+            homeTeam: { select: { name: true } },
+            awayTeam: { select: { name: true } },
+          },
+        },
+      },
+    }),
+    prisma.octopusGoalkeeperBet.findMany({
+      where: { matchId: { in: matchIds }, cancelledAt: null },
+      include: {
+        user: { select: { username: true } },
+        match: {
+          select: {
+            homeTeam: { select: { name: true } },
+            awayTeam: { select: { name: true } },
+          },
+        },
+      },
+    }),
+  ]);
+
+  const snapshot: MatchPointsSnapshot = new Map();
+  const add = (
+    userId: string,
+    username: string,
+    matchId: string,
+    match: string,
+    points: number
+  ) => {
+    const key = `${userId}:${matchId}`;
+    const existing = snapshot.get(key) ?? { username, match, points: 0 };
+    existing.points += points;
+    snapshot.set(key, existing);
+  };
+
+  for (const row of predictions) {
+    add(
+      row.userId,
+      row.user.username,
+      row.matchId,
+      `${row.match.homeTeam.name} vs ${row.match.awayTeam.name}`,
+      row.points + row.doubleBonus + row.finishTypePoints + row.penaltyWinnerPoints
+    );
+  }
+  for (const row of scorerPredictions) {
+    add(
+      row.userId,
+      row.user.username,
+      row.matchId,
+      `${row.match.homeTeam.name} vs ${row.match.awayTeam.name}`,
+      row.points
+    );
+  }
+  for (const row of boldBets) {
+    add(
+      row.userId,
+      row.user.username,
+      row.matchId,
+      `${row.match.homeTeam.name} vs ${row.match.awayTeam.name}`,
+      row.points
+    );
+  }
+  for (const row of octopusBets) {
+    add(
+      row.userId,
+      row.user.username,
+      row.matchId,
+      `${row.match.homeTeam.name} vs ${row.match.awayTeam.name}`,
+      row.points
+    );
+  }
+
+  return snapshot;
 }
 
 async function scorerSnapshot(matchId: string) {
@@ -165,6 +286,8 @@ async function main() {
 
   const scorerCorrections: string[] = [];
   const syncErrors: string[] = [];
+  const matchIds = matches.map((match) => match.id);
+  const beforeMatchPoints = await matchPointsSnapshot(matchIds);
 
   for (const match of matches) {
     const label = `${match.homeTeam.name} vs ${match.awayTeam.name}`;
@@ -208,6 +331,7 @@ async function main() {
 
   const afterOctopus = await octopusSnapshot();
   const afterTotals = await pointsSnapshot();
+  const afterMatchPoints = await matchPointsSnapshot(matchIds);
   const totalDeltas = diffSnapshots(beforeTotals, afterTotals);
 
   const octopusDeltas = Array.from(afterOctopus.entries())
@@ -252,6 +376,30 @@ async function main() {
     for (const row of totalDeltas) {
       console.log(
         `  - ${row.username}: ${row.before} -> ${row.after} (${row.delta >= 0 ? "+" : ""}${row.delta})`
+      );
+    }
+  }
+
+  const matchDeltas = Array.from(afterMatchPoints.entries())
+    .map(([key, after]) => {
+      const before = beforeMatchPoints.get(key)?.points ?? 0;
+      return {
+        username: after.username,
+        match: after.match,
+        before,
+        after: after.points,
+        delta: after.points - before,
+      };
+    })
+    .filter((row) => row.delta !== 0)
+    .sort((a, b) => a.username.localeCompare(b.username) || a.match.localeCompare(b.match));
+  console.log("[repair] user match point deltas:");
+  if (matchDeltas.length === 0) {
+    console.log("  none");
+  } else {
+    for (const row of matchDeltas) {
+      console.log(
+        `  - ${row.username}: ${row.match}, ${row.before} -> ${row.after} (${row.delta >= 0 ? "+" : ""}${row.delta})`
       );
     }
   }

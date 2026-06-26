@@ -90,17 +90,75 @@ function isGoalkeeper(player: MatchPlayerView) {
   return isGoalkeeperPosition(player.position);
 }
 
+function positionText(player: MatchPlayerView) {
+  return (player.position ?? "").toLowerCase();
+}
+
+function hasAny(text: string, values: string[]) {
+  return values.some((value) => text.includes(value));
+}
+
+function isMidfielderText(position: string) {
+  return (
+    /^(m|mid)$/.test(position) ||
+    /\b(cm|dm|am|lm|rm|cdm|cam)\b/.test(position) ||
+    hasAny(position, [
+      "midfielder",
+      "midfield",
+      "middle",
+      "mid",
+      "وسط",
+      "محور",
+      "ارتكاز",
+    ])
+  );
+}
+
+function isDefenderText(position: string) {
+  if (isMidfielderText(position)) return false;
+  return (
+    /^(d|def)$/.test(position) ||
+    /\b(cb|lb|rb|lwb|rwb)\b/.test(position) ||
+    hasAny(position, [
+      "defender",
+      "defence",
+      "defense",
+      "back",
+      "sweeper",
+      "مدافع",
+      "دفاع",
+      "ظهير",
+      "قلب دفاع",
+    ])
+  );
+}
+
+function isAttackerText(position: string) {
+  if (isMidfielderText(position)) return false;
+  return (
+    /^(f|for|att)$/.test(position) ||
+    /\b(fw|st|cf|lw|rw)\b/.test(position) ||
+    hasAny(position, [
+      "attack",
+      "forward",
+      "offence",
+      "offense",
+      "striker",
+      "wing",
+      "مهاجم",
+      "هجوم",
+      "جناح",
+      "رأس حربة",
+    ])
+  );
+}
+
 function positionRank(player: MatchPlayerView) {
-  const position = (player.position ?? "").toLowerCase();
+  const position = positionText(player);
   const gridPlace = /^\d+$/.test(player.grid ?? "")
     ? Number.parseInt(player.grid!, 10)
     : null;
-  const isDefender =
-    /^(d|def)$/.test(position) ||
-    /\b(cb|lb|rb|lwb|rwb)\b/.test(position) ||
-    position.includes("def") ||
-    position.includes("back") ||
-    position.includes("sweeper");
+  const isDefender = isDefenderText(position);
 
   if (isDefender) {
     const isFullback =
@@ -112,31 +170,23 @@ function positionRank(player: MatchPlayerView) {
     if (isFullback || gridPlace === 2 || gridPlace === 3) return 0.5;
     return 0;
   }
-  if (/^(m|mid)$/.test(position) || /\b(cm|dm|am|lm|rm)\b/.test(position)) return 2;
-  if (position.includes("defensive") && position.includes("mid")) return 1;
-  if (position.includes("attack") && position.includes("mid")) return 3;
-  if (position.includes("mid")) return 2;
-  if (
-    /^(f|for|att)$/.test(position) ||
-    /\b(fw|st|cf|lw|rw)\b/.test(position) ||
-    position.includes("attack") ||
-    position.includes("forward") ||
-    position.includes("offence") ||
-    position.includes("offense") ||
-    position.includes("striker") ||
-    position.includes("wing")
-  ) {
-    return 4;
+  if (isMidfielderText(position)) {
+    if (hasAny(position, ["defensive", "holding", "محور", "ارتكاز", "دفاعي"])) {
+      return 1.5;
+    }
+    if (hasAny(position, ["attacking", "هجومي"])) return 2.5;
+    return 2;
   }
+  if (isAttackerText(position)) return 4;
   return 5;
 }
 
 function horizontalRoleRank(player: MatchPlayerView) {
-  const position = (player.position ?? "").toLowerCase();
-  const isLeft = position.includes("left");
-  const isRight = position.includes("right");
+  const position = positionText(player);
+  const isLeft = hasAny(position, ["left", "يسار", "أيسر", "ايسر"]);
+  const isRight = hasAny(position, ["right", "يمين", "أيمن", "ايمن"]);
   const isCenter =
-    position.includes("center") || position.includes("central");
+    hasAny(position, ["center", "central", "centre", "قلب", "محور", "وسط"]);
 
   if (isLeft) return isCenter ? 1 : 0;
   if (isRight) return isCenter ? 3 : 4;
@@ -177,11 +227,11 @@ function sortFormationLine(
 }
 
 function horizontalRank(player: MatchPlayerView) {
-  const position = (player.position ?? "").toLowerCase();
+  const position = positionText(player);
   if (/^(lwb|lb|lw)$/.test(position)) return 0;
   if (/^(rwb|rb|rw)$/.test(position)) return 2;
-  if (/\bleft\b|\blb\b|\blwb\b|\blw\b/.test(position)) return 0;
-  if (/\bright\b|\brb\b|\brwb\b|\brw\b/.test(position)) return 2;
+  if (/\bleft\b|\blb\b|\blwb\b|\blw\b/.test(position) || hasAny(position, ["يسار", "أيسر", "ايسر"])) return 0;
+  if (/\bright\b|\brb\b|\brwb\b|\brw\b/.test(position) || hasAny(position, ["يمين", "أيمن", "ايمن"])) return 2;
   return 1;
 }
 
