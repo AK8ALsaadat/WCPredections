@@ -391,35 +391,6 @@ export default function PredictPage() {
   }, [predHome, predAway, teamSets]);
 
   useEffect(() => {
-    if (!lineup || !boldPlayerId) return;
-    if (
-      !teamSets.home.has(boldPlayerId) &&
-      !teamSets.away.has(boldPlayerId)
-    ) {
-      setBoldPlayerId("");
-      if (!match?.userBoldScorerBet?.playerId) setBoldEnabled(false);
-    }
-  }, [lineup, teamSets, boldPlayerId, match?.userBoldScorerBet?.playerId]);
-
-  useEffect(() => {
-    if (!lineup || !octopusPlayerId) return;
-    const keeperStillAvailable = [
-      ...lineup.homePlayers,
-      ...lineup.awayPlayers,
-    ].some(
-      (player) =>
-        player.id === octopusPlayerId && isGoalkeeperPosition(player.position)
-    );
-    if (
-      !keeperStillAvailable &&
-      octopusPlayerId !== match?.userOctopusBet?.playerId
-    ) {
-      setOctopusPlayerId("");
-      if (!match?.userOctopusBet?.playerId) setOctopusEnabled(false);
-    }
-  }, [lineup, octopusPlayerId, match?.userOctopusBet?.playerId]);
-
-  useEffect(() => {
     const cachedMatch = readPredictMatchCache<MatchData>(matchId);
     const cachedLineup = readPredictLineupCache<LineupData>(matchId);
     const draft = readPredictDraft<FormState>(matchId);
@@ -1088,6 +1059,7 @@ export default function PredictPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     setError("");
     setSuccess("");
 
@@ -2043,6 +2015,7 @@ export default function PredictPage() {
           loading={submitting}
           disabled={
             loading ||
+            submitting ||
             budget.anyExceeded ||
             needsLineupForScorers ||
             (hasAnyGoals && !budget.isComplete)

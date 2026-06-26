@@ -499,14 +499,22 @@ check(
   lightMatchesWithoutLineup.length === 2
 );
 
-const now = Date.now;
-Date.now = () => new Date("2026-06-25T17:43:00.000Z").getTime();
-const fiveAmRiyadhMatch = "2026-06-26T02:00:00.000Z";
+const riyadhNow = new Date(Date.now() + 3 * 60 * 60 * 1000);
+const fiveAmRiyadhMatch = new Date(
+  Date.UTC(
+    riyadhNow.getUTCFullYear(),
+    riyadhNow.getUTCMonth(),
+    riyadhNow.getUTCDate() + 1,
+    2,
+    0,
+    0,
+    0
+  )
+).toISOString();
 check(
   "5am Riyadh matches remain inside prediction window",
   isPredictionAllowed(fiveAmRiyadhMatch, "SCHEDULED")
 );
-Date.now = now;
 
 const fiveHome = new Set(["h1", "h2", "h3", "h4", "h5"]);
 const oneAway = new Set(["a1"]);
