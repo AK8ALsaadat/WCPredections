@@ -14,6 +14,7 @@ const TEAM_ALIASES: Record<string, string> = {
   "democratic republic of the congo": "congo dr",
   "congo democratic republic": "congo dr",
   "ir iran": "iran",
+  "bosnia and herzegovina": "bosnia herzegovina",
 };
 
 export function normalizeTeamIdentity(name: string): string {

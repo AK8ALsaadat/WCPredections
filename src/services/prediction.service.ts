@@ -16,6 +16,7 @@ import {
   getBoldScorerBetEligibility,
 } from "@/services/bold-scorer-bet.service";
 import { calculateOctopusPointsForMatch } from "@/services/octopus-bet.service";
+import { recalculateKnockoutBracketPredictionPoints } from "@/services/knockout-bracket-prediction.service";
 import { getUsageRoundScope } from "@/services/usage-round.service";
 import {
   calculateDoubleBonus,
@@ -956,6 +957,9 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
   }
 
   await calculateOctopusPointsForMatch(matchId);
+  if (match.isKnockout) {
+    await recalculateKnockoutBracketPredictionPoints();
+  }
 
   try {
     revalidateTag("leaderboard-overall");

@@ -86,6 +86,26 @@ export type FullPredictionBundleInput = z.infer<
   typeof fullPredictionBundleSchema
 >;
 
+export const knockoutBracketPredictionSchema = z
+  .object({
+    finalistOneTeamId: z.string().min(1),
+    finalistTwoTeamId: z.string().min(1),
+    championTeamId: z.string().min(1),
+  })
+  .refine((data) => data.finalistOneTeamId !== data.finalistTwoTeamId, {
+    message: "Choose two different finalists",
+    path: ["finalistTwoTeamId"],
+  })
+  .refine(
+    (data) =>
+      data.championTeamId === data.finalistOneTeamId ||
+      data.championTeamId === data.finalistTwoTeamId,
+    {
+      message: "Champion must be one of your finalists",
+      path: ["championTeamId"],
+    }
+  );
+
 export const roundSchema = z.object({
   name: z.string().min(1).max(100),
   startsAt: z.string().datetime(),

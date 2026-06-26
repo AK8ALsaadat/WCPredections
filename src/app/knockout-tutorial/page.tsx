@@ -90,6 +90,19 @@ export default function KnockoutTutorialPage() {
               : "If you pick penalties, you also choose the team that wins the shootout."}
           </p>
 
+          <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-3 text-sm text-primary">
+            <p className="font-bold">
+              {isArabic
+                ? "توقع البطولة قبل أول مباراة إقصائية"
+                : "Tournament pick before the first knockout match"}
+            </p>
+            <p className="mt-1">
+              {isArabic
+                ? "اختر طرفي النهائي والبطل من صفحة المباريات. كل طرف نهائي صحيح +3 نقاط، وإذا توقعت البطل صح تاخذ +10 نقاط."
+                : "On the matches page, pick the two finalists and the champion. Each correct finalist is +3 points, and the correct champion is +10 points."}
+            </p>
+          </div>
+
           <Button className="w-full" onClick={finish} loading={loading}>
             {isArabic ? "فهمت، خلني أتوقع" : "Got it, show matches"}
           </Button>

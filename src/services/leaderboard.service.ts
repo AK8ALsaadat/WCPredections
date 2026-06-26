@@ -63,7 +63,14 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
     cancelledAt: null,
   };
 
-  const [allUsers, predictionGroups, scorerGroups, boldGroups, octopusGroups] =
+  const [
+    allUsers,
+    predictionGroups,
+    scorerGroups,
+    boldGroups,
+    octopusGroups,
+    bracketPredictions,
+  ] =
     await Promise.all([
       prisma.user.findMany({
         select: { id: true, username: true },
@@ -94,6 +101,23 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
         where: octopusWhere,
         _sum: { points: true },
       }),
+      hasMatchFilter
+        ? Promise.resolve(
+            [] as {
+              userId: string;
+              finalistOnePoints: number;
+              finalistTwoPoints: number;
+              championPoints: number;
+            }[]
+          )
+        : prisma.knockoutBracketPrediction.findMany({
+            select: {
+              userId: true,
+              finalistOnePoints: true,
+              finalistTwoPoints: true,
+              championPoints: true,
+            },
+          }),
     ]);
 
   const pointsMap = new Map<string, PointsRow>();
@@ -132,6 +156,17 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
   for (const g of octopusGroups) {
     const pts = g._sum.points ?? 0;
     const existing = pointsMap.get(g.userId);
+    if (existing) {
+      existing.points += pts;
+    }
+  }
+
+  for (const prediction of bracketPredictions) {
+    const pts =
+      prediction.finalistOnePoints +
+      prediction.finalistTwoPoints +
+      prediction.championPoints;
+    const existing = pointsMap.get(prediction.userId);
     if (existing) {
       existing.points += pts;
     }
@@ -327,6 +362,11 @@ async function computeLeaderStreakDays(
         WHERE m.match_time < $1
           AND o.cancelled_at IS NULL
         GROUP BY o.user_id
+        UNION ALL
+        SELECT k.user_id, SUM(k.finalist_one_points + k.finalist_two_points + k.champion_points) AS total
+        FROM knockout_bracket_predictions k
+        WHERE k.updated_at < $1
+        GROUP BY k.user_id
       ) t
       GROUP BY t.user_id
       ORDER BY SUM(t.total) DESC, t.user_id ASC

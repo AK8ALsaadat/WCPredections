@@ -9,12 +9,20 @@ import { getUserPredictionHistory } from "@/services/prediction.service";
 export async function GET() {
   try {
     const sessionUser = await requireAuth();
-    const [user, history] = await Promise.all([
+    const [user, history, bracketPrediction] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: sessionUser.userId },
         select: { id: true, username: true, createdAt: true },
       }),
       getUserPredictionHistory(sessionUser.userId),
+      prisma.knockoutBracketPrediction.findUnique({
+        where: { userId: sessionUser.userId },
+        select: {
+          finalistOnePoints: true,
+          finalistTwoPoints: true,
+          championPoints: true,
+        },
+      }),
     ]);
 
     const roundPoints: Record<string, number> = {};
@@ -36,6 +44,12 @@ export async function GET() {
     }
     for (const bet of history.octopusBets) {
       roundPoints[bet.roundId] = (roundPoints[bet.roundId] ?? 0) + bet.points;
+    }
+    if (bracketPrediction) {
+      roundPoints.knockoutBracket =
+        (bracketPrediction.finalistOnePoints ?? 0) +
+        (bracketPrediction.finalistTwoPoints ?? 0) +
+        (bracketPrediction.championPoints ?? 0);
     }
     const totalPoints = Object.values(roundPoints).reduce(
       (sum, points) => sum + points,

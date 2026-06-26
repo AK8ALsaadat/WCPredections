@@ -38,6 +38,7 @@ model User {
   boldScorerBets     BoldScorerBet[]
   octopusBets        OctopusGoalkeeperBet[]
   fanClashPicks      FanClashPick[]
+  knockoutBracketPrediction KnockoutBracketPrediction?
 
   @@map("users")
 }
@@ -68,6 +69,9 @@ model Team {
   awayMatches          Match[]  @relation("AwayTeam")
   penaltyWins          Match[]  @relation("PenaltyWinner")
   penaltyPredictions   Prediction[] @relation("PredictedPenaltyWinner")
+  finalistOnePicks     KnockoutBracketPrediction[] @relation("FinalistOneTeam")
+  finalistTwoPicks     KnockoutBracketPrediction[] @relation("FinalistTwoTeam")
+  championPicks        KnockoutBracketPrediction[] @relation("ChampionTeam")
 
   @@map("teams")
 }
@@ -266,4 +270,25 @@ model FanClashPick {
   @@index([matchId])
   @@index([userId])
   @@map("fan_clash_picks")
+}
+
+model KnockoutBracketPrediction {
+  id                 String   @id @default(cuid())
+  userId             String   @unique @map("user_id")
+  finalistOneTeamId  String   @map("finalist_one_team_id")
+  finalistTwoTeamId  String   @map("finalist_two_team_id")
+  championTeamId     String   @map("champion_team_id")
+  finalistOnePoints  Int      @default(0) @map("finalist_one_points")
+  finalistTwoPoints  Int      @default(0) @map("finalist_two_points")
+  championPoints     Int      @default(0) @map("champion_points")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user             User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  finalistOneTeam  Team @relation("FinalistOneTeam", fields: [finalistOneTeamId], references: [id])
+  finalistTwoTeam  Team @relation("FinalistTwoTeam", fields: [finalistTwoTeamId], references: [id])
+  championTeam     Team @relation("ChampionTeam", fields: [championTeamId], references: [id])
+
+  @@index([championTeamId])
+  @@map("knockout_bracket_predictions")
 }
