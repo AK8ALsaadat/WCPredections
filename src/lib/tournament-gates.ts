@@ -36,10 +36,6 @@ export async function canShowKnockoutFeatures() {
   return true;
 }
 
-export function shouldGateKnockoutPredictions(match: { isKnockout?: boolean | null }) {
-  return false;
-}
-
 export function filterVisibleMatches<T extends { isKnockout: boolean }>(
   matches: T[]
 ): T[] {

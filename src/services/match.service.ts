@@ -3,7 +3,7 @@ import { revalidateTag, unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { isPredictionAllowed } from "@/lib/utils";
 import { getTournamentRoundName } from "@/lib/rounds";
-import { canShowKnockoutFeatures, filterVisibleMatches } from "@/lib/tournament-gates";
+import { filterVisibleMatches } from "@/lib/tournament-gates";
 import { matchIdentityKey } from "@/lib/team-identity";
 import type { MatchStatus } from "@prisma/client";
 import { recalculateMatchScoring } from "@/services/prediction.service";
@@ -734,24 +734,6 @@ export async function getMatchLineup(
 export async function getMatchByIdForPredict(matchId: string, userId?: string) {
   const match = await getCachedMatchShell(matchId);
   if (!match) return null;
-  const knockoutGate = await canShowKnockoutFeatures();
-  if (match.isKnockout && !knockoutGate) {
-    return {
-      ...match,
-      userPrediction: null,
-      userScorerPredictions: [],
-      userBoldScorerBet: null,
-      userOctopusBet: null,
-      boldScorerRoundStatus: null,
-      octopusRoundStatus: null,
-      roundUsageLimits: null,
-      octopusCount: 0,
-      predictionsCount: 0,
-      doublesCount: 0,
-      boldCount: 0,
-      _knockoutGated: true,
-    };
-  }
 
   let userPrediction = null;
   let userScorerPredictions: { playerId: string; predictedGoals: number }[] = [];
