@@ -33,7 +33,11 @@ export function isGroupStageComplete() {
 }
 
 export async function canShowKnockoutFeatures() {
-  return isGroupStageComplete();
+  return true;
+}
+
+export function shouldGateKnockoutPredictions(match: { isKnockout?: boolean | null }) {
+  return false;
 }
 
 export function filterVisibleMatches<T extends { isKnockout: boolean }>(

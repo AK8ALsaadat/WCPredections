@@ -736,8 +736,6 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
   if (!match) return null;
   const knockoutGate = await canShowKnockoutFeatures();
   if (match.isKnockout && !knockoutGate) {
-    // Return a lightweight shell so the client can display the match
-    // (read-only) instead of a 404. Predictions and bets remain hidden.
     return {
       ...match,
       userPrediction: null,

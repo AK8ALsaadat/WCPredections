@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { MatchCard } from "@/components/matches/MatchCard";
-import { KnockoutBracketPredictionCard } from "@/components/matches/KnockoutBracketPredictionCard";
 import { LoadingPage } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Select } from "@/components/ui/Select";
@@ -562,8 +561,6 @@ export default function MatchesPage() {
       <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
         {t.matches.lockNotice}
       </div>
-
-      <KnockoutBracketPredictionCard />
 
       <p className="text-sm text-muted">
         {t.matches.predictWindow}{" "}
