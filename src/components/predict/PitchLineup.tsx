@@ -128,29 +128,36 @@ function PlayerPortrait({
   isBold?: boolean;
   isOctopus?: boolean;
 }) {
-  const photoUrl =
-    player.photoUrl ??
-    `/api/player-avatar?name=${encodeURIComponent(player.name)}`;
+  const fallbackPhotoUrl = `/api/player-avatar?name=${encodeURIComponent(player.name)}`;
+  const [resolvedSrc, setResolvedSrc] = useState<string>(player.photoUrl ?? fallbackPhotoUrl);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    setResolvedSrc(player.photoUrl ?? fallbackPhotoUrl);
     setLoaded(false);
     setFailed(false);
-  }, [photoUrl]);
+  }, [fallbackPhotoUrl, player.photoUrl]);
 
   if (!enabled || failed) return null;
 
   return (
     <img
-      src={photoUrl}
+      src={resolvedSrc}
       alt=""
       width={96}
       height={128}
-      loading="lazy"
+      loading="eager"
       decoding="async"
       onLoad={() => setLoaded(true)}
-      onError={() => setFailed(true)}
+      onError={() => {
+        if (resolvedSrc !== fallbackPhotoUrl) {
+          setResolvedSrc(fallbackPhotoUrl);
+          setLoaded(false);
+          return;
+        }
+        setFailed(true);
+      }}
       className={`absolute inset-0 object-cover object-top transition-opacity duration-150 ${sizeClass} ${
         loaded ? "opacity-100" : "opacity-0"
       } ${isBold || isOctopus ? "saturate-125" : ""}`}
@@ -172,18 +179,6 @@ function withDisplayNumbers(players: MatchPlayerView[]) {
     used.add(displayNumber);
     return { ...player, shirtNumber: displayNumber };
   });
-}
-
-function shouldEnableLineupPhotos() {
-  if (typeof window === "undefined") return false;
-
-  const nav = navigator as Navigator & {
-    connection?: { saveData?: boolean; effectiveType?: string };
-  };
-  if (nav.connection?.saveData) return false;
-  if (nav.connection?.effectiveType?.includes("2g")) return false;
-
-  return window.matchMedia("(min-width: 640px)").matches;
 }
 
 function PlayerDot({
@@ -470,16 +465,10 @@ export function PitchLineup({
   onGoalsChange,
   labels,
 }: PitchLineupProps) {
-  const [showPhotos, setShowPhotos] = useState(false);
+  const [showPhotos, setShowPhotos] = useState(true);
 
   useEffect(() => {
-    if (!shouldEnableLineupPhotos()) {
-      setShowPhotos(false);
-      return;
-    }
-
-    const timer = setTimeout(() => setShowPhotos(true), 650);
-    return () => clearTimeout(timer);
+    setShowPhotos(true);
   }, []);
 
   const homePlayers = useMemo(
