@@ -7,6 +7,7 @@ import {
 } from "@/services/scoring.service";
 import {
   getUsageRoundScope,
+  isHighValueBoldScorerRound,
   type UsageRoundScope,
 } from "@/services/usage-round.service";
 import {
@@ -293,7 +294,7 @@ export async function calculateBoldScorerBetPointsForMatch(
   const [match, bets] = await Promise.all([
     prisma.match.findUnique({
       where: { id: matchId },
-      select: { status: true },
+      select: { status: true, roundId: true },
     }),
     prisma.boldScorerBet.findMany({
       where: { matchId, cancelledAt: null },
@@ -302,6 +303,9 @@ export async function calculateBoldScorerBetPointsForMatch(
       },
     }),
   ]);
+
+  const scope = match?.roundId ? await getUsageRoundScope(matchId, match.roundId) : null;
+  const highValue = scope ? isHighValueBoldScorerRound(scope) : false;
 
   for (const bet of bets) {
     const regulationGoals =
@@ -313,9 +317,9 @@ export async function calculateBoldScorerBetPointsForMatch(
       ) ?? 0;
     const points =
       match?.status === "FINISHED"
-        ? calculateBoldScorerBetPoints(regulationGoals)
+        ? calculateBoldScorerBetPoints(regulationGoals, { highValue })
         : regulationGoals > 0
-          ? BOLD_SCORER_POINTS
+          ? (highValue ? 10 : BOLD_SCORER_POINTS)
           : 0;
     await prisma.boldScorerBet.update({
       where: { id: bet.id },

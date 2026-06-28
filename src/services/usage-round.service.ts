@@ -20,6 +20,56 @@ export type UsageRoundScope = {
   databaseRoundId: string;
 };
 
+export type UsageRoundPhase =
+  | "group"
+  | "round-of-32"
+  | "round-of-16"
+  | "quarter-finals"
+  | "semi-finals"
+  | "third-place-final"
+  | "final";
+
+export function getUsageRoundPhase(
+  scopeOrKey: string | UsageRoundScope
+): UsageRoundPhase {
+  const key = typeof scopeOrKey === "string" ? scopeOrKey : scopeOrKey.key;
+  const normalized = key.toLowerCase();
+  if (normalized.includes("quarter-finals")) return "quarter-finals";
+  if (normalized.includes("semi-finals")) return "semi-finals";
+  if (normalized.includes("third-place-final")) return "third-place-final";
+  if (normalized.includes("final")) return "final";
+  if (normalized.includes("round-of-16")) return "round-of-16";
+  if (normalized.includes("round-of-32")) return "round-of-32";
+  return "group";
+}
+
+export function isHighValueBoldScorerRound(
+  scopeOrKey: string | UsageRoundScope
+): boolean {
+  const phase = getUsageRoundPhase(scopeOrKey);
+  return (
+    phase === "quarter-finals" ||
+    phase === "semi-finals" ||
+    phase === "third-place-final" ||
+    phase === "final"
+  );
+}
+
+export function getMaxDoublesForUsageScope(
+  scopeOrKey: string | UsageRoundScope
+): number {
+  const phase = getUsageRoundPhase(scopeOrKey);
+  return phase === "round-of-16" || phase === "quarter-finals" || phase === "semi-finals" || phase === "third-place-final" || phase === "final"
+    ? 1
+    : 2;
+}
+
+export function canCombineDoubleAndBoldForUsageScope(
+  scopeOrKey: string | UsageRoundScope
+): boolean {
+  return isHighValueBoldScorerRound(scopeOrKey);
+}
+
 function stageKey(stageName: string | null): string {
   return (stageName ?? "default")
     .trim()

@@ -1195,6 +1195,24 @@ export default function PredictPage() {
         return;
       }
 
+      setMatch((previous) =>
+        previous
+          ? {
+              ...previous,
+              userPrediction: {
+                predHome,
+                predAway,
+                isDouble,
+                predictedFinishType: finishType || null,
+                predictedPenaltyWinnerTeamId: penaltyWinner || null,
+              },
+              userScorerPredictions: picksToArray(scorerPicks).map((pick) => ({
+                playerId: pick.playerId,
+                predictedGoals: pick.goals,
+              })),
+            }
+          : previous
+      );
       invalidatePredictCaches(matchId);
       invalidateMatchDetailCache(matchId);
       invalidateLeaguePredictionsCache(matchId);

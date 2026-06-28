@@ -23,14 +23,15 @@ export function Navbar({ user }: { user: UserSession }) {
 
   const navLinks = useMemo(
     () => [
-      { href: "/dashboard", label: t.nav.dashboard },
-      { href: "/matches", label: t.nav.matches },
+      { href: "/dashboard", label: t.nav.dashboard, icon: "🏠" },
+      { href: "/matches", label: t.nav.matches, icon: "⚽" },
       {
         href: "/leaderboard/overall",
         label: t.nav.leaderboard,
         match: "/leaderboard",
+        icon: "🏆",
       },
-      { href: "/profile", label: t.nav.profile },
+      { href: "/profile", label: t.nav.profile, icon: "👤" },
     ],
     [t]
   );
@@ -54,10 +55,12 @@ export function Navbar({ user }: { user: UserSession }) {
   return (
     <nav className="sticky top-0 z-50 border-b border-card-border bg-background">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-        <Link href="/dashboard" prefetch={false} className="flex items-center gap-2">
-          <span className="wc-brand-mark" aria-hidden>WC</span>
-          <span className="text-xl">⚽</span>
-          <span className="font-bold text-primary">{t.appName}</span>
+        <Link href="/dashboard" prefetch={false} className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-black text-white" aria-hidden>WC</span>
+          <div className="flex flex-col">
+            <span className="text-sm font-black text-primary">{t.appName}</span>
+            <span className="text-[11px] text-muted">⚽ {t.nav.matches}</span>
+          </div>
         </Link>
 
         <div className="hidden items-center gap-1 md:flex">
@@ -69,13 +72,14 @@ export function Navbar({ user }: { user: UserSession }) {
               onMouseEnter={() => router.prefetch(link.href)}
               onFocus={() => router.prefetch(link.href)}
               className={cn(
-                "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-colors",
                 isNavActive(pathname, link.href, link.match)
                   ? "bg-primary/20 text-primary"
-                  : "text-muted hover:text-foreground"
+                  : "text-muted hover:bg-card hover:text-foreground"
               )}
             >
-              {link.label}
+              <span aria-hidden>{link.icon}</span>
+              <span>{link.label}</span>
             </Link>
           ))}
           {user.isAdmin && (
@@ -129,13 +133,14 @@ export function Navbar({ user }: { user: UserSession }) {
                 prefetch={false}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-medium",
+                  "flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold",
                   isNavActive(pathname, link.href, link.match)
                     ? "bg-primary/20 text-primary"
                     : "text-muted"
                 )}
               >
-                {link.label}
+                <span aria-hidden>{link.icon}</span>
+                <span>{link.label}</span>
               </Link>
             ))}
             {user.isAdmin && (

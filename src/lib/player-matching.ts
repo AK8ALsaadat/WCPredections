@@ -6,6 +6,7 @@ export function normalizePlayerName(name: string): string {
     .replace(/[øØ]/g, "o")
     .replace(/[æÆ]/g, "ae")
     .replace(/[œŒ]/g, "oe")
+    .replace(/[’'\-\.]/g, " ")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -69,6 +70,7 @@ export function playerNamesMatch(a: string, b: string): boolean {
   if (firstA === firstB) return true;
   if (firstA.length === 1 && firstB.startsWith(firstA)) return true;
   if (firstB.length === 1 && firstA.startsWith(firstB)) return true;
+  if (lastA === lastB && (firstA?.length === 1 || firstB?.length === 1)) return true;
 
   if (partsA.length === 1 && partsB.includes(lastA)) return true;
   if (partsB.length === 1 && partsA.includes(lastB)) return true;
@@ -143,6 +145,16 @@ export function resolveScorerGoalsForPlayer(
     if (scorer.player.teamId !== predictedPlayer.teamId) continue;
     if (!playerNamesMatch(predictedPlayer.name, scorer.player.name)) continue;
     const goals = goalsByPlayerId.get(scorer.playerId);
+    if (goals != null && goals > 0) return goals;
+  }
+
+  const predictedLastName = lastNameKey(predictedPlayer.name);
+  const sameLastNameMatches = actualScorers.filter((scorer) => {
+    const scorerLastName = lastNameKey(scorer.player.name);
+    return Boolean(predictedLastName && scorerLastName && predictedLastName === scorerLastName);
+  });
+  if (sameLastNameMatches.length === 1) {
+    const goals = goalsByPlayerId.get(sameLastNameMatches[0].playerId);
     if (goals != null && goals > 0) return goals;
   }
 

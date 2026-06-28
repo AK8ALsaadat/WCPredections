@@ -18,6 +18,7 @@ const MatchPointsBreakdown = dynamic(
 );
 import { asFinishType } from "@/lib/finish-type";
 import { formatDate, isPredictionAllowed } from "@/lib/utils";
+import { getBracketByApiMatchId, getBracketRoundLabel } from "@/lib/wc-bracket";
 import {
   prefetchPredictData,
   seedPredictMatchFromList,
@@ -120,6 +121,7 @@ export default function MatchDetailPage() {
 
   const m = match as {
     id: string;
+    apiMatchId?: string | null;
     matchTime: string;
     status: string;
     homeScore: number | null;
@@ -166,6 +168,8 @@ export default function MatchDetailPage() {
   const canPredict = isPredictionAllowed(m.matchTime, m.status);
   const isFinished = m.status === "FINISHED";
   const isLive = m.status === "LIVE";
+  const bracket = getBracketByApiMatchId(m.apiMatchId);
+  const bracketRoundLabel = bracket ? getBracketRoundLabel(bracket.matchNo) : null;
   const penaltyWinnerName =
     m.penaltyWinnerTeamId === m.homeTeam.id
       ? m.homeTeam.name
@@ -282,6 +286,19 @@ export default function MatchDetailPage() {
         )}
 
       </section>
+
+      {bracketRoundLabel && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle>{locale === "ar" ? "مسار الإقصاء" : "Knockout path"}</CardTitle>
+          </CardHeader>
+          <p className="px-6 pb-6 text-sm text-muted">
+            {locale === "ar"
+              ? `${bracketRoundLabel} · الفائز يواصل إلى الدور التالي في الشوط الإقصائي`
+              : `${bracketRoundLabel} · The winner advances to the next knockout round.`}
+          </p>
+        </Card>
+      )}
 
       {breakdownInput && (
         <MatchPointsBreakdown

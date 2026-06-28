@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import {
   getPlayerLabel,
   layoutFormation,
@@ -143,12 +142,11 @@ function PlayerPortrait({
   if (!enabled || failed) return null;
 
   return (
-    <Image
+    <img
       src={photoUrl}
       alt=""
       width={96}
       height={128}
-      unoptimized
       loading="lazy"
       decoding="async"
       onLoad={() => setLoaded(true)}

@@ -290,7 +290,12 @@ export function calculateScorerPredictionPoints(
 
 /** البطاقة الجريئة — تراهن على هداف مرة واحدة كل جولة */
 export const BOLD_SCORER_POINTS = 5;
+export const BOLD_SCORER_POINTS_LATE_ROUND = 10;
 
-export function calculateBoldScorerBetPoints(regulationGoals: number): number {
-  return regulationGoals > 0 ? BOLD_SCORER_POINTS : -BOLD_SCORER_POINTS;
+export function calculateBoldScorerBetPoints(
+  regulationGoals: number,
+  options?: { highValue?: boolean }
+): number {
+  const points = options?.highValue ? BOLD_SCORER_POINTS_LATE_ROUND : BOLD_SCORER_POINTS;
+  return regulationGoals > 0 ? points : -points;
 }

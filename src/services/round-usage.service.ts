@@ -2,7 +2,11 @@ import { getBoldScorerBetStatus } from "@/services/bold-scorer-bet.service";
 import { getOctopusBetStatus } from "@/services/octopus-bet.service";
 import { MAX_DOUBLES_PER_ROUND } from "@/services/prediction.service";
 import { prisma } from "@/lib/prisma";
-import { getUsageRoundScope } from "@/services/usage-round.service";
+import {
+  getMaxDoublesForUsageScope,
+  getUsageRoundScope,
+  getUsageRoundPhase,
+} from "@/services/usage-round.service";
 import {
   getUserTotalPoints,
   MIN_POINTS_FOR_BOLD_SCORER_BET,
@@ -32,6 +36,7 @@ export async function getRoundUsageLimits(
     getUserTotalPoints(userId),
   ]);
   const hasBoldPoints = totalPoints >= MIN_POINTS_FOR_BOLD_SCORER_BET;
+  const maxDoubles = getMaxDoublesForUsageScope(scope);
 
   const doubleOnThisMatch =
     roundPredictions.find((prediction) => prediction.matchId === matchId)
@@ -44,12 +49,14 @@ export async function getRoundUsageLimits(
 
   return {
     roundId: resolvedRoundId,
+    usageRoundKey: scope.key,
+    phase: getUsageRoundPhase(scope),
     doubles: {
       used: doublesInRound,
-      max: MAX_DOUBLES_PER_ROUND,
+      max: maxDoubles,
       onThisMatch: doubleOnThisMatch,
-      canEnable: doublesUsedElsewhere < MAX_DOUBLES_PER_ROUND,
-      remaining: Math.max(0, MAX_DOUBLES_PER_ROUND - doublesUsedElsewhere),
+      canEnable: doublesUsedElsewhere < maxDoubles,
+      remaining: Math.max(0, maxDoubles - doublesUsedElsewhere),
     },
     boldScorer: {
       used: boldStatus.used,

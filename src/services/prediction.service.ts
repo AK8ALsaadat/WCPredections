@@ -17,7 +17,11 @@ import {
 } from "@/services/bold-scorer-bet.service";
 import { calculateOctopusPointsForMatch } from "@/services/octopus-bet.service";
 import { recalculateKnockoutBracketPredictionPoints } from "@/services/knockout-bracket-prediction.service";
-import { getUsageRoundScope } from "@/services/usage-round.service";
+import {
+  canCombineDoubleAndBoldForUsageScope,
+  getMaxDoublesForUsageScope,
+  getUsageRoundScope,
+} from "@/services/usage-round.service";
 import {
   calculateDoubleBonus,
   calculateFinishTypePoints,
@@ -112,6 +116,7 @@ export async function submitPrediction(
   const isDouble = data.isDouble ?? false;
 
   if (isDouble) {
+    const maxDoubles = getMaxDoublesForUsageScope(usageScope);
     const doublesUsed = await prisma.prediction.count({
       where: {
         userId,
@@ -120,10 +125,8 @@ export async function submitPrediction(
         matchId: { in: usageScope.matchIds },
       },
     });
-    if (doublesUsed >= MAX_DOUBLES_PER_ROUND) {
-      throw new Error(
-        `يمكنك استخدام ${MAX_DOUBLES_PER_ROUND} مضاعفات فقط في كل جولة`
-      );
+    if (doublesUsed >= maxDoubles) {
+      throw new Error(`يمكنك استخدام ${maxDoubles} مضاعفات فقط في كل جولة`);
     }
   }
 
@@ -148,9 +151,10 @@ export async function submitPrediction(
         select: { matchId: true },
       }),
     ]);
+    const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(usageScope);
     if (
-      boldOnThisMatch?.matchId === data.matchId ||
-      octopusOnThisMatch?.matchId === data.matchId
+      octopusOnThisMatch?.matchId === data.matchId ||
+      (boldOnThisMatch?.matchId === data.matchId && !allowDoubleWithBold)
     ) {
       throw new Error(
         "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
@@ -634,7 +638,6 @@ export async function submitMatchPredictionBundle(
     }
   }
 
-  // ✅ منع استخدام الـ Double والـ Bold معاً على نفس المباراة
   const storedBoldActiveOnThisMatch =
     storedBold != null &&
     storedBold.cancelledAt == null &&
@@ -645,27 +648,25 @@ export async function submitMatchPredictionBundle(
     storedOctopus.matchId === data.matchId;
   const nextBoldActiveOnThisMatch = Boolean(data.boldPlayerId);
   const nextOctopusActiveOnThisMatch = Boolean(data.octopusPlayerId);
+  const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(usageScope);
 
   if (
     isDouble &&
-    (nextBoldActiveOnThisMatch || nextOctopusActiveOnThisMatch)
+    (nextOctopusActiveOnThisMatch ||
+      storedOctopusActiveOnThisMatch ||
+      ((nextBoldActiveOnThisMatch || storedBoldActiveOnThisMatch) &&
+        !allowDoubleWithBold))
   ) {
     throw new Error(
       "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
     );
   }
 
-  if (
-    nextBoldActiveOnThisMatch &&
-    nextOctopusActiveOnThisMatch
-  ) {
+  if (nextBoldActiveOnThisMatch && nextOctopusActiveOnThisMatch) {
     throw new Error("ما تقدر تستخدم الرهان والأخطبوط معاً على نفس المباراة");
   }
 
-  if (
-    nextOctopusActiveOnThisMatch &&
-    nextBoldActiveOnThisMatch
-  ) {
+  if (nextOctopusActiveOnThisMatch && nextBoldActiveOnThisMatch) {
     throw new Error("ما تقدر تستخدم الأخطبوط مع الرهان على نفس المباراة");
   }
 

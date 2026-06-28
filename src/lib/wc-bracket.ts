@@ -55,3 +55,12 @@ export function getBracketByApiMatchId(apiMatchId: string | null | undefined) {
   if (!apiMatchId) return null;
   return WC_2026_BRACKET[apiMatchId] ?? null;
 }
+
+export function getBracketRoundLabel(matchNo: number): string | null {
+  if (matchNo >= 73 && matchNo <= 88) return "Round of 16";
+  if (matchNo >= 89 && matchNo <= 96) return "Quarter-finals";
+  if (matchNo >= 97 && matchNo <= 100) return "Semi-finals";
+  if (matchNo === 101) return "Third-place match";
+  if (matchNo === 102 || matchNo === 103 || matchNo === 104) return "Final";
+  return null;
+}
