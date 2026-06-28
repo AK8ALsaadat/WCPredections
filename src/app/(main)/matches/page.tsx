@@ -268,11 +268,11 @@ export default function MatchesPage() {
         if (seq !== loadSeq.current) return;
 
         if (data.success) {
-<<<<<<< HEAD
           const emptyUpcoming =
             matchType === "upcoming" &&
             (data.data.matches?.length ?? 0) === 0 &&
             (data.data.pinnedMatches?.length ?? 0) === 0;
+
           if (emptyUpcoming) {
             const fallbackRes = await clientFetch(
               scheduleFallbackApiUrl(targetPage, targetRound),
@@ -289,43 +289,10 @@ export default function MatchesPage() {
                   (fallbackData.data.pinnedMatches?.length ?? 0) > 0);
               if (fallbackHasMatches) {
                 data = fallbackData;
-=======
-          const resolvedPage = data.data.page as number;
-          type MatchWithOptionalLineup = Match & {
-            lineup?: unknown[];
-            homeLineup?: unknown[];
-            awayLineup?: unknown[];
-          };
-          function dedupeMatches(rawMatches: Match[]) {
-            function hasLineup(m: Match) {
-              const withLineup = m as MatchWithOptionalLineup;
-              return !!(
-                (withLineup.lineup?.length ?? 0) > 0 ||
-                (withLineup.homeLineup?.length ?? 0) > 0 ||
-                (withLineup.awayLineup?.length ?? 0) > 0
-              );
-            }
-
-            const groups = new Map<string, Match[]>();
-            for (const m of rawMatches) {
-              const key = `${matchIdentityKey(
-                m.homeTeam.name,
-                m.awayTeam.name
-              )}|${new Date(m.matchTime).getTime()}`;
-              const arr = groups.get(key) ?? [];
-              arr.push(m);
-              groups.set(key, arr);
-            }
-            const result: Match[] = [];
-            for (const [, arr] of groups) {
-              if (arr.length === 1) {
-                if (hasLineup(arr[0])) result.push(arr[0]);
-                continue;
->>>>>>> f7a0b4c (Implement prediction rules and UI fixes)
               }
             }
-            if (seq !== loadSeq.current) return;
           }
+
           const resolvedPage = data.data.page as number;
           const rawMatchesArr: Match[] = data.data.matches ?? [];
           const rawPinnedArr: Match[] = data.data.pinnedMatches ?? [];
