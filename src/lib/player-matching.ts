@@ -31,11 +31,41 @@ export function firstNameKey(name: string): string {
 }
 
 const NAME_SUFFIXES = new Set(["jr", "junior", "filho", "neto"]);
+const NAME_VARIANT_ALIASES: Record<string, string[]> = {
+  mahrez: ["maherz", "mohrez", "moharrez", "mahriz", "mohariz"],
+  moussa: ["musa", "mousa", "moosa"],
+  alsaadat: ["alsaad", "alsaadat", "alsaadat", "al-saadat"],
+  mohamed: ["mohammed", "mohamad", "muhammad"],
+};
+
+function nameVariants(name: string): string[] {
+  const normalized = normalizePlayerName(name);
+  const variants = new Set<string>([normalized]);
+  const queue = [normalized];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) continue;
+    const aliases = NAME_VARIANT_ALIASES[current] ?? [];
+    for (const alias of aliases) {
+      if (!variants.has(alias)) {
+        variants.add(alias);
+        queue.push(alias);
+      }
+    }
+  }
+
+  return [...variants];
+}
 
 export function playerNamesMatch(a: string, b: string): boolean {
   const normA = normalizePlayerName(a);
   const normB = normalizePlayerName(b);
   if (normA === normB) return true;
+
+  const variantsA = nameVariants(a);
+  const variantsB = nameVariants(b);
+  if (variantsA.some((variant) => variantsB.includes(variant))) return true;
 
   const partsA = nameParts(a);
   const partsB = nameParts(b);

@@ -19,20 +19,20 @@ export function MobileBottomNav() {
 
   const navItems = useMemo(
     () => [
-      { href: "/dashboard", label: t.nav.dashboard, icon: "H" },
-      { href: "/matches", label: t.nav.matches, icon: "M" },
-      { href: "/leaderboard/overall", label: t.nav.leaderboard, icon: "LB" },
-      { href: "/profile", label: t.nav.profile, icon: "P" },
+      { href: "/dashboard", label: t.nav.dashboard, icon: "🏠" },
+      { href: "/matches", label: t.nav.matches, icon: "⚽" },
+      { href: "/leaderboard/overall", label: t.nav.leaderboard, icon: "🏆" },
+      { href: "/profile", label: t.nav.profile, icon: "👤" },
     ],
     [t]
   );
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-card-border bg-background md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-card-border bg-background/95 md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-4 gap-1 px-2 py-1.5">
         {navItems.map((item) => {
           const active = isActive(pathname, item.href);
           return (
@@ -41,11 +41,11 @@ export function MobileBottomNav() {
               href={item.href}
               prefetch={false}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-2.5 text-[10px] font-semibold transition-all",
-                active ? "bg-primary/15 text-primary shadow-inner" : "text-muted hover:bg-card hover:text-foreground"
+                "flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-semibold transition-all",
+                active ? "bg-primary/10 text-primary" : "text-muted hover:bg-card hover:text-foreground"
               )}
             >
-              <span className="text-sm font-black leading-none" aria-hidden>
+              <span className="text-base leading-none" aria-hidden>
                 {item.icon}
               </span>
               <span className="leading-tight">{item.label}</span>

@@ -53,14 +53,11 @@ export function Navbar({ user }: { user: UserSession }) {
   }
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-card-border bg-background">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-        <Link href="/dashboard" prefetch={false} className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-black text-white" aria-hidden>WC</span>
-          <div className="flex flex-col">
-            <span className="text-sm font-black text-primary">{t.appName}</span>
-            <span className="text-[11px] text-muted">⚽ {t.nav.matches}</span>
-          </div>
+    <nav className="sticky top-0 z-50 border-b border-card-border bg-background/95 backdrop-blur">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6">
+        <Link href="/dashboard" prefetch={false} className="flex items-center gap-2 text-sm font-black text-foreground">
+          <span className="text-lg" aria-hidden>⚽</span>
+          <span>{t.appName}</span>
         </Link>
 
         <div className="hidden items-center gap-1 md:flex">
@@ -72,9 +69,9 @@ export function Navbar({ user }: { user: UserSession }) {
               onMouseEnter={() => router.prefetch(link.href)}
               onFocus={() => router.prefetch(link.href)}
               className={cn(
-                "flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-colors",
+                "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 isNavActive(pathname, link.href, link.match)
-                  ? "bg-primary/20 text-primary"
+                  ? "bg-primary/10 text-primary"
                   : "text-muted hover:bg-card hover:text-foreground"
               )}
             >
@@ -86,9 +83,9 @@ export function Navbar({ user }: { user: UserSession }) {
             <Link
               href="/admin"
               className={cn(
-                "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 pathname.startsWith("/admin")
-                  ? "bg-warning/20 text-warning"
+                  ? "bg-warning/10 text-warning"
                   : "text-muted hover:text-foreground"
               )}
             >
@@ -108,7 +105,7 @@ export function Navbar({ user }: { user: UserSession }) {
         <div className="flex items-center gap-2 md:hidden">
           <LanguageToggle />
           <button
-            className="rounded-lg p-2 text-muted hover:text-foreground"
+            className="rounded-md p-2 text-muted hover:text-foreground"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Menu"
           >
@@ -133,9 +130,9 @@ export function Navbar({ user }: { user: UserSession }) {
                 prefetch={false}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold",
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium",
                   isNavActive(pathname, link.href, link.match)
-                    ? "bg-primary/20 text-primary"
+                    ? "bg-primary/10 text-primary"
                     : "text-muted"
                 )}
               >
@@ -144,7 +141,7 @@ export function Navbar({ user }: { user: UserSession }) {
               </Link>
             ))}
             {user.isAdmin && (
-              <Link href="/admin" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-warning">
+              <Link href="/admin" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm text-warning">
                 {t.nav.admin}
               </Link>
             )}
