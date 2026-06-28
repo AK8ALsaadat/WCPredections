@@ -1366,6 +1366,12 @@ export default function PredictPage() {
         <p className="mt-2 text-center text-sm text-muted">
           {formatDate(match.matchTime, locale)}
         </p>
+        {match._knockoutGated && (
+          <div className="mt-3 rounded-lg border border-warning/50 bg-warning/10 p-3">
+            <p className="text-sm font-semibold text-warning">🔒 {t.matches.knockout}</p>
+            <p className="mt-1 text-xs text-muted">{t.knockoutExtrasLegend} — predictions are read-only for this match.</p>
+          </div>
+        )}
         <div className="mt-4">
           <PredictionCountdown
             matchTime={match.matchTime}

@@ -194,6 +194,18 @@ export function MatchCard({
     false
   );
 
+  // Ensure we always have sensible fallbacks for display values
+  const safeHome = {
+    name: (homeTeamDisplay.name || homeTeamDisplay.shortName || "").trim() || stageLabel,
+    shortName: (homeTeamDisplay.shortName || homeTeamDisplay.name || "").trim() || "—",
+    logoUrl: homeTeamDisplay.logoUrl,
+  };
+  const safeAway = {
+    name: (awayTeamDisplay.name || awayTeamDisplay.shortName || "").trim() || stageLabel,
+    shortName: (awayTeamDisplay.shortName || awayTeamDisplay.name || "").trim() || "—",
+    logoUrl: awayTeamDisplay.logoUrl,
+  };
+
   useEffect(() => {
     setCanPredict(isPredictionAllowed(match.matchTime, match.status));
     setLockReason(getPredictionLockReason(match.matchTime, match.status, t));
@@ -275,8 +287,8 @@ export function MatchCard({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <TeamLogo {...homeTeamDisplay} />
-            <span className="truncate font-medium">{homeTeamDisplay.shortName}</span>
+            <TeamLogo {...safeHome} />
+            <span className="truncate font-medium">{safeHome.shortName}</span>
           </div>
 
           <div className="flex shrink-0 flex-col items-center px-1">
@@ -368,8 +380,8 @@ export function MatchCard({
           </div>
 
           <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-            <span className="truncate font-medium">{awayTeamDisplay.shortName}</span>
-            <TeamLogo {...awayTeamDisplay} />
+            <span className="truncate font-medium">{safeAway.shortName}</span>
+            <TeamLogo {...safeAway} />
           </div>
         </div>
       </Link>
