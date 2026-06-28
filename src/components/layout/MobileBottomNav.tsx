@@ -21,7 +21,6 @@ export function MobileBottomNav() {
     () => [
       { href: "/dashboard", label: t.nav.dashboard, icon: "H" },
       { href: "/matches", label: t.nav.matches, icon: "M" },
-      { href: "/knockout-bracket", label: "Bracket", icon: "KO" },
       { href: "/leaderboard/overall", label: t.nav.leaderboard, icon: "LB" },
       { href: "/profile", label: t.nav.profile, icon: "P" },
     ],

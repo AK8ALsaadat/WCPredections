@@ -127,6 +127,14 @@ function isWithinPredictionCalendarWindow(matchTime: Date): boolean {
   return matchDay === today || matchDay === tomorrow;
 }
 
+function isWindowOpenForPrediction(matchTime: Date): boolean {
+  const now = Date.now();
+  const lockAt = getPredictionLockTime(matchTime).getTime();
+  if (now >= lockAt) return false;
+
+  return isWithinPredictionCalendarWindow(matchTime);
+}
+
 function isMatchStatusLocked(status?: string | null): boolean {
   return status === "LIVE" || status === "FINISHED" || status === "CANCELLED";
 }
@@ -141,10 +149,7 @@ export function isPredictionAllowed(
   const match = new Date(matchTime);
   if (isPredictionLocked(matchTime)) return false;
 
-  const hoursLeft = hoursUntilMatch(match);
-  if (hoursLeft > PREDICTION_WINDOW_HOURS) return false;
-
-  return isWithinPredictionCalendarWindow(match);
+  return isWindowOpenForPrediction(match);
 }
 
 export function getPredictionLockReason(
@@ -161,10 +166,8 @@ export function getPredictionLockReason(
   if (isPredictionLocked(matchTime)) return t.lockedBeforeKickoff;
 
   const match = new Date(matchTime);
-  const hoursLeft = hoursUntilMatch(match);
-
-  if (hoursLeft > PREDICTION_WINDOW_HOURS) return t.tooEarly;
   if (!isWithinPredictionCalendarWindow(match)) return t.windowOnly;
+  if (hoursUntilMatch(match) > PREDICTION_WINDOW_HOURS) return t.tooEarly;
 
   return null;
 }

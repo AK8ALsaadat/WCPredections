@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { isPredictionAllowed } from "@/lib/utils";
 
 const GROUP_STAGE_GATE_REVALIDATE_SECONDS = 60;
 
@@ -34,6 +35,18 @@ export function isGroupStageComplete() {
 
 export async function canShowKnockoutFeatures() {
   return true;
+}
+
+export function shouldShowMatchInUpcomingList<T extends {
+  isKnockout?: boolean;
+  status?: string;
+  matchTime: Date | string;
+}>(match: T): boolean {
+  if (match.status === "LIVE") return true;
+  if (match.status && match.status !== "SCHEDULED") return false;
+
+  if (match.isKnockout) return true;
+  return isPredictionAllowed(match.matchTime, match.status);
 }
 
 export function filterVisibleMatches<T extends { isKnockout: boolean }>(

@@ -2,6 +2,7 @@
 import { revalidateTag, unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { isPredictionAllowed } from "@/lib/utils";
+import { shouldShowMatchInUpcomingList } from "@/lib/tournament-gates";
 import { getTournamentRoundName } from "@/lib/rounds";
 import { filterVisibleMatches } from "@/lib/tournament-gates";
 import { matchIdentityKey } from "@/lib/team-identity";
@@ -396,14 +397,16 @@ export async function getUpcomingMatches(roundId?: string) {
     { revalidate: 60, tags: ["matches-schedule"] }
   )();
   const now = Date.now();
-  // dedupe server-side to reduce client overhead
   const deduped = filterVisibleMatches(dedupeMatches(rows));
-  return deduped.filter(
-    (match) =>
-      match.status === "LIVE" ||
-      (match.status === "SCHEDULED" &&
-        new Date(match.matchTime).getTime() >= now)
-  );
+
+  return deduped.filter((match) => {
+    if (match.status !== "SCHEDULED" && match.status !== "LIVE") return false;
+
+    const matchTime = new Date(match.matchTime).getTime();
+    if (matchTime < now) return false;
+
+    return shouldShowMatchInUpcomingList(match);
+  });
 }
 
 export async function getCompletedMatches(roundId?: string) {

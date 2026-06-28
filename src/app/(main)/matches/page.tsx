@@ -13,6 +13,7 @@ import {
   getPredictionTimezone,
   isMatchStarted,
 } from "@/lib/utils";
+import { shouldShowMatchInUpcomingList } from "@/lib/tournament-gates";
 import {
   invalidateClientCachePrefix,
   isClientCacheFresh,
@@ -304,7 +305,8 @@ export default function MatchesPage() {
 
           const dedupedMatchesArr = dedupeDisplayMatches(rawMatchesArr).filter((m) => {
             const key = `${matchIdentityKey(m.homeTeam.name, m.awayTeam.name)}|${new Date(m.matchTime).getTime()}`;
-            return !pinnedKeys.has(key);
+            if (pinnedKeys.has(key)) return false;
+            return shouldShowMatchInUpcomingList(m);
           });
 
           const payload: MatchesPageCache = {

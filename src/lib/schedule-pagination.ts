@@ -1,4 +1,4 @@
-import { isPredictionAllowed } from "@/lib/utils";
+import { shouldShowMatchInUpcomingList } from "@/lib/tournament-gates";
 
 export const SCHEDULE_PAGE_SIZE = 12;
 
@@ -27,7 +27,7 @@ export function splitScheduleByPredictionWindow<T extends SchedulableMatch>(
       other.push(match);
       continue;
     }
-    if (isPredictionAllowed(match.matchTime)) {
+    if (shouldShowMatchInUpcomingList(match)) {
       open.push(match);
     } else {
       other.push(match);
