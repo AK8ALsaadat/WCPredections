@@ -88,16 +88,35 @@ export type FullPredictionBundleInput = z.infer<
 
 export const knockoutBracketPredictionSchema = z
   .object({
-    finalistOneTeamId: z.string().min(1),
-    finalistTwoTeamId: z.string().min(1),
-    championTeamId: z.string().min(1),
+    picks: z.record(z.string().regex(/^\d+$/), z.string().min(1)).optional(),
+    finalistOneTeamId: z.string().min(1).optional(),
+    finalistTwoTeamId: z.string().min(1).optional(),
+    championTeamId: z.string().min(1).optional(),
   })
-  .refine((data) => data.finalistOneTeamId !== data.finalistTwoTeamId, {
+  .transform((data) => {
+    if (data.picks) return data;
+    return {
+      ...data,
+      picks: {
+        "101": data.finalistOneTeamId ?? "",
+        "102": data.finalistTwoTeamId ?? "",
+        "104": data.championTeamId ?? "",
+      },
+    };
+  })
+  .refine((data) => Object.values(data.picks ?? {}).every(Boolean), {
+    message: "Complete your knockout bracket",
+    path: ["picks"],
+  })
+  .refine((data) => data.finalistOneTeamId == null || data.finalistTwoTeamId == null || data.finalistOneTeamId !== data.finalistTwoTeamId, {
     message: "Choose two different finalists",
     path: ["finalistTwoTeamId"],
   })
   .refine(
     (data) =>
+      data.championTeamId == null ||
+      data.finalistOneTeamId == null ||
+      data.finalistTwoTeamId == null ||
       data.championTeamId === data.finalistOneTeamId ||
       data.championTeamId === data.finalistTwoTeamId,
     {

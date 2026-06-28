@@ -165,13 +165,6 @@ function queueAdjacentMatchesPrefetch(
       3
     );
   }
-  for (let targetPage = 1; targetPage <= totalPages; targetPage += 1) {
-    if (targetPage === currentPage || targetPage === currentPage + 1) continue;
-    enqueueBackgroundPrefetch(
-      () => prefetchMatchesPage(targetPage, targetRound, targetType),
-      4
-    );
-  }
   if (currentPage === 1 && targetType === "upcoming") {
     enqueueBackgroundPrefetch(
       () => prefetchMatchesPage(1, targetRound, "past"),
@@ -515,9 +508,6 @@ export default function MatchesPage() {
             onFocus={() =>
               void prefetchMatchesPage(1, selectedRound, "upcoming")
             }
-            onTouchStart={() =>
-              void prefetchMatchesPage(1, selectedRound, "upcoming")
-            }
             className={`px-4 py-2 font-medium rounded-t transition ${
               matchType === "upcoming"
                 ? "bg-primary text-white"
@@ -535,9 +525,6 @@ export default function MatchesPage() {
               void prefetchMatchesPage(1, selectedRound, "past")
             }
             onFocus={() =>
-              void prefetchMatchesPage(1, selectedRound, "past")
-            }
-            onTouchStart={() =>
               void prefetchMatchesPage(1, selectedRound, "past")
             }
             className={`px-4 py-2 font-medium rounded-t transition ${

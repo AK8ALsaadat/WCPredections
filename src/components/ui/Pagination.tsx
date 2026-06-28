@@ -55,7 +55,6 @@ export function Pagination({
         onClick={() => goTo(page - 1)}
         onMouseEnter={() => onPagePrefetch?.(page - 1)}
         onFocus={() => onPagePrefetch?.(page - 1)}
-        onTouchStart={() => onPagePrefetch?.(page - 1)}
         className="rounded-lg border border-card-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
       >
         {labels.previous}
@@ -76,7 +75,6 @@ export function Pagination({
                 onClick={() => goTo(p)}
                 onMouseEnter={() => onPagePrefetch?.(p)}
                 onFocus={() => onPagePrefetch?.(p)}
-                onTouchStart={() => onPagePrefetch?.(p)}
                 className={cn(
                   "min-w-9 rounded-lg border px-2 py-2 text-sm tabular-nums transition-colors",
                   p === page
@@ -97,7 +95,6 @@ export function Pagination({
         onClick={() => goTo(page + 1)}
         onMouseEnter={() => onPagePrefetch?.(page + 1)}
         onFocus={() => onPagePrefetch?.(page + 1)}
-        onTouchStart={() => onPagePrefetch?.(page + 1)}
         className="rounded-lg border border-card-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
       >
         {labels.next}

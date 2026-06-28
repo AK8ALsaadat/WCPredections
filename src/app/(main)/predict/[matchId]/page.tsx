@@ -59,11 +59,39 @@ import type {
 } from "@/services/match-players.service";
 
 const LINEUP_FAST_POLL_MS = 45_000;
+const SAVE_REQUEST_TIMEOUT_MS = 45_000;
 const SCORE_OPTIONS = Array.from({ length: 10 }, (_, score) => score);
 
 function normalizeScore(score: number) {
   if (!Number.isFinite(score)) return 0;
   return Math.min(9, Math.max(0, Math.trunc(score)));
+}
+
+async function fetchJsonWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs = SAVE_REQUEST_TIMEOUT_MS
+) {
+  const abort = new AbortController();
+  const timeout = window.setTimeout(() => abort.abort(), timeoutMs);
+  try {
+    const res = await fetch(input, {
+      ...init,
+      cache: init.cache ?? "no-store",
+      credentials: init.credentials ?? "same-origin",
+      signal: abort.signal,
+    });
+    const data = await res.json().catch(() => null);
+    return { res, data };
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function saveTimeoutMessage(locale: string) {
+  return locale === "ar"
+    ? "انتهت مهلة الحفظ، حاول مرة ثانية"
+    : "Save timed out, try again";
 }
  
 
@@ -924,14 +952,12 @@ export default function PredictPage() {
 
     setSubmitting(true);
     try {
-      const res = await clientFetch("/api/octopus-bet", {
+      const { res, data } = await fetchJsonWithTimeout("/api/octopus-bet", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ matchId, playerId: null }),
       });
-      if (!res) throw new Error(t.errors.loadFailed);
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
+      if (!res.ok || !data?.success) throw new Error(data?.error ?? t.errors.generic);
 
       setOctopusPlayerId("");
       setOctopusEnabled(false);
@@ -976,7 +1002,13 @@ export default function PredictPage() {
       invalidateMatchesListCaches();
       setSuccess(t.matches.predictionSubmitted);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.loadFailed);
+      setError(
+        isAbortError(err)
+          ? saveTimeoutMessage(locale)
+          : err instanceof Error
+            ? err.message
+            : t.errors.generic
+      );
     } finally {
       setSubmitting(false);
     }
@@ -999,14 +1031,12 @@ export default function PredictPage() {
 
     setSubmitting(true);
     try {
-      const res = await clientFetch("/api/bold-scorer-bet", {
+      const { res, data } = await fetchJsonWithTimeout("/api/bold-scorer-bet", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ matchId, playerId: null }),
       });
-      if (!res) throw new Error(t.errors.loadFailed);
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
+      if (!res.ok || !data?.success) throw new Error(data?.error ?? t.errors.generic);
 
       setBoldPlayerId("");
       setBoldEnabled(false);
@@ -1051,7 +1081,13 @@ export default function PredictPage() {
       invalidateMatchesListCaches();
       setSuccess(t.matches.predictionSubmitted);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.errors.loadFailed);
+      setError(
+        isAbortError(err)
+          ? saveTimeoutMessage(locale)
+          : err instanceof Error
+            ? err.message
+            : t.errors.generic
+      );
     } finally {
       setSubmitting(false);
     }
@@ -1136,7 +1172,7 @@ export default function PredictPage() {
     setSubmitting(true);
 
     try {
-      const res = await clientFetch("/api/predictions", {
+      const { res, data } = await fetchJsonWithTimeout("/api/predictions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1153,9 +1189,8 @@ export default function PredictPage() {
         }),
       });
 
-      const data = res ? await res.json() : null;
-      if (!data.success) {
-        setError(data.error);
+      if (!res.ok || !data?.success) {
+        setError(data?.error ?? t.errors.generic);
         return;
       }
 
@@ -1165,9 +1200,14 @@ export default function PredictPage() {
       clearPredictDraft(matchId);
       invalidateMatchesListCaches();
       setSuccess(t.matches.predictionSubmitted);
-      router.push(`/matches/${matchId}`);
-    } catch {
-      setError(t.errors.generic);
+      await router.replace(`/matches/${matchId}`);
+      router.refresh();
+    } catch (err) {
+      setError(
+        isAbortError(err)
+          ? saveTimeoutMessage(locale)
+          : t.errors.generic
+      );
     } finally {
       setSubmitting(false);
     }

@@ -18,15 +18,12 @@ export function PredictNavLink({
   return (
     <Link
       href={`/predict/${matchId}`}
-      prefetch
+      prefetch={false}
       className={className}
       onMouseEnter={() =>
         prefetchPredictData(matchId, { urgent: true, includeLineup: true })
       }
       onFocus={() =>
-        prefetchPredictData(matchId, { urgent: true, includeLineup: true })
-      }
-      onTouchStart={() =>
         prefetchPredictData(matchId, { urgent: true, includeLineup: true })
       }
     >

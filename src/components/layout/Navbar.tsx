@@ -25,6 +25,7 @@ export function Navbar({ user }: { user: UserSession }) {
     () => [
       { href: "/dashboard", label: t.nav.dashboard },
       { href: "/matches", label: t.nav.matches },
+      { href: "/knockout-bracket", label: "Bracket" },
       {
         href: "/leaderboard/overall",
         label: t.nav.leaderboard,

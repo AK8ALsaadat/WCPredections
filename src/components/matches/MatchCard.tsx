@@ -18,7 +18,6 @@ import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
 import { LeaguePredictionsNavLink } from "@/components/matches/LeaguePredictionsNavLink";
 import {
-  prefetchPredictData,
   seedPredictMatchFromList,
 } from "@/lib/predict-prefetch";
 import { prefetchMatchDetail } from "@/lib/match-detail-cache";
@@ -224,7 +223,6 @@ export function MatchCard({
         predictedGoals: sp.predictedGoals,
       })),
     });
-    void prefetchPredictData(match.id, { includeLineup: true });
   }, [showPredictButton, canPredict, match]);
 
   return (
@@ -274,7 +272,6 @@ export function MatchCard({
         className="block"
         onMouseEnter={() => void prefetchMatchDetail(match.id, true)}
         onFocus={() => void prefetchMatchDetail(match.id, true)}
-        onTouchStart={() => void prefetchMatchDetail(match.id, true)}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">

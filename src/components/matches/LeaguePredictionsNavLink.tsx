@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import {
-  useEffect,
-  useRef,
   type MouseEventHandler,
   type ReactNode,
 } from "react";
@@ -22,38 +20,16 @@ export function LeaguePredictionsNavLink({
   className,
   onClick,
 }: LeaguePredictionsNavLinkProps) {
-  const linkRef = useRef<HTMLAnchorElement>(null);
-
-  useEffect(() => {
-    const link = linkRef.current;
-    if (!link || typeof IntersectionObserver === "undefined") return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry?.isIntersecting) return;
-        void prefetchLeaguePredictions(matchId);
-        observer.disconnect();
-      },
-      { rootMargin: "240px 0px" }
-    );
-    observer.observe(link);
-    return () => observer.disconnect();
-  }, [matchId]);
-
   return (
     <Link
-      ref={linkRef}
       href={`/matches/${matchId}/predictions`}
-      prefetch
+      prefetch={false}
       className={className}
       onClick={onClick}
       onMouseEnter={() =>
         void prefetchLeaguePredictions(matchId, { urgent: true })
       }
       onFocus={() =>
-        void prefetchLeaguePredictions(matchId, { urgent: true })
-      }
-      onTouchStart={() =>
         void prefetchLeaguePredictions(matchId, { urgent: true })
       }
     >

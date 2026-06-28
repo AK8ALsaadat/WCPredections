@@ -734,7 +734,26 @@ export async function getMatchLineup(
 export async function getMatchByIdForPredict(matchId: string, userId?: string) {
   const match = await getCachedMatchShell(matchId);
   if (!match) return null;
-  if (match.isKnockout && !(await canShowKnockoutFeatures())) return null;
+  const knockoutGate = await canShowKnockoutFeatures();
+  if (match.isKnockout && !knockoutGate) {
+    // Return a lightweight shell so the client can display the match
+    // (read-only) instead of a 404. Predictions and bets remain hidden.
+    return {
+      ...match,
+      userPrediction: null,
+      userScorerPredictions: [],
+      userBoldScorerBet: null,
+      userOctopusBet: null,
+      boldScorerRoundStatus: null,
+      octopusRoundStatus: null,
+      roundUsageLimits: null,
+      octopusCount: 0,
+      predictionsCount: 0,
+      doublesCount: 0,
+      boldCount: 0,
+      _knockoutGated: true,
+    };
+  }
 
   let userPrediction = null;
   let userScorerPredictions: { playerId: string; predictedGoals: number }[] = [];

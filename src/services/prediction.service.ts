@@ -420,14 +420,6 @@ export async function submitMatchPredictionBundle(
     throw new Error(lockReason);
   }
 
-  const [existing, usageScope] = await Promise.all([
-    prisma.prediction.findUnique({
-      where: { userId_matchId: { userId, matchId: data.matchId } },
-      select: { id: true, isDouble: true },
-    }),
-    getUsageRoundScope(data.matchId, match.roundId),
-  ]);
-
   const isDouble = data.isDouble ?? false;
   let predHome = data.predHome;
   let predAway = data.predAway;
@@ -452,6 +444,62 @@ export async function submitMatchPredictionBundle(
     data.predictedFinishType === "PENALTIES"
       ? data.predictedPenaltyWinnerTeamId ?? null
       : null;
+
+  if (!isDouble && !data.boldPlayerId && !data.octopusPlayerId) {
+    await validateScorerPicks(match, predHome, predAway, picks);
+
+    const result = await prisma.$transaction(async (tx) => {
+      await Promise.all([
+        tx.boldScorerBet.deleteMany({
+          where: { userId, matchId: data.matchId },
+        }),
+        tx.octopusGoalkeeperBet.deleteMany({
+          where: { userId, matchId: data.matchId },
+        }),
+      ]);
+
+      const prediction = await tx.prediction.upsert({
+        where: {
+          userId_matchId: { userId, matchId: data.matchId },
+        },
+        create: {
+          userId,
+          matchId: data.matchId,
+          predHome,
+          predAway,
+          isDouble: false,
+          predictedFinishType: data.predictedFinishType ?? null,
+          predictedPenaltyWinnerTeamId,
+        },
+        update: {
+          predHome,
+          predAway,
+          isDouble: false,
+          predictedFinishType: data.predictedFinishType ?? null,
+          predictedPenaltyWinnerTeamId,
+        },
+        select: { id: true },
+      });
+
+      await replaceScorerPredictions(userId, data.matchId, picks, tx);
+
+      return {
+        prediction,
+        scorers: picks.length,
+        boldBet: null,
+        octopusBet: null,
+      };
+    });
+
+    try {
+      revalidateTag(`match-${data.matchId}`);
+      revalidateTag("matches-schedule");
+    } catch {
+      // Background/test contexts may not have a Next cache store.
+    }
+
+    return result;
+  }
 
   if (data.boldPlayerId) {
     const eligibility = await getBoldScorerBetEligibility(userId);
@@ -508,6 +556,14 @@ export async function submitMatchPredictionBundle(
   }
 
   await validateScorerPicks(match, predHome, predAway, picks);
+
+  const [existing, usageScope] = await Promise.all([
+    prisma.prediction.findUnique({
+      where: { userId_matchId: { userId, matchId: data.matchId } },
+      select: { id: true, isDouble: true },
+    }),
+    getUsageRoundScope(data.matchId, match.roundId),
+  ]);
 
   if (isDouble) {
     const doublesUsed = await prisma.prediction.count({

@@ -278,9 +278,11 @@ model KnockoutBracketPrediction {
   finalistOneTeamId  String   @map("finalist_one_team_id")
   finalistTwoTeamId  String   @map("finalist_two_team_id")
   championTeamId     String   @map("champion_team_id")
+  picks              Json     @default("{}")
   finalistOnePoints  Int      @default(0) @map("finalist_one_points")
   finalistTwoPoints  Int      @default(0) @map("finalist_two_points")
   championPoints     Int      @default(0) @map("champion_points")
+  totalPoints         Int      @default(0) @map("total_points")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 

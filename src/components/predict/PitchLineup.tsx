@@ -176,6 +176,18 @@ function withDisplayNumbers(players: MatchPlayerView[]) {
   });
 }
 
+function shouldEnableLineupPhotos() {
+  if (typeof window === "undefined") return false;
+
+  const nav = navigator as Navigator & {
+    connection?: { saveData?: boolean; effectiveType?: string };
+  };
+  if (nav.connection?.saveData) return false;
+  if (nav.connection?.effectiveType?.includes("2g")) return false;
+
+  return window.matchMedia("(min-width: 640px)").matches;
+}
+
 function PlayerDot({
   player,
   goals,
@@ -463,6 +475,11 @@ export function PitchLineup({
   const [showPhotos, setShowPhotos] = useState(false);
 
   useEffect(() => {
+    if (!shouldEnableLineupPhotos()) {
+      setShowPhotos(false);
+      return;
+    }
+
     const timer = setTimeout(() => setShowPhotos(true), 650);
     return () => clearTimeout(timer);
   }, []);

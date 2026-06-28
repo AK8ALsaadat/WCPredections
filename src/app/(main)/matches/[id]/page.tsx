@@ -52,7 +52,7 @@ export default function MatchDetailPage() {
         return Promise.resolve();
       }
       if (!opts?.silent && !cached) setLoading(true);
-      return clientFetch(`/api/matches/${matchId}`)
+      return clientFetch(`/api/matches/${matchId}`, { cache: "no-store" })
         .then((r) => (r ? r.json() : null))
         .then((data) => {
           if (data.success) {

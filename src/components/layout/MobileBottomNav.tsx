@@ -19,10 +19,11 @@ export function MobileBottomNav() {
 
   const navItems = useMemo(
     () => [
-      { href: "/dashboard", label: t.nav.dashboard, icon: "🏠" },
-      { href: "/matches", label: t.nav.matches, icon: "⚽" },
-      { href: "/leaderboard/overall", label: t.nav.leaderboard, icon: "🏆" },
-      { href: "/profile", label: t.nav.profile, icon: "👤" },
+      { href: "/dashboard", label: t.nav.dashboard, icon: "H" },
+      { href: "/matches", label: t.nav.matches, icon: "M" },
+      { href: "/knockout-bracket", label: "Bracket", icon: "KO" },
+      { href: "/leaderboard/overall", label: t.nav.leaderboard, icon: "LB" },
+      { href: "/profile", label: t.nav.profile, icon: "P" },
     ],
     [t]
   );
@@ -32,7 +33,7 @@ export function MobileBottomNav() {
       className="fixed inset-x-0 bottom-0 z-50 border-t border-card-border bg-background md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <div className="grid grid-cols-4">
+      <div className="grid grid-cols-5">
         {navItems.map((item) => {
           const active = isActive(pathname, item.href);
           return (
@@ -45,7 +46,7 @@ export function MobileBottomNav() {
                 active ? "text-primary" : "text-muted"
               )}
             >
-              <span className="text-lg leading-none" aria-hidden>
+              <span className="text-sm font-black leading-none" aria-hidden>
                 {item.icon}
               </span>
               <span className="leading-tight">{item.label}</span>
