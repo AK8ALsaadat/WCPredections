@@ -1024,12 +1024,14 @@ export async function updateMatchResult(
   if (data.scorerPlayerIds) {
     await prisma.matchScorer.deleteMany({ where: { matchId } });
     if (data.scorerPlayerIds.length > 0) {
+      const uniquePlayerIds = Array.from(new Set(data.scorerPlayerIds));
       await prisma.matchScorer.createMany({
-        data: data.scorerPlayerIds.map((playerId) => ({
+        data: uniquePlayerIds.map((playerId) => ({
           matchId,
           playerId,
           goals: 1,
         })),
+        skipDuplicates: true,
       });
     }
   }

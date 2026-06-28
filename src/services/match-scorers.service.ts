@@ -149,13 +149,19 @@ export async function replaceMatchScorers(
   await prisma.$transaction(async (tx) => {
     await tx.matchScorer.deleteMany({ where: { matchId } });
     if (resolved.size > 0) {
+      const data = Array.from(resolved.values()).map((row) => ({
+        matchId,
+        playerId: row.playerId,
+        goals: row.goals,
+        minute: row.minute,
+      }));
+      // ensure there are no duplicate player entries and skip duplicates at DB level
+      const uniqueData = Array.from(
+        new Map(data.map((d) => [d.playerId, d])).values()
+      );
       await tx.matchScorer.createMany({
-        data: Array.from(resolved.values()).map((row) => ({
-          matchId,
-          playerId: row.playerId,
-          goals: row.goals,
-          minute: row.minute,
-        })),
+        data: uniqueData,
+        skipDuplicates: true,
       });
     }
   });
