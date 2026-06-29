@@ -367,6 +367,96 @@ function MobileLeaderboardList({
   );
 }
 
+function YeloLeagueSection({
+  entries,
+  highlightUserId,
+  showRankTrend,
+  pointsLabel,
+}: {
+  entries: LeaderboardEntry[];
+  highlightUserId?: string;
+  showRankTrend?: boolean;
+  pointsLabel?: string;
+}) {
+  const { messages: t } = useI18n();
+  if (entries.length === 0) return null;
+
+  const toneForIndex = (index: number) => {
+    if (index === 0) {
+      return {
+        row: "border-emerald-300/45 bg-gradient-to-l from-emerald-950/70 via-emerald-900/30 to-card",
+        points: "text-emerald-200",
+        label: "text-emerald-100/70",
+        badge: "border-emerald-300/45 bg-emerald-500/15 text-emerald-100",
+      };
+    }
+    if (index >= Math.max(1, entries.length - 2)) {
+      return {
+        row: "border-red-400/40 bg-gradient-to-l from-red-950/70 via-red-950/25 to-card",
+        points: "text-red-200",
+        label: "text-red-200/70",
+        badge: "border-red-300/40 bg-red-500/15 text-red-100",
+      };
+    }
+    return {
+      row: "border-yellow-300/35 bg-gradient-to-l from-yellow-950/55 via-yellow-900/20 to-card",
+      points: "text-yellow-200",
+      label: "text-yellow-100/70",
+      badge: "border-yellow-300/40 bg-yellow-500/15 text-yellow-100",
+    };
+  };
+
+  return (
+    <section className="pt-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-300/30 to-transparent" />
+        <h2 className="rounded-lg border border-yellow-300/35 bg-yellow-400/10 px-4 py-1.5 text-base font-black text-yellow-100">
+          Yelo
+        </h2>
+      </div>
+
+      <div className="space-y-2">
+        {entries.map((entry, index) => {
+          const tone = toneForIndex(index);
+          const isMe = entry.userId === highlightUserId;
+
+          return (
+            <Link
+              key={entry.userId}
+              href={`/user/${encodeURIComponent(entry.username)}`}
+              className={`flex items-center gap-3 rounded-xl border px-3 py-3 transition hover:border-yellow-200/55 md:px-5 ${
+                tone.row
+              } ${isMe ? "ring-1 ring-primary/60" : ""}`}
+            >
+              <div className="min-w-0 flex-1 text-end">
+                <div className="flex min-w-0 items-center justify-end gap-2">
+                  {showRankTrend && <RankTrend change={entry.rankChange} />}
+                  <span className="truncate font-semibold text-foreground">
+                    {entry.username}
+                  </span>
+                  <span
+                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-xs font-black ${tone.badge}`}
+                  >
+                    {entry.rank}
+                  </span>
+                </div>
+              </div>
+              <div className="shrink-0 text-start">
+                <p className={`text-[10px] ${tone.label}`}>
+                  {pointsLabel ?? t.leaderboard.points}
+                </p>
+                <p className={`text-lg font-black tabular-nums ${tone.points}`}>
+                  {entry.points}
+                </p>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function LeaderboardTable({
   entries,
   highlightUserId,
@@ -375,6 +465,7 @@ export function LeaderboardTable({
   labels,
   realtimeEndpoint,
   showRelegationZone = false,
+  showYeloLeague = false,
 }: {
   entries: LeaderboardEntry[];
   highlightUserId?: string;
@@ -382,6 +473,7 @@ export function LeaderboardTable({
   pointsLabel?: string;
   realtimeEndpoint?: string;
   showRelegationZone?: boolean;
+  showYeloLeague?: boolean;
   labels?: {
     rank: string;
     trend: string;
@@ -451,11 +543,13 @@ export function LeaderboardTable({
     );
   }
 
-  const leader = liveEntries[0];
-  const remainingEntries = liveEntries.slice(1);
+  const mainEntries = showYeloLeague ? liveEntries.slice(0, 10) : liveEntries;
+  const yeloEntries = showYeloLeague ? liveEntries.slice(10) : [];
+  const leader = mainEntries[0];
+  const remainingEntries = mainEntries.slice(1);
   const { relegatedUserIds, exemptUserIds } = getRelegationStatus(
-    liveEntries,
-    showRelegationZone
+    mainEntries,
+    showYeloLeague ? false : showRelegationZone
   );
 
   return (
@@ -574,6 +668,13 @@ export function LeaderboardTable({
           </table>
         </Card>
       )}
+
+      <YeloLeagueSection
+        entries={yeloEntries}
+        highlightUserId={highlightUserId}
+        showRankTrend={showRankTrend}
+        pointsLabel={pointsLabel}
+      />
     </div>
   );
 }

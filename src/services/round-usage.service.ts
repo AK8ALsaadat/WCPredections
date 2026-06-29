@@ -40,7 +40,7 @@ export async function getRoundUsageLimits(
   const maxDoubles = getMaxDoublesForUsageScope(scope);
   const phase = getUsageRoundPhase(scope);
   const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(scope);
-  const highValueBoldScorer = isHighValueBoldScorerRound(scope);
+  const canDoubleBoostBoldScorer = isHighValueBoldScorerRound(scope);
 
   const doubleOnThisMatch =
     roundPredictions.find((prediction) => prediction.matchId === matchId)
@@ -50,6 +50,7 @@ export async function getRoundUsageLimits(
   ).length;
   const doublesUsedElsewhere =
     doublesInRound - (doubleOnThisMatch ? 1 : 0);
+  const highValueBoldScorer = canDoubleBoostBoldScorer && doubleOnThisMatch;
 
   return {
     roundId: resolvedRoundId,
@@ -79,6 +80,7 @@ export async function getRoundUsageLimits(
       playerId: boldStatus.bet?.playerId ?? null,
       points: boldStatus.bet?.points ?? 0,
       highValue: highValueBoldScorer,
+      canDoubleBoost: canDoubleBoostBoldScorer,
       pointsForHit: highValueBoldScorer ? 10 : 5,
       pointsForMiss: highValueBoldScorer ? -10 : -5,
     },

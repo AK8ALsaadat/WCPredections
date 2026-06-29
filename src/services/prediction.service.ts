@@ -72,15 +72,20 @@ export async function validateDoubleUsage(
 ): Promise<void> {
   if (!isDouble) return;
 
-  const doublesUsed = await countDoublesUsedInRound(
-    userId,
-    matchId,
-    excludePredictionId
-  );
+  const scope = await getUsageRoundScope(matchId);
+  const maxDoubles = getMaxDoublesForUsageScope(scope);
+  const doublesUsed = await prisma.prediction.count({
+    where: {
+      userId,
+      isDouble: true,
+      id: excludePredictionId ? { not: excludePredictionId } : undefined,
+      matchId: { in: scope.matchIds },
+    },
+  });
 
-  if (doublesUsed >= MAX_DOUBLES_PER_ROUND) {
+  if (doublesUsed >= maxDoubles) {
     throw new Error(
-      `يمكنك استخدام ${MAX_DOUBLES_PER_ROUND} مضاعفات فقط في كل جولة`
+      `يمكنك استخدام ${maxDoubles} مضاعفات فقط في كل جولة`
     );
   }
 }
@@ -571,6 +576,7 @@ export async function submitMatchPredictionBundle(
   ]);
 
   if (isDouble) {
+    const maxDoubles = getMaxDoublesForUsageScope(usageScope);
     const doublesUsed = await prisma.prediction.count({
       where: {
         userId,
@@ -579,9 +585,9 @@ export async function submitMatchPredictionBundle(
         matchId: { in: usageScope.matchIds },
       },
     });
-    if (doublesUsed >= MAX_DOUBLES_PER_ROUND) {
+    if (doublesUsed >= maxDoubles) {
       throw new Error(
-        `يمكنك استخدام ${MAX_DOUBLES_PER_ROUND} مضاعفات فقط في كل جولة`
+        `يمكنك استخدام ${maxDoubles} مضاعفات فقط في كل جولة`
       );
     }
   }

@@ -40,6 +40,7 @@ export default async function OverallLeaderboardPage() {
         highlightUserId={user?.userId}
         showRankTrend
         showRelegationZone
+        showYeloLeague
         labels={{
           rank: t.leaderboard.rank,
           trend: t.leaderboard.trend,

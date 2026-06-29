@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -44,6 +43,23 @@ function formatDeadline(deadline: string | Date | null) {
   }).format(new Date(deadline));
 }
 
+function formatCountdown(deadline: string | Date | null, now: number) {
+  if (!deadline) return "--:--";
+  const diffMs = new Date(deadline).getTime() - now;
+  if (diffMs <= 0) return "مغلق";
+
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return `${days}ي ${hours}س ${minutes}د`;
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
 export function KnockoutBracketPredictionCard() {
   const [status, setStatus] = useState<BracketPredictionStatus | null>(null);
   const [finalistOneTeamId, setFinalistOneTeamId] = useState("");
@@ -53,6 +69,12 @@ export function KnockoutBracketPredictionCard() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -157,22 +179,43 @@ export function KnockoutBracketPredictionCard() {
 
   const hasTeams = (status?.finalistCandidates.length ?? 0) > 1;
   const disabled = loading || saving || status?.locked || !hasTeams;
+  const countdown = formatCountdown(status?.deadline ?? null, now);
 
   return (
     <section className="rounded-lg border border-primary/35 bg-gradient-to-l from-primary/10 via-card to-card p-4 shadow-sm">
+      <div className="mb-4 grid gap-3 md:grid-cols-2">
+        <div className="rounded-lg border border-primary/35 bg-primary/10 px-4 py-3 text-sm text-primary">
+          <p className="font-black">توقع طرفي النهائي والبطل</p>
+          <p className="mt-1 text-primary/90">
+            يقفل مع مباراة البرازيل الساعة 8:00 مساء. كل طرف نهائي صحيح +3،
+            والبطل الصحيح +10 وتضاف للترتيب العام.
+          </p>
+        </div>
+        <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <p className="font-black">نظام المضاعفة والرهان</p>
+          <p className="mt-1">
+            دور 16: مضاعفة واحدة فقط. من ربع النهائي: تقدر تجمع مضاعفة واحدة
+            مع الرهان؛ إذا كان الرهان على مباراة مضاعفة يصير +10 إذا صح و-10 إذا خطأ،
+            وبدون المضاعفة يبقى +5 / -5.
+          </p>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="text-end">
-          <p className="text-xs font-black uppercase tracking-wider text-primary">
-            توقع النهائي
-          </p>
-          <h2 className="mt-1 text-lg font-black text-foreground">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="rounded-lg border border-primary/40 bg-background/60 px-3 py-1.5 text-sm font-black tabular-nums text-primary">
+              {countdown}
+            </span>
+            <p className="text-xs font-black uppercase tracking-wider text-primary">
+              توقع النهائي
+            </p>
+          </div>
+          <h2 className="mt-2 text-lg font-black text-foreground">
             اختر طرفي النهائي والبطل
           </h2>
           <p className="mt-1 text-sm text-muted">
             الديدلاين {formatDeadline(status?.deadline ?? null)} بتوقيت الرياض. كل طرف نهائي صحيح +3، والبطل الصحيح +10.
-          </p>
-          <p className="mt-2 text-xs text-warning">
-            من دور 16 لك مضاعفة واحدة فقط. من ربع النهائي تقدر تجمع مضاعفة واحدة مع الرهان، والرهان يصير +10 أو -10.
           </p>
         </div>
 
@@ -217,17 +260,9 @@ export function KnockoutBracketPredictionCard() {
               {error && <span className="text-danger">{error}</span>}
               {status?.locked && <span className="text-warning">انتهى وقت التوقع</span>}
             </div>
-            <div className="flex gap-2">
-              <Link
-                href="/leaderboard/knockout"
-                className="inline-flex items-center justify-center rounded-lg border border-card-border px-3 py-2 text-xs font-bold text-foreground transition hover:border-primary/50"
-              >
-                ليدربورد النهائي
-              </Link>
-              <Button type="submit" size="sm" loading={saving} disabled={disabled}>
-                حفظ توقع النهائي
-              </Button>
-            </div>
+            <Button type="submit" size="sm" loading={saving} disabled={disabled}>
+              حفظ توقع النهائي
+            </Button>
           </div>
         </form>
       </div>

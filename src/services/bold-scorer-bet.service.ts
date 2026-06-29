@@ -20,38 +20,7 @@ export { BOLD_SCORER_POINTS };
 export { MIN_POINTS_FOR_BOLD_SCORER_BET };
 
 export async function getBoldScorerBetEligibility(userId: string) {
-  const [predictionAgg, scorerAgg, boldAgg, octopusAgg] = await Promise.all([
-    prisma.prediction.aggregate({
-      where: { userId },
-      _sum: {
-        points: true,
-        doubleBonus: true,
-        finishTypePoints: true,
-        penaltyWinnerPoints: true,
-      },
-    }),
-    prisma.scorerPrediction.aggregate({
-      where: { userId },
-      _sum: { points: true },
-    }),
-    prisma.boldScorerBet.aggregate({
-      where: { userId, cancelledAt: null },
-      _sum: { points: true },
-    }),
-    prisma.octopusGoalkeeperBet.aggregate({
-      where: { userId, cancelledAt: null },
-      _sum: { points: true },
-    }),
-  ]);
-
-  const userPoints =
-    (predictionAgg._sum.points ?? 0) +
-    (predictionAgg._sum.doubleBonus ?? 0) +
-    (predictionAgg._sum.finishTypePoints ?? 0) +
-    (predictionAgg._sum.penaltyWinnerPoints ?? 0) +
-    (scorerAgg._sum.points ?? 0) +
-    (boldAgg._sum.points ?? 0) +
-    (octopusAgg._sum.points ?? 0);
+  const userPoints = await getUserTotalPoints(userId);
 
   return {
     userPoints,
@@ -201,9 +170,7 @@ export async function submitBoldScorerBet(
     }),
   ]);
   if (octopusBet && octopusBet.matchId !== matchId && !octopusBet.cancelledAt) {
-    throw new Error(
-      "Ù…Ø§ ØªÙ‚Ø¯Ø± ØªØ³ØªØ®Ø¯Ù… Ø§Ù„Ø±Ù‡Ø§Ù† ÙˆØ§Ù„Ø£Ø®Ø·Ø¨ÙˆØ· Ù…Ø¹Ø§Ù‹ Ø¹Ù„Ù‰ Ù†ÙØ³ Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©"
-    );
+    throw new Error("ما تقدر تستخدم الرهان والأخطبوط معاً على نفس المباراة");
   }
 
   const eligibility = await getBoldScorerBetEligibility(userId);
@@ -308,9 +275,26 @@ export async function calculateBoldScorerBetPointsForMatch(
   ]);
 
   const scope = match?.roundId ? await getUsageRoundScope(matchId, match.roundId) : null;
-  const highValue = scope ? isHighValueBoldScorerRound(scope) : false;
+  const canDoubleBoost = scope ? isHighValueBoldScorerRound(scope) : false;
+  const predictionRows =
+    canDoubleBoost && bets.length > 0
+      ? await prisma.prediction.findMany({
+          where: {
+            matchId,
+            userId: { in: bets.map((bet) => bet.userId) },
+          },
+          select: { userId: true, isDouble: true },
+        })
+      : [];
+  const doubleByUser = new Map(
+    predictionRows.map((prediction) => [
+      prediction.userId,
+      prediction.isDouble,
+    ])
+  );
 
   for (const bet of bets) {
+    const highValue = canDoubleBoost && doubleByUser.get(bet.userId) === true;
     const regulationGoals =
       resolveScorerGoalsForPlayer(
         bet.playerId,

@@ -5,6 +5,7 @@ import {
   fullPredictionBundleSchema,
   type FullPredictionBundleInput,
 } from "@/lib/validations";
+import { getMatchByIdForPredict } from "@/services/match.service";
 import { submitMatchPredictionBundle } from "@/services/prediction.service";
 
 export async function POST(request: Request) {
@@ -17,7 +18,8 @@ export async function POST(request: Request) {
     ) as FullPredictionBundleInput;
 
     const result = await submitMatchPredictionBundle(user.userId, data);
-    return apiSuccess(result, 201);
+    const match = await getMatchByIdForPredict(data.matchId, user.userId);
+    return apiSuccess({ ...result, match }, 201);
   } catch (error) {
     return handleApiError(error);
   }

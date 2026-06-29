@@ -5,11 +5,12 @@ import { apiSuccess, handleApiError } from "@/lib/api";
 import { getSession, requireAuth } from "@/lib/session";
 import { parseBody, updateUsernameSchema } from "@/lib/validations";
 import { getUserPredictionHistory } from "@/services/prediction.service";
+import { getUserTotalPoints } from "@/services/user-points.service";
 
 export async function GET() {
   try {
     const sessionUser = await requireAuth();
-    const [user, history, bracketPrediction] = await Promise.all([
+    const [user, history, bracketPrediction, totalPoints] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: sessionUser.userId },
         select: { id: true, username: true, createdAt: true },
@@ -23,6 +24,7 @@ export async function GET() {
           championPoints: true,
         },
       }),
+      getUserTotalPoints(sessionUser.userId),
     ]);
 
     const roundPoints: Record<string, number> = {};
@@ -51,11 +53,6 @@ export async function GET() {
         (bracketPrediction.finalistTwoPoints ?? 0) +
         (bracketPrediction.championPoints ?? 0);
     }
-    const totalPoints = Object.values(roundPoints).reduce(
-      (sum, points) => sum + points,
-      0
-    );
-
     const correctPredictions = history.predictions.filter(
       (p) => p.points > 0
     ).length;

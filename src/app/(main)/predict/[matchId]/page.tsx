@@ -187,6 +187,7 @@ type MatchData = {
       playerId?: string | null;
       points?: number;
       highValue?: boolean;
+      canDoubleBoost?: boolean;
       pointsForHit?: number;
       pointsForMiss?: number;
     };
@@ -1224,7 +1225,9 @@ export default function PredictPage() {
         return;
       }
 
-      const freshMatch = await fetchPredictMatchFresh(matchId);
+      const freshMatch =
+        (data?.data?.match as MatchData | null | undefined) ??
+        (await fetchPredictMatchFresh(matchId));
       if (!freshMatch) {
         throw new Error(
           locale === "ar"
@@ -1294,7 +1297,6 @@ export default function PredictPage() {
   const boldLimits = match.roundUsageLimits?.boldScorer;
   const octopusLimits = match.roundUsageLimits?.octopus;
   const allowDoubleWithBold = match.roundUsageLimits?.allowDoubleWithBold ?? false;
-  const highValueBoldScorer = boldLimits?.highValue ?? false;
   const boldOnThisMatch =
     Boolean(boldLimits?.onThisMatch) ||
     Boolean(match.boldScorerRoundStatus?.onThisMatch) ||
@@ -1331,12 +1333,8 @@ export default function PredictPage() {
       !doubleLimits.onThisMatch);
   const knockoutRulesNotice =
     locale === "ar"
-      ? `تنبيه: من دور 16 الحد مضاعفة واحدة فقط. من ربع النهائي تقدر تجمع مضاعفة واحدة مع الرهان، والرهان يحسب ${
-          highValueBoldScorer ? "+10 / -10" : "+5 / -5"
-        }.`
-      : `Notice: Round of 16 allows one double only. From the quarter-finals you can combine one double with the scorer bet, and the bet is worth ${
-          highValueBoldScorer ? "+10 / -10" : "+5 / -5"
-        }.`;
+      ? `تنبيه: من دور 16 الحد مضاعفة واحدة فقط. من ربع النهائي تقدر تجمع مضاعفة واحدة مع الرهان؛ إذا الرهان على مباراة مضاعفة يصير +10 / -10، وبدون المضاعفة يبقى +5 / -5.`
+      : "Notice: Round of 16 allows one double only. From the quarter-finals you can combine one double with the scorer bet; a bet on a doubled match is +10 / -10, otherwise it remains +5 / -5.";
   const predictedScorerIds = new Set(Object.keys(scorerPicks));
   const hasPredictedScorers = predictedScorerIds.size > 0;
   const toBoldPlayerOption = (player: MatchPlayerView) => ({

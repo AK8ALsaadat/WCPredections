@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getTournamentRoundName } from "@/lib/rounds";
 import { getTournamentRound } from "@/services/match.service";
+import { applyOverallLeaderboardBaseline } from "@/services/baseline-points.service";
 import type { LeaderboardEntry } from "@/types";
 
 export { getUserTotalPoints } from "@/services/user-points.service";
@@ -9,20 +10,6 @@ export { getUserTotalPoints } from "@/services/user-points.service";
 type PointsRow = { username: string; points: number };
 
 const LB_CACHE_SECONDS = 300;
-const INITIAL_LEADERBOARD_POINTS = new Map<string, number>([
-  ["nawafmd", 155],
-  ["bdr", 152],
-  ["mohannad", 152],
-  ["mohammed", 147],
-  ["abood9af", 146],
-  ["danger", 144],
-  ["alsaadat", 142],
-  ["alfaris14", 141],
-  ["dawoad", 128],
-  ["dawood", 128],
-  ["abdullah", 127],
-  ["nawaf", 100],
-]);
 
 // Riyadh timezone offset (UTC+3) used for day boundaries and night window logic
 const RIYADH_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -195,12 +182,9 @@ async function getUserPointsMap(
     }
   }
 
-  if (
-    !hasMatchFilter &&
-    process.env.LEADERBOARD_BASELINE_POINTS !== "false"
-  ) {
+  if (!hasMatchFilter) {
     for (const row of pointsMap.values()) {
-      row.points += INITIAL_LEADERBOARD_POINTS.get(row.username.toLowerCase()) ?? 0;
+      row.points = applyOverallLeaderboardBaseline(row.username, row.points);
     }
   }
 
@@ -209,7 +193,7 @@ async function getUserPointsMap(
 
 function buildLeaderboard(pointsMap: Map<string, PointsRow>): LeaderboardEntry[] {
   // استبعد حسابات الاختبار وبعض المستخدمين بحسب القواعد
-  const EXCLUDED_USERNAMES = new Set(["mmg", "mhk", "verifier"]);
+  const EXCLUDED_USERNAMES = new Set(["verifier"]);
   const EXCLUDE_PATTERNS: RegExp[] = [
     /^qa_/i,
     /^ui_qa_/i,
