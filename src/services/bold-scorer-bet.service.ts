@@ -6,6 +6,7 @@ import {
   calculateBoldScorerBetPoints,
 } from "@/services/scoring.service";
 import {
+  canCombineDoubleAndBoldForUsageScope,
   getUsageRoundScope,
   isHighValueBoldScorerRound,
   type UsageRoundScope,
@@ -185,6 +186,8 @@ export async function submitBoldScorerBet(
     }
   }
 
+  const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(scope);
+
   const [prediction, octopusBet] = await Promise.all([
     prisma.prediction.findUnique({
       where: { userId_matchId: { userId, matchId } },
@@ -248,7 +251,7 @@ export async function submitBoldScorerBet(
   }
 
   return prisma.$transaction(async (tx) => {
-    if (prediction?.isDouble) {
+    if (prediction?.isDouble && !allowDoubleWithBold) {
       await tx.prediction.update({
         where: { id: prediction.id },
         data: { isDouble: false },

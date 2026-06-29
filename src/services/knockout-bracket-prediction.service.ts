@@ -13,6 +13,9 @@ export const KNOCKOUT_ROUND_POINTS = {
   final: 10,
 } as const;
 
+export const FINALIST_PREDICTION_POINTS = 3;
+export const CHAMPION_PREDICTION_POINTS = 10;
+
 const ROUND_DEFS = [
   {
     key: "roundOf32",
@@ -60,6 +63,17 @@ const MATCH_NO_TO_ROUND = new Map(
 
 type TeamRef = { id: string; name: string; shortName: string; logoUrl: string | null };
 type Picks = Record<string, string>;
+type FinalistsPredictionInput = {
+  picks?: Prisma.JsonValue | Picks;
+  finalistOneTeamId?: string | null;
+  finalistTwoTeamId?: string | null;
+  championTeamId?: string | null;
+};
+type ActualFinalResult = {
+  finalistTeamIds?: string[];
+  championTeamId?: string | null;
+};
+type ActualWinnersInput = Record<string, string | null> | ActualFinalResult;
 
 function isRealTeam(team: Pick<TeamRef, "name">) {
   const identity = normalizeTeamIdentity(team.name);
@@ -105,19 +119,43 @@ function getMatchWinnerTeamId(match: {
   return match.homeScore > match.awayScore ? match.homeTeamId : match.awayTeamId;
 }
 
+function actualFinalResultFromInput(actual: ActualWinnersInput): ActualFinalResult {
+  if ("finalistTeamIds" in actual || "championTeamId" in actual) {
+    const finalResult = actual as ActualFinalResult;
+    return {
+      finalistTeamIds: Array.isArray(finalResult.finalistTeamIds)
+        ? finalResult.finalistTeamIds
+        : [],
+      championTeamId:
+        typeof finalResult.championTeamId === "string"
+          ? finalResult.championTeamId
+          : null,
+    };
+  }
+
+  const winnerMap = actual as Record<string, string | null>;
+  return {
+    finalistTeamIds: [winnerMap["101"], winnerMap["102"]].filter(
+      (teamId): teamId is string => Boolean(teamId)
+    ),
+    championTeamId: winnerMap["104"] ?? null,
+  };
+}
+
 export function calculateKnockoutBracketPredictionPoints(
-  prediction: { picks?: Prisma.JsonValue | Picks; championTeamId?: string },
-  actualWinners: Record<string, string | null>
+  prediction: FinalistsPredictionInput,
+  actualWinners: ActualWinnersInput
 ) {
   const picks = pickObject(prediction.picks as Prisma.JsonValue);
-  let total = 0;
+  let bracketTotal = 0;
   let finalistOnePoints = 0;
   let finalistTwoPoints = 0;
   let championPoints = 0;
   const matchPoints: Record<string, number> = {};
 
   for (const matchNo of PREDICTION_MATCH_NOS) {
-    const actualWinner = actualWinners[String(matchNo)];
+    const actualWinner =
+      (actualWinners as Record<string, string | null>)[String(matchNo)] ?? null;
     const pickedWinner = picks[String(matchNo)];
     const round = MATCH_NO_TO_ROUND.get(matchNo);
     if (!actualWinner || !pickedWinner || !round || actualWinner !== pickedWinner) {
@@ -125,13 +163,35 @@ export function calculateKnockoutBracketPredictionPoints(
       continue;
     }
     matchPoints[String(matchNo)] = round.points;
-    total += round.points;
-    if (matchNo === 101) finalistOnePoints = round.points;
-    if (matchNo === 102) finalistTwoPoints = round.points;
-    if (matchNo === 104) championPoints = round.points;
+    bracketTotal += round.points;
   }
 
-  return { finalistOnePoints, finalistTwoPoints, championPoints, total, matchPoints };
+  const finalistOneTeamId = prediction.finalistOneTeamId ?? picks["101"];
+  const finalistTwoTeamId = prediction.finalistTwoTeamId ?? picks["102"];
+  const championTeamId = prediction.championTeamId ?? picks["104"];
+  const actualFinal = actualFinalResultFromInput(actualWinners);
+  const actualFinalists = new Set(actualFinal.finalistTeamIds ?? []);
+
+  if (finalistOneTeamId && actualFinalists.has(finalistOneTeamId)) {
+    finalistOnePoints = FINALIST_PREDICTION_POINTS;
+  }
+  if (finalistTwoTeamId && actualFinalists.has(finalistTwoTeamId)) {
+    finalistTwoPoints = FINALIST_PREDICTION_POINTS;
+  }
+  if (championTeamId && actualFinal.championTeamId === championTeamId) {
+    championPoints = CHAMPION_PREDICTION_POINTS;
+  }
+
+  const total = finalistOnePoints + finalistTwoPoints + championPoints;
+
+  return {
+    finalistOnePoints,
+    finalistTwoPoints,
+    championPoints,
+    total,
+    matchPoints,
+    bracketTotal,
+  };
 }
 
 export async function getKnockoutBracketDeadline() {
@@ -222,7 +282,97 @@ async function getActualWinners() {
   return winners;
 }
 
+async function getActualFinalResultFromDatabase(): Promise<ActualFinalResult> {
+  const finalMatch = await prisma.match.findFirst({
+    where: {
+      isKnockout: true,
+      NOT: [
+        { stageName: { contains: "Third" } },
+        { stageName: { contains: "3rd" } },
+      ],
+      OR: [
+        { stageName: { contains: "Final" } },
+        { apiMatchId: "537390" },
+      ],
+    },
+    include: {
+      homeTeam: { select: { id: true, name: true } },
+      awayTeam: { select: { id: true, name: true } },
+    },
+    orderBy: { matchTime: "desc" },
+  });
+
+  if (!finalMatch) return { finalistTeamIds: [], championTeamId: null };
+
+  const finalistTeamIds = [finalMatch.homeTeam, finalMatch.awayTeam]
+    .filter(isRealTeam)
+    .map((team) => team.id);
+
+  return {
+    finalistTeamIds,
+    championTeamId: getMatchWinnerTeamId(finalMatch),
+  };
+}
+
+async function getKnockoutFinalistCandidates(): Promise<TeamRef[]> {
+  const rows = await prisma.match.findMany({
+    where: { isKnockout: true },
+    select: {
+      matchTime: true,
+      homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+      awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+    },
+    orderBy: { matchTime: "asc" },
+  });
+
+  const unique = new Map<string, TeamRef>();
+  for (const row of rows) {
+    for (const team of [row.homeTeam, row.awayTeam]) {
+      if (!isRealTeam(team)) continue;
+      unique.set(team.id, team);
+    }
+  }
+
+  return Array.from(unique.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function validateSimpleFinalistsPrediction(picks: Picks) {
+  const finalistOneTeamId = picks["101"];
+  const finalistTwoTeamId = picks["102"];
+  const championTeamId = picks["104"];
+  if (!finalistOneTeamId || !finalistTwoTeamId || !championTeamId) {
+    throw new Error("Choose both finalists and the champion");
+  }
+  if (finalistOneTeamId === finalistTwoTeamId) {
+    throw new Error("Choose two different finalists");
+  }
+  if (championTeamId !== finalistOneTeamId && championTeamId !== finalistTwoTeamId) {
+    throw new Error("Champion must be one of your finalists");
+  }
+
+  const candidates = await getKnockoutFinalistCandidates();
+  const candidateIds = new Set(candidates.map((team) => team.id));
+  if (
+    candidateIds.size > 0 &&
+    (!candidateIds.has(finalistOneTeamId) ||
+      !candidateIds.has(finalistTwoTeamId) ||
+      !candidateIds.has(championTeamId))
+  ) {
+    throw new Error("Choose teams from the knockout teams list");
+  }
+
+  return { finalistOneTeamId, finalistTwoTeamId, championTeamId };
+}
+
 async function resolveAndValidatePicks(picks: Picks) {
+  const hasCompleteBracket = PREDICTION_MATCH_NOS.every(
+    (matchNo) => Boolean(picks[String(matchNo)])
+  );
+
+  if (!hasCompleteBracket) {
+    return validateSimpleFinalistsPrediction(picks);
+  }
+
   const template = await getKnockoutBracketTemplate();
   const matchByNo = new Map(template.matches.map((match) => [match.matchNo, match]));
   const resolvedWinners = new Map<number, TeamRef>();
@@ -267,13 +417,25 @@ async function resolveAndValidatePicks(picks: Picks) {
 }
 
 export async function recalculateKnockoutBracketPredictionPoints() {
-  const actualWinners = await getActualWinners();
+  const [actualWinners, actualFinalResult] = await Promise.all([
+    getActualWinners(),
+    getActualFinalResultFromDatabase(),
+  ]);
   const predictions = await prisma.knockoutBracketPrediction.findMany({
-    select: { id: true, picks: true, championTeamId: true },
+    select: {
+      id: true,
+      picks: true,
+      finalistOneTeamId: true,
+      finalistTwoTeamId: true,
+      championTeamId: true,
+    },
   });
 
   for (const prediction of predictions) {
-    const points = calculateKnockoutBracketPredictionPoints(prediction, actualWinners);
+    const points = calculateKnockoutBracketPredictionPoints(
+      prediction,
+      { ...actualWinners, ...actualFinalResult }
+    );
     await prisma.knockoutBracketPrediction.update({
       where: { id: prediction.id },
       data: {
@@ -296,7 +458,7 @@ export async function recalculateKnockoutBracketPredictionPoints() {
 }
 
 export async function getKnockoutBracketPredictionStatus(userId: string) {
-  const [deadline, template, prediction, actualWinners] = await Promise.all([
+  const [deadline, template, prediction, actualWinners, actualFinalResult, finalistCandidates] = await Promise.all([
     getKnockoutBracketDeadline(),
     getKnockoutBracketTemplate(),
     prisma.knockoutBracketPrediction.findUnique({
@@ -308,16 +470,27 @@ export async function getKnockoutBracketPredictionStatus(userId: string) {
       },
     }),
     getActualWinners(),
+    getActualFinalResultFromDatabase(),
+    getKnockoutFinalistCandidates(),
   ]);
 
   const picks = pickObject(prediction?.picks);
   const livePoints = prediction
-    ? calculateKnockoutBracketPredictionPoints({ picks, championTeamId: prediction.championTeamId }, actualWinners)
+    ? calculateKnockoutBracketPredictionPoints(
+        {
+          picks,
+          finalistOneTeamId: prediction.finalistOneTeamId,
+          finalistTwoTeamId: prediction.finalistTwoTeamId,
+          championTeamId: prediction.championTeamId,
+        },
+        { ...actualWinners, ...actualFinalResult }
+      )
     : null;
 
   return {
     deadline,
     locked: isLocked(deadline),
+    finalistCandidates,
     ...template,
     prediction: prediction
       ? {
@@ -333,6 +506,7 @@ export async function getKnockoutBracketPredictionStatus(userId: string) {
           championPoints: livePoints.championPoints,
           matchPoints: livePoints.matchPoints,
           total: livePoints.total,
+          bracketTotal: livePoints.bracketTotal,
         }
       : null,
   };
@@ -340,16 +514,31 @@ export async function getKnockoutBracketPredictionStatus(userId: string) {
 
 export async function submitKnockoutBracketPrediction(
   userId: string,
-  data: { picks?: Picks }
+  data: {
+    picks?: Picks;
+    finalistOneTeamId?: string | null;
+    finalistTwoTeamId?: string | null;
+    championTeamId?: string | null;
+  }
 ) {
   const deadline = await getKnockoutBracketDeadline();
   if (!deadline) throw new Error("Knockout matches are not ready yet");
   if (isLocked(deadline)) throw new Error("Knockout bracket prediction is locked");
 
-  const picks = data.picks ?? {};
+  const picks = data.picks ?? {
+    "101": data.finalistOneTeamId ?? "",
+    "102": data.finalistTwoTeamId ?? "",
+    "104": data.championTeamId ?? "",
+  };
   const finalistData = await resolveAndValidatePicks(picks);
-  const actualWinners = await getActualWinners();
-  const points = calculateKnockoutBracketPredictionPoints({ picks }, actualWinners);
+  const [actualWinners, actualFinalResult] = await Promise.all([
+    getActualWinners(),
+    getActualFinalResultFromDatabase(),
+  ]);
+  const points = calculateKnockoutBracketPredictionPoints(
+    { picks, ...finalistData },
+    { ...actualWinners, ...actualFinalResult }
+  );
 
   const prediction = await prisma.knockoutBracketPrediction.upsert({
     where: { userId },
@@ -375,6 +564,8 @@ export async function submitKnockoutBracketPrediction(
   try {
     revalidateTag("leaderboard-knockout");
     revalidatePath("/knockout-bracket");
+    revalidatePath("/matches");
+    revalidatePath("/dashboard");
     revalidatePath("/leaderboard/knockout");
   } catch {
     // Cache revalidation is not available in every runtime.

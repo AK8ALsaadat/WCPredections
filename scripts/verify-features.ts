@@ -5,6 +5,7 @@
 import {
   buildRegulationScorerGoalsMap,
   BOLD_SCORER_POINTS,
+  BOLD_SCORER_POINTS_LATE_ROUND,
   calculateBoldScorerBetPoints,
   calculateDoubleBonus,
   calculateFinishTypePoints,
@@ -38,7 +39,12 @@ import { ar } from "../src/lib/i18n/ar";
 import { asFinishType } from "../src/lib/finish-type";
 import { parseOptionalScore } from "../src/lib/utils";
 import { statsFromLeaderboard } from "../src/services/leaderboard.service";
-import { buildUsageRoundKey } from "../src/services/usage-round.service";
+import {
+  buildUsageRoundKey,
+  canCombineDoubleAndBoldForUsageScope,
+  getMaxDoublesForUsageScope,
+  isHighValueBoldScorerRound,
+} from "../src/services/usage-round.service";
 import {
   calculateOctopusPoints,
   getOctopusCleanSheetBonus,
@@ -46,7 +52,10 @@ import {
 } from "../src/lib/octopus-points";
 import { aggregateGoalsFromEvents } from "../src/lib/fixture-events";
 import { parseSportScoreGoalkeeperSavesFromDetail } from "../src/services/football-api/sportscore.provider";
-import { filterVisibleMatches } from "../src/lib/tournament-gates";
+import {
+  filterVisibleMatches,
+  shouldShowMatchInUpcomingList,
+} from "../src/lib/tournament-gates";
 import type { LeaderboardEntry } from "../src/types";
 
 let passed = 0;
@@ -347,6 +356,22 @@ ok(
 console.log("\n=== حدود الجولة ===");
 ok("مضاعفة: حد أقصى 2 لكل جولة", MAX_DOUBLES_PER_ROUND === 2);
 ok("البطاقة الجريئة: مرة واحدة لكل جولة", MAX_BOLD_SCORER_BETS_PER_ROUND === 1);
+ok(
+  "round of 16 allows one double",
+  getMaxDoublesForUsageScope("wc:stage:round-of-16") === 1
+);
+ok(
+  "quarter-finals allows one double",
+  getMaxDoublesForUsageScope("wc:stage:quarter-finals") === 1
+);
+ok(
+  "quarter-finals can combine double and bold scorer",
+  canCombineDoubleAndBoldForUsageScope("wc:stage:quarter-finals")
+);
+ok(
+  "round of 16 cannot combine double and bold scorer",
+  !canCombineDoubleAndBoldForUsageScope("wc:stage:round-of-16")
+);
 const usageRoundMatches = [
   {
     id: "a1",
@@ -389,6 +414,13 @@ ok(
 ok(
   "ما سجل = -5",
   calculateBoldScorerBetPoints(0) === -5
+);
+ok("BOLD_SCORER_POINTS_LATE_ROUND = 10", BOLD_SCORER_POINTS_LATE_ROUND === 10);
+ok(
+  "quarter-finals bold scorer = +10/-10",
+  isHighValueBoldScorerRound("wc:stage:quarter-finals") &&
+    calculateBoldScorerBetPoints(1, { highValue: true }) === 10 &&
+    calculateBoldScorerBetPoints(0, { highValue: true }) === -10
 );
 const boldBreakdown = buildMatchPointsBreakdown({
   homeScore: 1,
@@ -519,6 +551,20 @@ ok(
 );
 
 console.log("\n=== ترتيب الجولة ===");
+ok(
+  "future scheduled matches stay visible",
+  shouldShowMatchInUpcomingList({
+    status: "SCHEDULED",
+    matchTime: new Date(Date.now() + 72 * 60 * 60 * 1000),
+  })
+);
+ok(
+  "past scheduled matches are hidden",
+  !shouldShowMatchInUpcomingList({
+    status: "SCHEDULED",
+    matchTime: new Date(Date.now() - 60 * 1000),
+  })
+);
 const entries: LeaderboardEntry[] = [
   { userId: "a", username: "a", points: 10, rank: 1 },
   { userId: "b", username: "b", points: 5, rank: 2 },

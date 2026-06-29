@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
@@ -59,7 +59,7 @@ import type {
 } from "@/services/match-players.service";
 
 const LINEUP_FAST_POLL_MS = 45_000;
-const SAVE_REQUEST_TIMEOUT_MS = 45_000;
+const SAVE_REQUEST_TIMEOUT_MS = 20_000;
 const SCORE_OPTIONS = Array.from({ length: 10 }, (_, score) => score);
 
 function normalizeScore(score: number) {
@@ -86,6 +86,16 @@ async function fetchJsonWithTimeout(
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+async function fetchPredictMatchFresh(matchId: string) {
+  const { res, data } = await fetchJsonWithTimeout(
+    `/api/matches/${matchId}?predict=true&saved=${Date.now()}`,
+    { method: "GET", cache: "no-store" },
+    12_000
+  );
+  if (!res.ok || !data?.success) return null;
+  return data.data as MatchData;
 }
 
 function saveTimeoutMessage(locale: string) {
@@ -153,6 +163,9 @@ type MatchData = {
   } | null;
   roundUsageLimits?: {
     roundId: string;
+    usageRoundKey?: string;
+    phase?: string;
+    allowDoubleWithBold?: boolean;
     doubles: {
       used: number;
       max: number;
@@ -173,6 +186,9 @@ type MatchData = {
       playerName: string | null;
       playerId?: string | null;
       points?: number;
+      highValue?: boolean;
+      pointsForHit?: number;
+      pointsForMiss?: number;
     };
     octopus: {
       used: boolean;
@@ -297,7 +313,6 @@ function applySavedPrediction(m: MatchData, setters: {
 export default function PredictPage() {
   const { messages: t, locale } = useI18n();
   const params = useParams();
-  const router = useRouter();
   const matchId = params.matchId as string;
 
   const [match, setMatch] = useState<MatchData | null>(() =>
@@ -763,6 +778,8 @@ export default function PredictPage() {
 
   function handleDoubleToggle(checked: boolean) {
     const limits = match?.roundUsageLimits?.doubles;
+    const allowDoubleWithBold =
+      match?.roundUsageLimits?.allowDoubleWithBold ?? false;
     if (checked && limits && !limits.canEnable && !limits.onThisMatch) {
       setError(t.predict.doubleExhausted);
       return;
@@ -770,8 +787,10 @@ export default function PredictPage() {
     setError("");
     setIsDouble(checked);
     if (checked) {
-      setBoldEnabled(false);
-      setBoldPlayerId("");
+      if (!allowDoubleWithBold) {
+        setBoldEnabled(false);
+        setBoldPlayerId("");
+      }
       setOctopusEnabled(false);
       setOctopusPlayerId("");
     }
@@ -800,7 +819,9 @@ export default function PredictPage() {
     setBoldEnabled(checked);
     if (!checked) setBoldPlayerId("");
     if (checked) {
-      setIsDouble(false);
+      if (!(match?.roundUsageLimits?.allowDoubleWithBold ?? false)) {
+        setIsDouble(false);
+      }
       setOctopusEnabled(false);
       setOctopusPlayerId("");
     }
@@ -832,6 +853,9 @@ export default function PredictPage() {
         setScorerPicks({ [playerId]: 1 });
         setBoldPlayerId(playerId);
         setBoldEnabled(true);
+        if (!(match?.roundUsageLimits?.allowDoubleWithBold ?? false)) {
+          setIsDouble(false);
+        }
         setError("");
         return;
       }
@@ -842,6 +866,9 @@ export default function PredictPage() {
 
     setError("");
     setBoldEnabled(true);
+    if (!(match?.roundUsageLimits?.allowDoubleWithBold ?? false)) {
+      setIsDouble(false);
+    }
 
     if (!(playerId in scorerPicks)) {
       const teamPlayerIds = isHome ? teamSets.home : teamSets.away;
@@ -1133,7 +1160,9 @@ export default function PredictPage() {
       return;
     }
 
-    if (isDouble && (boldEnabled || octopusEnabled)) {
+    const allowDoubleWithBold =
+      match?.roundUsageLimits?.allowDoubleWithBold ?? false;
+    if (isDouble && (octopusEnabled || (boldEnabled && !allowDoubleWithBold))) {
       setError(
         octopusEnabled ? octopusCopy.conflict : t.predict.doubleAndBoldConflict
       );
@@ -1195,37 +1224,42 @@ export default function PredictPage() {
         return;
       }
 
-      setMatch((previous) =>
-        previous
-          ? {
-              ...previous,
-              userPrediction: {
-                predHome,
-                predAway,
-                isDouble,
-                predictedFinishType: finishType || null,
-                predictedPenaltyWinnerTeamId: penaltyWinner || null,
-              },
-              userScorerPredictions: picksToArray(scorerPicks).map((pick) => ({
-                playerId: pick.playerId,
-                predictedGoals: pick.goals,
-              })),
-            }
-          : previous
-      );
+      const freshMatch = await fetchPredictMatchFresh(matchId);
+      if (!freshMatch) {
+        throw new Error(
+          locale === "ar"
+            ? "تم إرسال الحفظ لكن تعذر تأكيده من السيرفر. حدث الصفحة وتأكد قبل بداية المباراة."
+            : "Save was sent, but the server confirmation failed. Refresh and confirm before kickoff."
+        );
+      }
+
       invalidatePredictCaches(matchId);
       invalidateMatchDetailCache(matchId);
       invalidateLeaguePredictionsCache(matchId);
       clearPredictDraft(matchId);
       invalidateMatchesListCaches();
+      writePredictMatchCache(matchId, { ...freshMatch, _complete: true });
+      setMatch(freshMatch);
+      applySavedPrediction(freshMatch, {
+        setPredHome,
+        setPredAway,
+        setIsDouble,
+        setFinishType,
+        setPenaltyWinner,
+        setScorerPicks,
+        setBoldPlayerId,
+        setBoldEnabled,
+        setOctopusPlayerId,
+        setOctopusEnabled,
+      });
       setSuccess(t.matches.predictionSubmitted);
-      await router.replace(`/matches/${matchId}`);
-      router.refresh();
     } catch (err) {
       setError(
         isAbortError(err)
           ? saveTimeoutMessage(locale)
-          : t.errors.generic
+          : err instanceof Error
+            ? err.message
+            : t.errors.generic
       );
     } finally {
       setSubmitting(false);
@@ -1259,6 +1293,8 @@ export default function PredictPage() {
   const doubleLimits = match.roundUsageLimits?.doubles;
   const boldLimits = match.roundUsageLimits?.boldScorer;
   const octopusLimits = match.roundUsageLimits?.octopus;
+  const allowDoubleWithBold = match.roundUsageLimits?.allowDoubleWithBold ?? false;
+  const highValueBoldScorer = boldLimits?.highValue ?? false;
   const boldOnThisMatch =
     Boolean(boldLimits?.onThisMatch) ||
     Boolean(match.boldScorerRoundStatus?.onThisMatch) ||
@@ -1293,6 +1329,14 @@ export default function PredictPage() {
     (doubleLimits != null &&
       !doubleLimits.canEnable &&
       !doubleLimits.onThisMatch);
+  const knockoutRulesNotice =
+    locale === "ar"
+      ? `تنبيه: من دور 16 الحد مضاعفة واحدة فقط. من ربع النهائي تقدر تجمع مضاعفة واحدة مع الرهان، والرهان يحسب ${
+          highValueBoldScorer ? "+10 / -10" : "+5 / -5"
+        }.`
+      : `Notice: Round of 16 allows one double only. From the quarter-finals you can combine one double with the scorer bet, and the bet is worth ${
+          highValueBoldScorer ? "+10 / -10" : "+5 / -5"
+        }.`;
   const predictedScorerIds = new Set(Object.keys(scorerPicks));
   const hasPredictedScorers = predictedScorerIds.size > 0;
   const toBoldPlayerOption = (player: MatchPlayerView) => ({
@@ -1398,6 +1442,11 @@ export default function PredictPage() {
         {FEATURE_FLAGS.showNotifications && success && (
           <div className="rounded-lg border border-primary/50 bg-primary/10 px-4 py-3 text-sm text-primary">
             {success}
+          </div>
+        )}
+        {match.isKnockout && match.roundUsageLimits && (
+          <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+            {knockoutRulesNotice}
           </div>
         )}
 
@@ -1507,7 +1556,7 @@ export default function PredictPage() {
                 <p className="text-sm text-muted">
                   {isDouble
                     ? t.predict.doubleEnabled
-                    : boldEnabled
+                    : boldEnabled && !allowDoubleWithBold
                     ? t.predict.doubleAndBoldConflict
                     : t.predict.doubleHint}
                 </p>
@@ -1649,6 +1698,7 @@ export default function PredictPage() {
                   </p>
                   <p className="text-sm text-muted">
                     {isDouble
+                      && !allowDoubleWithBold
                       ? t.predict.doubleAndBoldConflict
                       : boldEnabled
                       ? t.predict.boldScorerBet.selectingPlayer

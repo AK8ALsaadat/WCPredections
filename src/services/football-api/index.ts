@@ -210,7 +210,93 @@ async function findExistingMatch(
     });
   }
 
+  if (existing) return existing;
+
+  if (mapped.isKnockout) {
+    existing = await findExistingKnockoutPlaceholderMatch(
+      roundId,
+      mapped,
+      homeTeamId,
+      awayTeamId,
+      timeWindow
+    );
+  }
+
   return existing;
+}
+
+function isPlaceholderTeamName(name: string | null | undefined) {
+  const normalized = normalizeTeamIdentity(name ?? "");
+  return (
+    !normalized ||
+    normalized === "tbd" ||
+    normalized.includes("to-be") ||
+    normalized.includes("winner") ||
+    normalized.includes("loser") ||
+    normalized.includes("match")
+  );
+}
+
+function sameTeamIdentity(a: string | null | undefined, b: string | null | undefined) {
+  const left = normalizeTeamIdentity(a ?? "");
+  const right = normalizeTeamIdentity(b ?? "");
+  return Boolean(left && right && left === right);
+}
+
+async function findExistingKnockoutPlaceholderMatch(
+  roundId: string,
+  mapped: ExternalMatch,
+  homeTeamId: string,
+  awayTeamId: string,
+  timeWindow: { gte: Date; lte: Date }
+) {
+  const candidates = await prisma.match.findMany({
+    where: {
+      roundId,
+      isKnockout: true,
+      matchTime: timeWindow,
+      status: { not: "FINISHED" },
+    },
+    include: {
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const incomingHasPlaceholder =
+    isPlaceholderTeamName(mapped.homeTeamName) ||
+    isPlaceholderTeamName(mapped.awayTeamName);
+
+  for (const candidate of candidates) {
+    const candidateHasPlaceholder =
+      isPlaceholderTeamName(candidate.homeTeam.name) ||
+      isPlaceholderTeamName(candidate.awayTeam.name);
+
+    const sameHome =
+      candidate.homeTeamId === homeTeamId ||
+      sameTeamIdentity(candidate.homeTeam.name, mapped.homeTeamName);
+    const sameAway =
+      candidate.awayTeamId === awayTeamId ||
+      sameTeamIdentity(candidate.awayTeam.name, mapped.awayTeamName);
+    const sameAnySide =
+      candidate.homeTeamId === homeTeamId ||
+      candidate.homeTeamId === awayTeamId ||
+      candidate.awayTeamId === homeTeamId ||
+      candidate.awayTeamId === awayTeamId ||
+      sameTeamIdentity(candidate.homeTeam.name, mapped.homeTeamName) ||
+      sameTeamIdentity(candidate.homeTeam.name, mapped.awayTeamName) ||
+      sameTeamIdentity(candidate.awayTeam.name, mapped.homeTeamName) ||
+      sameTeamIdentity(candidate.awayTeam.name, mapped.awayTeamName);
+
+    if (sameHome && sameAway) return candidate;
+    if ((candidateHasPlaceholder || incomingHasPlaceholder) && sameAnySide) {
+      return candidate;
+    }
+    if (candidateHasPlaceholder && incomingHasPlaceholder) return candidate;
+  }
+
+  return null;
 }
 
 async function mergeMatchIntoCanonical(canonicalId: string, duplicateId: string) {
@@ -487,8 +573,8 @@ async function syncMatch(
       existing.status !== mapped.status);
 
   const shouldSyncScorers =
-    mapped.status === "LIVE" || mapped.status === "FINISHED";
-  let scorerDataComplete = !shouldSyncScorers;
+    mapped.status === "LIVE" ||
+    (mapped.status === "FINISHED" && (!existing || !!scoresChanged));
 
   if (shouldSyncScorers) {
     try {
@@ -504,7 +590,6 @@ async function syncMatch(
         options,
         sourceProvider
       );
-      scorerDataComplete = true;
       // Publish immediate update about match scorers and basic match info
       try {
         const ms = await prisma.matchScorer.findMany({ where: { matchId: match.id }, include: { player: true } });
@@ -512,13 +597,6 @@ async function syncMatch(
         publish({ type: 'match-updated', data: { matchId: match.id, status: match.status, homeScore: match.homeScore, awayScore: match.awayScore } });
       } catch {}
     } catch (error) {
-      const knownScorers = await prisma.matchScorer.findMany({
-        where: { matchId: match.id },
-        select: { goals: true },
-      });
-      const knownGoals = knownScorers.reduce((sum, row) => sum + row.goals, 0);
-      scorerDataComplete =
-        knownGoals === (match.homeScore ?? 0) + (match.awayScore ?? 0);
       console.warn(
         `[مزامنة هدافين] تخطي مباراة ${mapped.apiId}:`,
         error instanceof Error ? error.message : error
@@ -692,6 +770,22 @@ export async function syncMatchesFromApi(
     }
     externalMatches = Array.from(merged.values());
   }
+
+  const nowMs = Date.now();
+  externalMatches.sort((a, b) => {
+    const priority = (match: ExternalMatch) => {
+      if (match.status === "LIVE") return 0;
+      if (match.status === "SCHEDULED" && match.matchTime.getTime() >= nowMs) {
+        return 1;
+      }
+      if (match.status === "SCHEDULED") return 2;
+      return 3;
+    };
+    const priorityDiff = priority(a) - priority(b);
+    return priorityDiff !== 0
+      ? priorityDiff
+      : a.matchTime.getTime() - b.matchTime.getTime();
+  });
 
   let created = 0;
   let updated = 0;

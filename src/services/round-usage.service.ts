@@ -1,11 +1,12 @@
 import { getBoldScorerBetStatus } from "@/services/bold-scorer-bet.service";
 import { getOctopusBetStatus } from "@/services/octopus-bet.service";
-import { MAX_DOUBLES_PER_ROUND } from "@/services/prediction.service";
 import { prisma } from "@/lib/prisma";
 import {
+  canCombineDoubleAndBoldForUsageScope,
   getMaxDoublesForUsageScope,
   getUsageRoundScope,
   getUsageRoundPhase,
+  isHighValueBoldScorerRound,
 } from "@/services/usage-round.service";
 import {
   getUserTotalPoints,
@@ -37,6 +38,9 @@ export async function getRoundUsageLimits(
   ]);
   const hasBoldPoints = totalPoints >= MIN_POINTS_FOR_BOLD_SCORER_BET;
   const maxDoubles = getMaxDoublesForUsageScope(scope);
+  const phase = getUsageRoundPhase(scope);
+  const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(scope);
+  const highValueBoldScorer = isHighValueBoldScorerRound(scope);
 
   const doubleOnThisMatch =
     roundPredictions.find((prediction) => prediction.matchId === matchId)
@@ -50,7 +54,8 @@ export async function getRoundUsageLimits(
   return {
     roundId: resolvedRoundId,
     usageRoundKey: scope.key,
-    phase: getUsageRoundPhase(scope),
+    phase,
+    allowDoubleWithBold,
     doubles: {
       used: doublesInRound,
       max: maxDoubles,
@@ -73,6 +78,9 @@ export async function getRoundUsageLimits(
       playerName: boldStatus.bet?.playerName ?? null,
       playerId: boldStatus.bet?.playerId ?? null,
       points: boldStatus.bet?.points ?? 0,
+      highValue: highValueBoldScorer,
+      pointsForHit: highValueBoldScorer ? 10 : 5,
+      pointsForMiss: highValueBoldScorer ? -10 : -5,
     },
     octopus: {
       used: octopusStatus.used,

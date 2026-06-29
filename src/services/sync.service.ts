@@ -44,7 +44,7 @@ function getWorldCupSyncOptions() {
       leagueId:
         (process.env.SPORTSCORE_COMPETITION_SLUG ?? "fifa-world-cup").trim(),
       season: (process.env.FOOTBALL_SEASON ?? "2026").trim(),
-      quickSync: true,
+      quickSync: process.env.SPORTSCORE_QUICK_SYNC === "true",
     };
   }
 
@@ -137,7 +137,7 @@ export async function syncActiveRoundFromApi() {
   const scorableMatches = await prisma.match.findMany({
     where: {
       roundId: round.id,
-      status: { in: ["LIVE", "FINISHED"] },
+      status: "LIVE",
       homeScore: { not: null },
       awayScore: { not: null },
     },
@@ -216,7 +216,7 @@ export function startAutoSync() {
     }
   };
 
-  setTimeout(run, intervalMs);
+  setTimeout(run, Math.min(5_000, intervalMs));
   syncInterval = setInterval(run, intervalMs);
   const quietStart = process.env.SYNC_QUIET_START ?? "10";
   const quietEnd = process.env.SYNC_QUIET_END ?? "16";

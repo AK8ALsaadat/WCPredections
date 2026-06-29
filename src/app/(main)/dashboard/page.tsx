@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/Card";
 import { getServerI18n } from "@/lib/i18n/server";
 import type { Messages } from "@/lib/i18n/ar";
 import { getTournamentRoundName } from "@/lib/rounds";
+import { getKnockoutBracketPredictionStatus } from "@/services/knockout-bracket-prediction.service";
 
 function RankStatCard({
   href,
@@ -125,12 +126,56 @@ function DashboardHeaderStats({
   );
 }
 
+function FinalistsPredictionSummary({
+  status,
+}: {
+  status: Awaited<ReturnType<typeof getKnockoutBracketPredictionStatus>>;
+}) {
+  if (!status.prediction) return null;
+
+  return (
+    <Card className="border-primary/25 bg-primary/5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-primary">
+            توقع النهائي
+          </p>
+          <h2 className="mt-1 text-lg font-bold text-foreground">
+            {status.prediction.finalistOneTeam.name} ضد{" "}
+            {status.prediction.finalistTwoTeam.name}
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            البطل: {status.prediction.championTeam.name}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-end">
+            <p className="text-xs text-muted">نقاط التوقع</p>
+            <p className="text-2xl font-black tabular-nums text-primary">
+              {status.points?.total ?? status.prediction.totalPoints}
+            </p>
+          </div>
+          <Link
+            href="/matches"
+            className="rounded-lg border border-card-border px-3 py-2 text-sm font-bold text-foreground transition hover:border-primary/50"
+          >
+            تعديل
+          </Link>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default async function DashboardPage() {
   const { messages: t } = await getServerI18n();
   const user = await getCurrentUser();
   if (!user) return null;
 
-  const data = await getDashboardData(user.userId);
+  const [data, finalistsStatus] = await Promise.all([
+    getDashboardData(user.userId),
+    getKnockoutBracketPredictionStatus(user.userId),
+  ]);
   const tournamentName =
     data.tournamentRound?.name ?? getTournamentRoundName();
   const tournamentStats = statsFromLeaderboard(data.overall, user.userId);
@@ -166,6 +211,8 @@ export default async function DashboardPage() {
           fullLeaderboardLabel={t.dashboard.fullLeaderboard}
         />
       </div>
+
+      <FinalistsPredictionSummary status={finalistsStatus} />
 
       <section className="grid gap-6 md:gap-8">
         <div>
