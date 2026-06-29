@@ -437,7 +437,7 @@ function YeloLeagueSection({
                   <span
                     className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-xs font-black ${tone.badge}`}
                   >
-                    {entry.rank}
+                    {index + 1}
                   </span>
                 </div>
               </div>
@@ -547,10 +547,15 @@ export function LeaderboardTable({
   const yeloEntries = showYeloLeague ? liveEntries.slice(10) : [];
   const leader = mainEntries[0];
   const remainingEntries = mainEntries.slice(1);
-  const { relegatedUserIds, exemptUserIds } = getRelegationStatus(
-    mainEntries,
-    showYeloLeague ? false : showRelegationZone
-  );
+  const yeloRelegatedUserIds = showYeloLeague
+    ? new Set(mainEntries.slice(-3).map((entry) => entry.userId))
+    : null;
+  const relegationStatus = getRelegationStatus(mainEntries, showRelegationZone);
+  const relegatedUserIds =
+    yeloRelegatedUserIds ?? relegationStatus.relegatedUserIds;
+  const exemptUserIds = showYeloLeague
+    ? new Set<string>()
+    : relegationStatus.exemptUserIds;
 
   return (
     <div className="space-y-4">

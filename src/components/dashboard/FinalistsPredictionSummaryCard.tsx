@@ -20,6 +20,38 @@ type FinalistsPredictionSummaryCardProps = {
   pointsTotal: number | null;
 };
 
+function ChampionCrownIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <path
+        d="m3 7 4.4 3.4L12 4l4.6 6.4L21 7l-1.5 10.5h-15L3 7Z"
+        fill="currentColor"
+      />
+      <path
+        d="M5 20h14"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function ChampionBadge({ name }: { name: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-lg border border-amber-300/60 bg-gradient-to-l from-amber-500/20 via-yellow-300/15 to-card px-3 py-1.5 text-sm font-black text-amber-100 shadow-[0_0_18px_rgba(245,158,11,0.18)]">
+      <ChampionCrownIcon className="h-4 w-4 text-amber-200" />
+      <span className="text-amber-200">البطل المتوقع</span>
+      <span className="text-foreground">{name}</span>
+    </span>
+  );
+}
+
 function formatDeadline(deadline: string | null) {
   if (!deadline) return "لم يحدد بعد";
   return new Intl.DateTimeFormat("ar-SA", {
@@ -87,9 +119,14 @@ export function FinalistsPredictionSummaryCard({
           )}
           <p className="mt-1 text-sm text-muted">
             {hasPrediction
-              ? `البطل: ${prediction.championTeam.name} · الديدلاين ${formatDeadline(deadline)}`
+              ? `الديدلاين ${formatDeadline(deadline)}`
               : `كل طرف نهائي صحيح +3، والبطل الصحيح +10. الديدلاين ${formatDeadline(deadline)}`}
           </p>
+          {hasPrediction && (
+            <div className="mt-3">
+              <ChampionBadge name={prediction.championTeam.name} />
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {hasPrediction && (

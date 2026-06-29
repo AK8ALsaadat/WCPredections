@@ -31,6 +31,38 @@ type BracketPredictionStatus = {
   } | null;
 };
 
+function ChampionCrownIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <path
+        d="m3 7 4.4 3.4L12 4l4.6 6.4L21 7l-1.5 10.5h-15L3 7Z"
+        fill="currentColor"
+      />
+      <path
+        d="M5 20h14"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function ChampionBadge({ name }: { name: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/60 bg-amber-400/15 px-2.5 py-1 text-xs font-black text-amber-100 shadow-[0_0_16px_rgba(245,158,11,0.18)]">
+      <ChampionCrownIcon className="h-3.5 w-3.5 text-amber-200" />
+      <span className="text-amber-200">البطل المتوقع</span>
+      <span className="text-foreground">{name}</span>
+    </span>
+  );
+}
+
 function formatDeadline(deadline: string | Date | null) {
   if (!deadline) return "لم يحدد بعد";
   return new Intl.DateTimeFormat("ar-SA", {
@@ -250,10 +282,12 @@ export function KnockoutBracketPredictionCard() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs">
               {status?.prediction && (
-                <span className="text-muted">
-                  محفوظ: {status.prediction.finalistOneTeam.name} و{" "}
-                  {status.prediction.finalistTwoTeam.name}، البطل{" "}
-                  {status.prediction.championTeam.name}
+                <span className="inline-flex flex-wrap items-center gap-2 text-muted">
+                  <span>
+                    محفوظ: {status.prediction.finalistOneTeam.name} و{" "}
+                    {status.prediction.finalistTwoTeam.name}
+                  </span>
+                  <ChampionBadge name={status.prediction.championTeam.name} />
                 </span>
               )}
               {saved && <span className="text-primary">تم حفظ توقع النهائي</span>}
