@@ -43,6 +43,7 @@ import {
   buildUsageRoundKey,
   canCombineDoubleAndBoldForUsageScope,
   getMaxDoublesForUsageScope,
+  getUsageRoundPhase,
   isHighValueBoldScorerRound,
 } from "../src/services/usage-round.service";
 import {
@@ -371,6 +372,34 @@ ok(
 ok(
   "round of 16 cannot combine double and bold scorer",
   !canCombineDoubleAndBoldForUsageScope("wc:stage:round-of-16")
+);
+const knockoutSchedule = Array.from({ length: 16 }, (_, index) => ({
+  id: `ko-${index}`,
+  roundId: "tournament",
+  homeTeamId: `home-${index}`,
+  awayTeamId: `away-${index}`,
+  matchTime: new Date(Date.UTC(2026, 5, 29 + index, 17, 0, 0)),
+  stageName: "Knockout Stage",
+  groupCode: null,
+  homeTeam: { name: `Home ${index}` },
+  awayTeam: { name: `Away ${index}` },
+  round: { name: "Main Tournament 26" },
+}));
+const knockoutKeys = knockoutSchedule.map((match) =>
+  buildUsageRoundKey(match, knockoutSchedule)
+);
+ok(
+  "generic knockout tournament name uses bracket fallback",
+  getUsageRoundPhase(knockoutKeys[0]) === "round-of-16" &&
+    getUsageRoundPhase(knockoutKeys[7]) === "round-of-16" &&
+    getUsageRoundPhase(knockoutKeys[8]) === "quarter-finals" &&
+    getUsageRoundPhase(knockoutKeys[15]) === "final"
+);
+ok(
+  "fallback quarter-final rules are automatic",
+  getMaxDoublesForUsageScope(knockoutKeys[8]) === 1 &&
+    canCombineDoubleAndBoldForUsageScope(knockoutKeys[8]) &&
+    isHighValueBoldScorerRound(knockoutKeys[8])
 );
 const usageRoundMatches = [
   {

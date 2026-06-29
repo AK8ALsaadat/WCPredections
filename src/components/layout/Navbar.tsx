@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
@@ -36,6 +36,23 @@ export function Navbar({ user }: { user: UserSession }) {
     [t]
   );
 
+  const prefetchRoute = useCallback(
+    (href: string) => {
+      router.prefetch(href);
+    },
+    [router]
+  );
+
+  useEffect(() => {
+    prefetchRoute("/dashboard");
+    for (const link of navLinks) {
+      prefetchRoute(link.href);
+    }
+    if (user.isAdmin) {
+      prefetchRoute("/admin");
+    }
+  }, [navLinks, prefetchRoute, user.isAdmin]);
+
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -55,7 +72,13 @@ export function Navbar({ user }: { user: UserSession }) {
   return (
     <nav className="sticky top-0 z-50 border-b border-card-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6">
-        <Link href="/dashboard" prefetch={false} className="flex items-center gap-2 text-sm font-black text-foreground">
+        <Link
+          href="/dashboard"
+          onFocus={() => prefetchRoute("/dashboard")}
+          onPointerEnter={() => prefetchRoute("/dashboard")}
+          onTouchStart={() => prefetchRoute("/dashboard")}
+          className="flex items-center gap-2 text-sm font-black text-foreground"
+        >
           <span className="text-lg" aria-hidden>⚽</span>
           <span>{t.appName}</span>
         </Link>
@@ -65,9 +88,9 @@ export function Navbar({ user }: { user: UserSession }) {
             <Link
               key={link.href}
               href={link.href}
-              prefetch={false}
-              onMouseEnter={() => router.prefetch(link.href)}
-              onFocus={() => router.prefetch(link.href)}
+              onFocus={() => prefetchRoute(link.href)}
+              onPointerEnter={() => prefetchRoute(link.href)}
+              onTouchStart={() => prefetchRoute(link.href)}
               className={cn(
                 "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 isNavActive(pathname, link.href, link.match)
@@ -82,6 +105,9 @@ export function Navbar({ user }: { user: UserSession }) {
           {user.isAdmin && (
             <Link
               href="/admin"
+              onFocus={() => prefetchRoute("/admin")}
+              onPointerEnter={() => prefetchRoute("/admin")}
+              onTouchStart={() => prefetchRoute("/admin")}
               className={cn(
                 "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 pathname.startsWith("/admin")
@@ -127,7 +153,9 @@ export function Navbar({ user }: { user: UserSession }) {
               <Link
                 key={link.href}
                 href={link.href}
-                prefetch={false}
+                onFocus={() => prefetchRoute(link.href)}
+                onPointerEnter={() => prefetchRoute(link.href)}
+                onTouchStart={() => prefetchRoute(link.href)}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
                   "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium",
@@ -141,7 +169,14 @@ export function Navbar({ user }: { user: UserSession }) {
               </Link>
             ))}
             {user.isAdmin && (
-              <Link href="/admin" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm text-warning">
+              <Link
+                href="/admin"
+                onFocus={() => prefetchRoute("/admin")}
+                onPointerEnter={() => prefetchRoute("/admin")}
+                onTouchStart={() => prefetchRoute("/admin")}
+                onClick={() => setMobileOpen(false)}
+                className="rounded-md px-3 py-2 text-sm text-warning"
+              >
                 {t.nav.admin}
               </Link>
             )}

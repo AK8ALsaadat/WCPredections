@@ -9,7 +9,7 @@ export async function GET() {
     });
     return apiSuccess(leaderboard, 200, {
       headers: {
-        "Cache-Control": "private, no-store",
+        "Cache-Control": "private, max-age=15, stale-while-revalidate=45",
       },
     });
   } catch (error) {

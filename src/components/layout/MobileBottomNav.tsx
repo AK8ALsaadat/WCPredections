@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
@@ -15,6 +15,7 @@ function isActive(pathname: string, href: string) {
 
 export function MobileBottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { messages: t } = useI18n();
 
   const navItems = useMemo(
@@ -26,6 +27,19 @@ export function MobileBottomNav() {
     ],
     [t]
   );
+
+  const prefetchRoute = useCallback(
+    (href: string) => {
+      router.prefetch(href);
+    },
+    [router]
+  );
+
+  useEffect(() => {
+    for (const item of navItems) {
+      prefetchRoute(item.href);
+    }
+  }, [navItems, prefetchRoute]);
 
   return (
     <nav
@@ -39,7 +53,9 @@ export function MobileBottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              prefetch={false}
+              onFocus={() => prefetchRoute(item.href)}
+              onPointerEnter={() => prefetchRoute(item.href)}
+              onTouchStart={() => prefetchRoute(item.href)}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-semibold transition-all",
                 active ? "bg-primary/10 text-primary" : "text-muted hover:bg-card hover:text-foreground"

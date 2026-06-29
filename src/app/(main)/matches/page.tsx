@@ -75,7 +75,7 @@ type MatchesPageCache = {
 
 const REFRESH_MS = 60_000;
 const LIVE_REFRESH_MS = 15_000;
-const MATCHES_CACHE_FRESH_MS = 60_000;
+const MATCHES_CACHE_FRESH_MS = 120_000;
 const ROUNDS_CACHE_FRESH_MS = 5 * 60_000;
 
 function matchesCacheKey(roundId: string, page: number, matchType: string) {
@@ -126,8 +126,7 @@ async function prefetchMatchesPage(
   matchesPrefetchInFlight.add(requestKey);
   try {
     const response = await clientFetch(
-      matchesApiUrl(targetPage, targetRound, targetType),
-      { cache: "no-store" }
+      matchesApiUrl(targetPage, targetRound, targetType)
     );
     const data = response ? await response.json() : null;
     if (!data?.success) return;
@@ -258,7 +257,7 @@ export default function MatchesPage() {
         const res = await clientFetch(
           matchesApiUrl(targetPage, targetRound, matchType),
           {
-            cache: "no-store",
+            cache: opts?.force ? "no-store" : "default",
             signal: opts?.signal,
           }
         );
@@ -278,7 +277,7 @@ export default function MatchesPage() {
             const fallbackRes = await clientFetch(
               scheduleFallbackApiUrl(targetPage, targetRound),
               {
-                cache: "no-store",
+                cache: opts?.force ? "no-store" : "default",
                 signal: opts?.signal,
               }
             );
@@ -398,6 +397,23 @@ export default function MatchesPage() {
   }, [page, selectedRound]);
 
   useEffect(() => {
+    const firstPageKey = matchesCacheKey(selectedRound, 1, matchType);
+    const cachedFirstPage = readClientCache<MatchesPageCache>(firstPageKey);
+    const isEmptyUpcomingCache =
+      matchType === "upcoming" &&
+      cachedFirstPage &&
+      cachedFirstPage.matches.length === 0 &&
+      cachedFirstPage.pinnedMatches.length === 0;
+
+    if (cachedFirstPage && !isEmptyUpcomingCache) {
+      setMatches(cachedFirstPage.matches);
+      setPinnedMatches(cachedFirstPage.pinnedMatches ?? []);
+      setMeta(cachedFirstPage.meta);
+      setPage(cachedFirstPage.meta.page);
+      setLoading(false);
+      return;
+    }
+
     setMatches([]);
     setPinnedMatches([]);
     setLoading(true);

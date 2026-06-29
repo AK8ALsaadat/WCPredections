@@ -12,9 +12,11 @@ export const INITIAL_LEADERBOARD_POINTS = new Map<string, number>([
   ["dawoad", 128],
   ["dawood", 128],
   ["abdullah", 127],
-  ["nawaf", 100],
+  ["nawaf", 108],
   ["mmg", 85],
   ["mhk", 67],
+  ["khalid", 2],
+  ["ali", 1],
 ]);
 
 export function deterministicYeloSeedPoints(username: string) {

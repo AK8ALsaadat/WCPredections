@@ -29,18 +29,48 @@ export type UsageRoundPhase =
   | "third-place-final"
   | "final";
 
+function knockoutPhaseFromKey(key: string): UsageRoundPhase | null {
+  const normalized = key.toLowerCase();
+
+  if (
+    normalized.includes("round-of-32") ||
+    normalized.includes("round-32") ||
+    normalized.includes("last-32") ||
+    normalized.includes("r32")
+  ) {
+    return "round-of-32";
+  }
+
+  if (
+    normalized.includes("round-of-16") ||
+    normalized.includes("round-16") ||
+    normalized.includes("last-16") ||
+    normalized.includes("r16")
+  ) {
+    return "round-of-16";
+  }
+
+  if (normalized.includes("quarter")) return "quarter-finals";
+  if (normalized.includes("semi")) return "semi-finals";
+  if (normalized.includes("third-place")) return "third-place-final";
+
+  if (
+    normalized === "final" ||
+    normalized.endsWith(":final") ||
+    normalized.includes("-final") ||
+    normalized.includes("grand-final")
+  ) {
+    return "final";
+  }
+
+  return null;
+}
+
 export function getUsageRoundPhase(
   scopeOrKey: string | UsageRoundScope
 ): UsageRoundPhase {
   const key = typeof scopeOrKey === "string" ? scopeOrKey : scopeOrKey.key;
-  const normalized = key.toLowerCase();
-  if (normalized.includes("quarter-finals")) return "quarter-finals";
-  if (normalized.includes("semi-finals")) return "semi-finals";
-  if (normalized.includes("third-place-final")) return "third-place-final";
-  if (normalized.includes("final")) return "final";
-  if (normalized.includes("round-of-16")) return "round-of-16";
-  if (normalized.includes("round-of-32")) return "round-of-32";
-  return "group";
+  return knockoutPhaseFromKey(key) ?? "group";
 }
 
 export function isHighValueBoldScorerRound(
@@ -84,7 +114,7 @@ function isGroupStage(stageName: string | null): boolean {
 
 function hasSpecificKnockoutStage(stageName: string | null): boolean {
   const key = stageKey(stageName);
-  return Boolean(key && key !== "default" && key !== "knockout-stage");
+  return knockoutPhaseFromKey(key) != null;
 }
 
 function matchTimeMs(matchTime: Date | string): number {
