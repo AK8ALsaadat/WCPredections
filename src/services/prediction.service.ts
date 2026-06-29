@@ -2,6 +2,7 @@ import type { FinishType } from "@prisma/client";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { resolveScorerGoalsForPlayer } from "@/lib/player-matching";
 import { goalkeeperPositionWhere } from "@/lib/goalkeeper";
+import { getTournamentRoundName } from "@/lib/rounds";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason, isPredictionAllowed } from "@/lib/utils";
 import {
@@ -1037,9 +1038,22 @@ export async function calculateMatchPoints(matchId: string): Promise<void> {
 }
 
 export async function calculateRoundPoints(roundId: string): Promise<void> {
+  const round = await prisma.round.findUnique({
+    where: { id: roundId },
+    select: { name: true },
+  });
+  const roundIds =
+    round?.name === getTournamentRoundName()
+      ? (
+          await prisma.round.findMany({
+            select: { id: true },
+          })
+        ).map((item) => item.id)
+      : [roundId];
+
   const matches = await prisma.match.findMany({
     where: {
-      roundId,
+      roundId: { in: roundIds },
       status: { in: ["LIVE", "FINISHED"] },
       homeScore: { not: null },
       awayScore: { not: null },

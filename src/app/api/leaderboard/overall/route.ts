@@ -3,10 +3,13 @@ import { getOverallLeaderboard } from "@/services/leaderboard.service";
 
 export async function GET() {
   try {
-    const leaderboard = await getOverallLeaderboard({ withTrend: false });
+    const leaderboard = await getOverallLeaderboard({
+      withTrend: false,
+      fresh: true,
+    });
     return apiSuccess(leaderboard, 200, {
       headers: {
-        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {

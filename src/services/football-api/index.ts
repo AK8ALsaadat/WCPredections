@@ -15,6 +15,7 @@ import {
   matchIdentityKey,
   normalizeTeamIdentity,
 } from "@/lib/team-identity";
+import { getBracketByApiMatchId, getBracketRoundLabel } from "@/lib/wc-bracket";
 
 export function getFootballApiProvider(): FootballApiProvider {
   const provider = resolveFootballApiProviderName();
@@ -451,6 +452,10 @@ async function syncMatch(
 
   const wasFinished = existing?.status === "FINISHED";
   const isNowFinished = mapped.status === "FINISHED";
+  const bracket = getBracketByApiMatchId(mapped.apiId);
+  const stageName = bracket
+    ? getBracketRoundLabel(bracket.matchNo) ?? mapped.stageName
+    : mapped.stageName;
 
   const matchData = {
     apiMatchId: mapped.apiId,
@@ -459,7 +464,7 @@ async function syncMatch(
     awayTeamId,
     matchTime: mapped.matchTime,
     groupCode: mapped.groupCode,
-    stageName: mapped.stageName,
+    stageName,
     status: mapped.status,
     isKnockout: mapped.isKnockout,
     homeScore: mapped.homeScore,

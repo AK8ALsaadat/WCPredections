@@ -713,7 +713,15 @@ export async function getMatchLineup(
     if (match?.apiMatchId) {
       invalidateCacheKey(`fd:/matches/${match.apiMatchId}:unfold`);
     }
-    return buildMatchLineup(matchId);
+    try {
+      return await buildMatchLineup(matchId);
+    } catch (error) {
+      console.warn(
+        "[lineup] fresh lineup failed, falling back to local squad:",
+        error instanceof Error ? error.message : error
+      );
+      return buildFastMatchLineup(matchId);
+    }
   }
 
   const hit = matchLineupCache.get(matchId);
@@ -721,7 +729,16 @@ export async function getMatchLineup(
     return hit.data;
   }
 
-  const data = await getCachedFullMatchLineup(matchId);
+  let data: Awaited<ReturnType<typeof buildMatchLineup>> = null;
+  try {
+    data = await getCachedFullMatchLineup(matchId);
+  } catch (error) {
+    console.warn(
+      "[lineup] full lineup failed, falling back to local squad:",
+      error instanceof Error ? error.message : error
+    );
+    data = await getCachedFastMatchLineup(matchId);
+  }
 
   if (data) {
     matchLineupCache.set(matchId, {
