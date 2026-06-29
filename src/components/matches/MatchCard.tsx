@@ -18,7 +18,6 @@ import { PredictNavLink } from "@/components/matches/PredictNavLink";
 import { ViewLeaguePredictionsButton } from "@/components/matches/ViewLeaguePredictionsButton";
 import { LeaguePredictionsNavLink } from "@/components/matches/LeaguePredictionsNavLink";
 import {
-  prefetchPredictData,
   seedPredictMatchFromList,
 } from "@/lib/predict-prefetch";
 import { prefetchMatchDetail } from "@/lib/match-detail-cache";
@@ -236,7 +235,6 @@ export function MatchCard({
         predictedGoals: sp.predictedGoals,
       })),
     });
-    void prefetchPredictData(match.id, { includeLineup: false });
   }, [showPredictButton, canPredict, match]);
 
   return (

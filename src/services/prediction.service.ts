@@ -1,4 +1,5 @@
-import type { FinishType } from "@prisma/client";
+import { randomUUID } from "node:crypto";
+import { Prisma, type FinishType } from "@prisma/client";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { resolveScorerGoalsForPlayer } from "@/lib/player-matching";
 import { goalkeeperPositionWhere } from "@/lib/goalkeeper";
@@ -24,6 +25,10 @@ import {
   getUsageRoundScope,
 } from "@/services/usage-round.service";
 import {
+  getPredictionMatchMetaCache,
+  setPredictionMatchMetaCache,
+} from "@/services/prediction-match-cache";
+import {
   calculateDoubleBonus,
   calculateFinishTypePoints,
   calculateKnockoutPenaltyWinnerPoints,
@@ -39,7 +44,16 @@ import {
   isMatchFinishedForScoring,
 } from "@/services/scoring.service";
 
-export const MAX_DOUBLES_PER_ROUND = 2;
+export const MAX_DOUBLES_PER_ROUND = 1;
+
+type SavedPredictionRow = {
+  id: string;
+  predHome: number;
+  predAway: number;
+  isDouble: boolean;
+  predictedFinishType: FinishType | null;
+  predictedPenaltyWinnerTeamId: string | null;
+};
 
 export function shouldIgnorePositionMultiplierForScorerPrediction(
   scorerPredictionId: string
@@ -362,6 +376,135 @@ async function replaceScorerPredictions(
   });
 }
 
+async function savePlainPredictionBundle(
+  userId: string,
+  data: {
+    matchId: string;
+    predHome: number;
+    predAway: number;
+    predictedFinishType?: FinishType | null;
+    predictedPenaltyWinnerTeamId?: string | null;
+    picks: { playerId: string; goals: number }[];
+  }
+) {
+  const nextScorers =
+    data.picks.length > 0
+      ? Prisma.sql`VALUES ${Prisma.join(
+          data.picks.map(
+            (pick) =>
+              Prisma.sql`(${randomUUID()}, ${pick.playerId}, ${pick.goals})`
+          )
+        )}`
+      : Prisma.sql`SELECT NULL::text, NULL::text, NULL::integer WHERE FALSE`;
+
+  const rows = await prisma.$queryRaw<SavedPredictionRow[]>(Prisma.sql`
+    WITH next_scorers("id", "player_id", "predicted_goals") AS (
+      ${nextScorers}
+    ),
+    upserted AS (
+      INSERT INTO "predictions" (
+        "id",
+        "user_id",
+        "match_id",
+        "pred_home",
+        "pred_away",
+        "is_double",
+        "predicted_finish_type",
+        "predicted_penalty_winner_team_id",
+        "created_at",
+        "updated_at"
+      )
+      VALUES (
+        ${randomUUID()},
+        ${userId},
+        ${data.matchId},
+        ${data.predHome},
+        ${data.predAway},
+        false,
+        ${data.predictedFinishType ?? null}::"FinishType",
+        ${data.predictedPenaltyWinnerTeamId ?? null},
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT ("user_id", "match_id") DO UPDATE SET
+        "pred_home" = EXCLUDED."pred_home",
+        "pred_away" = EXCLUDED."pred_away",
+        "is_double" = false,
+        "predicted_finish_type" = EXCLUDED."predicted_finish_type",
+        "predicted_penalty_winner_team_id" = EXCLUDED."predicted_penalty_winner_team_id",
+        "updated_at" = NOW()
+      RETURNING
+        "id",
+        "pred_home" AS "predHome",
+        "pred_away" AS "predAway",
+        "is_double" AS "isDouble",
+        "predicted_finish_type" AS "predictedFinishType",
+        "predicted_penalty_winner_team_id" AS "predictedPenaltyWinnerTeamId"
+    ),
+    deleted_scorers AS (
+      DELETE FROM "scorer_predictions" existing
+      WHERE existing."user_id" = ${userId}
+        AND existing."match_id" = ${data.matchId}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM next_scorers next
+          WHERE next."player_id" = existing."player_id"
+        )
+      RETURNING 1
+    ),
+    upserted_scorers AS (
+      INSERT INTO "scorer_predictions" (
+        "id",
+        "user_id",
+        "match_id",
+        "player_id",
+        "predicted_goals",
+        "points",
+        "created_at"
+      )
+      SELECT
+        next."id",
+        ${userId},
+        ${data.matchId},
+        next."player_id",
+        next."predicted_goals",
+        0,
+        NOW()
+      FROM next_scorers next
+      ON CONFLICT ("user_id", "match_id", "player_id") DO UPDATE SET
+        "predicted_goals" = EXCLUDED."predicted_goals",
+        "points" = 0
+      RETURNING 1
+    ),
+    deleted_bold AS (
+      DELETE FROM "bold_scorer_bets"
+      WHERE "user_id" = ${userId}
+        AND "match_id" = ${data.matchId}
+      RETURNING 1
+    ),
+    deleted_octopus AS (
+      DELETE FROM "octopus_goalkeeper_bets"
+      WHERE "user_id" = ${userId}
+        AND "match_id" = ${data.matchId}
+      RETURNING 1
+    )
+    SELECT
+      "id",
+      "predHome",
+      "predAway",
+      "isDouble",
+      "predictedFinishType",
+      "predictedPenaltyWinnerTeamId"
+    FROM upserted
+  `);
+
+  const prediction = rows[0];
+  if (!prediction) {
+    throw new Error("Prediction could not be saved");
+  }
+  return prediction;
+}
+
 export async function submitScorerPredictions(
   userId: string,
   matchId: string,
@@ -397,6 +540,13 @@ export async function submitScorerPredictions(
 
   await replaceScorerPredictions(userId, matchId, picks);
 
+  try {
+    revalidateTag(`matches-user-${userId}`);
+    revalidateTag(`match-${matchId}`);
+  } catch {
+    // Background/test contexts may not have a Next cache store.
+  }
+
   return prisma.scorerPrediction.findMany({
     where: { userId, matchId },
     include: { player: true },
@@ -417,13 +567,24 @@ export async function submitMatchPredictionBundle(
     octopusPlayerId?: string | null;
   }
 ) {
-  const match = await prisma.match.findUniqueOrThrow({
-    where: { id: data.matchId },
-    include: {
-      homeTeam: { select: { shortName: true } },
-      awayTeam: { select: { shortName: true } },
-    },
-  });
+  let match = getPredictionMatchMetaCache(data.matchId);
+  if (!match) {
+    match = await prisma.match.findUniqueOrThrow({
+      where: { id: data.matchId },
+      select: {
+        id: true,
+        roundId: true,
+        homeTeamId: true,
+        awayTeamId: true,
+        matchTime: true,
+        status: true,
+        isKnockout: true,
+        homeTeam: { select: { shortName: true } },
+        awayTeam: { select: { shortName: true } },
+      },
+    });
+    setPredictionMatchMetaCache(match);
+  }
 
   const lockReason = getPredictionLockReason(match.matchTime, match.status);
   if (lockReason) {
@@ -458,52 +619,30 @@ export async function submitMatchPredictionBundle(
   if (!isDouble && !data.boldPlayerId && !data.octopusPlayerId) {
     await validateScorerPicks(match, predHome, predAway, picks);
 
-    const result = await prisma.$transaction(async (tx) => {
-      await Promise.all([
-        tx.boldScorerBet.deleteMany({
-          where: { userId, matchId: data.matchId },
-        }),
-        tx.octopusGoalkeeperBet.deleteMany({
-          where: { userId, matchId: data.matchId },
-        }),
-      ]);
-
-      const prediction = await tx.prediction.upsert({
-        where: {
-          userId_matchId: { userId, matchId: data.matchId },
-        },
-        create: {
-          userId,
-          matchId: data.matchId,
-          predHome,
-          predAway,
-          isDouble: false,
-          predictedFinishType: data.predictedFinishType ?? null,
-          predictedPenaltyWinnerTeamId,
-        },
-        update: {
-          predHome,
-          predAway,
-          isDouble: false,
-          predictedFinishType: data.predictedFinishType ?? null,
-          predictedPenaltyWinnerTeamId,
-        },
-        select: { id: true },
-      });
-
-      await replaceScorerPredictions(userId, data.matchId, picks, tx);
-
-      return {
-        prediction,
-        scorers: picks.length,
-        boldBet: null,
-        octopusBet: null,
-      };
+    const prediction = await savePlainPredictionBundle(userId, {
+      matchId: data.matchId,
+      predHome,
+      predAway,
+      predictedFinishType: data.predictedFinishType ?? null,
+      predictedPenaltyWinnerTeamId,
+      picks,
     });
+
+    const result = {
+      prediction,
+      scorerPredictions: picks.map((pick) => ({
+        playerId: pick.playerId,
+        predictedGoals: pick.goals,
+      })),
+      scorers: picks.length,
+      boldBet: null,
+      octopusBet: null,
+    };
 
     try {
       revalidateTag(`match-${data.matchId}`);
       revalidateTag("matches-schedule");
+      revalidateTag(`matches-user-${userId}`);
     } catch {
       // Background/test contexts may not have a Next cache store.
     }
@@ -660,9 +799,7 @@ export async function submitMatchPredictionBundle(
   if (
     isDouble &&
     (nextOctopusActiveOnThisMatch ||
-      storedOctopusActiveOnThisMatch ||
-      ((nextBoldActiveOnThisMatch || storedBoldActiveOnThisMatch) &&
-        !allowDoubleWithBold))
+      (nextBoldActiveOnThisMatch && !allowDoubleWithBold))
   ) {
     throw new Error(
       "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
@@ -734,7 +871,14 @@ export async function submitMatchPredictionBundle(
         predictedFinishType: data.predictedFinishType ?? null,
         predictedPenaltyWinnerTeamId,
       },
-      select: { id: true },
+      select: {
+        id: true,
+        predHome: true,
+        predAway: true,
+        isDouble: true,
+        predictedFinishType: true,
+        predictedPenaltyWinnerTeamId: true,
+      },
     });
 
     await replaceScorerPredictions(userId, data.matchId, picks, tx);
@@ -793,12 +937,22 @@ export async function submitMatchPredictionBundle(
         })
       : null;
 
-    return { prediction, scorers: picks.length, boldBet, octopusBet };
+    return {
+      prediction,
+      scorerPredictions: picks.map((pick) => ({
+        playerId: pick.playerId,
+        predictedGoals: pick.goals,
+      })),
+      scorers: picks.length,
+      boldBet,
+      octopusBet,
+    };
   });
 
   try {
     revalidateTag(`match-${data.matchId}`);
     revalidateTag("matches-schedule");
+    revalidateTag(`matches-user-${userId}`);
   } catch {
     // Background/test contexts may not have a Next cache store.
   }
@@ -957,6 +1111,12 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
         match.homeScore!,
         match.awayScore!
       );
+      const finishTypeCorrectForPerfect =
+        !match.isKnockout ||
+        Boolean(
+          match.actualFinishType &&
+            prediction.predictedFinishType === match.actualFinishType
+        );
       const picks = picksByUser.get(prediction.userId) ?? [];
       
       // استخدم الدالة الجديدة التي تتحقق من الدقيقة 75
@@ -978,7 +1138,8 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
               position: sp.player.position,
             })),
             match.matchTime,
-            match.status
+            match.status,
+            { finishTypeCorrect: finishTypeCorrectForPerfect }
           )
         : 0;
     }

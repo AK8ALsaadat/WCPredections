@@ -1,4 +1,5 @@
 import { asFinishType } from "@/lib/finish-type";
+import { isPredictionAllowed } from "@/lib/utils";
 import type { MatchPointsBreakdownInput } from "@/lib/match-points-breakdown";
 
 export type HistoryMatch = {
@@ -143,18 +144,28 @@ export function buildMatchHistoryEntries(history: RawHistory): MatchHistoryEntry
   }
 
   const statusPriority: Record<string, number> = {
-    LIVE: 0,
-    SCHEDULED: 1,
+    SCHEDULED: 0,
+    LIVE: 1,
     FINISHED: 2,
     POSTPONED: 3,
     CANCELLED: 4,
   };
 
-  return Array.from(byMatch.values()).sort((a, b) => {
+  return Array.from(byMatch.values()).filter((entry) => {
+    if (entry.match.status !== "SCHEDULED") return true;
+    return !isPredictionAllowed(entry.match.matchTime, entry.match.status);
+  }).sort((a, b) => {
     const statusDiff =
       (statusPriority[a.match.status] ?? 5) -
       (statusPriority[b.match.status] ?? 5);
     if (statusDiff !== 0) return statusDiff;
+
+    if (a.match.status === "SCHEDULED") {
+      return (
+        new Date(a.match.matchTime).getTime() -
+        new Date(b.match.matchTime).getTime()
+      );
+    }
 
     return (
       new Date(b.match.matchTime).getTime() -

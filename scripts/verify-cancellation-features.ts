@@ -90,6 +90,7 @@ async function main() {
         awayTeamId: away.id,
         matchTime,
         status: "SCHEDULED",
+        stageName: "Round of 16",
       },
     });
     created.matchId = match.id;

@@ -5,6 +5,7 @@ import { advanceKnockoutTeams } from "@/services/knockout-advancement.service";
 import { syncMatchScorersFromApi } from "@/services/match-scorers.service";
 import { syncGoalkeeperSavesFromApi } from "@/services/octopus-bet.service";
 import { recalculateMatchScoring } from "@/services/prediction.service";
+import { clearPredictionMatchMetaCache } from "@/services/prediction-match-cache";
 import { publish } from '@/lib/broadcaster';
 import { ApiFootballProvider } from "./api-football.provider";
 import { FootballDataProvider } from "./football-data.provider";
@@ -29,6 +30,16 @@ export function getFootballApiProvider(): FootballApiProvider {
     default:
       return new ApiFootballProvider();
   }
+}
+
+export function resolveActualFinishType(
+  mapped: ExternalMatch
+): ExternalMatch["finishType"] {
+  if (mapped.finishType) return mapped.finishType;
+  if (mapped.status === "FINISHED" && mapped.isKnockout) {
+    return "NINETY_MINUTES";
+  }
+  return mapped.finishType ?? null;
 }
 
 async function upsertTeam(
@@ -555,7 +566,7 @@ async function syncMatch(
     isKnockout: mapped.isKnockout,
     homeScore: mapped.homeScore,
     awayScore: mapped.awayScore,
-    actualFinishType: mapped.finishType,
+    actualFinishType: resolveActualFinishType(mapped),
     penaltyWinnerTeamId,
   };
 
@@ -565,12 +576,15 @@ async function syncMatch(
         data: matchData,
       })
     : await prisma.match.create({ data: matchData });
+  clearPredictionMatchMetaCache(match.id);
 
   const scoresChanged =
     existing &&
     (existing.homeScore !== mapped.homeScore ||
       existing.awayScore !== mapped.awayScore ||
-      existing.status !== mapped.status);
+      existing.status !== mapped.status ||
+      existing.actualFinishType !== matchData.actualFinishType ||
+      existing.penaltyWinnerTeamId !== penaltyWinnerTeamId);
 
   const shouldSyncScorers =
     mapped.status === "LIVE" ||

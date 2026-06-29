@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
-type UsageMatch = {
+export type UsageMatch = {
   id: string;
   roundId: string;
   homeTeamId: string;
@@ -89,7 +89,12 @@ export function getMaxDoublesForUsageScope(
   scopeOrKey: string | UsageRoundScope
 ): number {
   const phase = getUsageRoundPhase(scopeOrKey);
-  return phase === "round-of-16" || phase === "quarter-finals" || phase === "semi-finals" || phase === "third-place-final" || phase === "final"
+  return phase === "round-of-32" ||
+    phase === "round-of-16" ||
+    phase === "quarter-finals" ||
+    phase === "semi-finals" ||
+    phase === "third-place-final" ||
+    phase === "final"
     ? 1
     : 2;
 }
@@ -312,6 +317,58 @@ const getCachedUsageRoundMatches = unstable_cache(
   { revalidate: 300, tags: ["matches-schedule"] }
 );
 
+const USAGE_SCOPE_MEMORY_CACHE_MS = 5 * 60 * 1000;
+const usageMatchMemoryCache = new Map<
+  string,
+  { data: UsageMatch; expiresAt: number }
+>();
+const usageRoundMatchesMemoryCache = new Map<
+  string,
+  { data: UsageMatch[]; expiresAt: number }
+>();
+const usageScopeMemoryCache = new Map<
+  string,
+  { data: UsageRoundScope; expiresAt: number }
+>();
+
+function getFreshCacheValue<T>(
+  cache: Map<string, { data: T; expiresAt: number }>,
+  key: string
+): T | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setFreshCacheValue<T>(
+  cache: Map<string, { data: T; expiresAt: number }>,
+  key: string,
+  data: T
+) {
+  cache.set(key, {
+    data,
+    expiresAt: Date.now() + USAGE_SCOPE_MEMORY_CACHE_MS,
+  });
+}
+
+export function primeUsageMatchCache(match: UsageMatch) {
+  setFreshCacheValue(usageMatchMemoryCache, match.id, match);
+}
+
+export function primeUsageRoundMatchesCache(
+  roundId: string,
+  matches: UsageMatch[]
+) {
+  setFreshCacheValue(usageRoundMatchesMemoryCache, roundId, matches);
+  for (const match of matches) {
+    setFreshCacheValue(usageMatchMemoryCache, match.id, match);
+  }
+}
+
 function isMissingNextIncrementalCache(error: unknown) {
   return (
     error instanceof Error &&
@@ -320,22 +377,36 @@ function isMissingNextIncrementalCache(error: unknown) {
 }
 
 async function getUsageMatch(matchId: string) {
+  const cached = getFreshCacheValue(usageMatchMemoryCache, matchId);
+  if (cached) return cached;
+
   try {
-    return await getCachedUsageMatch(matchId);
+    const match = await getCachedUsageMatch(matchId);
+    setFreshCacheValue(usageMatchMemoryCache, matchId, match);
+    return match;
   } catch (error) {
     if (isMissingNextIncrementalCache(error)) {
-      return fetchUsageMatch(matchId);
+      const match = await fetchUsageMatch(matchId);
+      setFreshCacheValue(usageMatchMemoryCache, matchId, match);
+      return match;
     }
     throw error;
   }
 }
 
 async function getUsageRoundMatches(roundId: string) {
+  const cached = getFreshCacheValue(usageRoundMatchesMemoryCache, roundId);
+  if (cached) return cached;
+
   try {
-    return await getCachedUsageRoundMatches(roundId);
+    const matches = await getCachedUsageRoundMatches(roundId);
+    setFreshCacheValue(usageRoundMatchesMemoryCache, roundId, matches);
+    return matches;
   } catch (error) {
     if (isMissingNextIncrementalCache(error)) {
-      return fetchUsageRoundMatches(roundId);
+      const matches = await fetchUsageRoundMatches(roundId);
+      setFreshCacheValue(usageRoundMatchesMemoryCache, roundId, matches);
+      return matches;
     }
     throw error;
   }
@@ -345,6 +416,10 @@ export async function getUsageRoundScope(
   matchId: string,
   knownRoundId?: string
 ): Promise<UsageRoundScope> {
+  const cacheKey = `${matchId}:${knownRoundId ?? "auto"}`;
+  const cached = getFreshCacheValue(usageScopeMemoryCache, cacheKey);
+  if (cached) return cached;
+
   const matchPromise = getUsageMatch(matchId);
   const [match, knownRoundMatches] = await Promise.all([
     matchPromise,
@@ -359,9 +434,11 @@ export async function getUsageRoundScope(
     .filter((candidate) => buildUsageRoundKey(candidate, roundMatches) === key)
     .map((candidate) => candidate.id);
 
-  return {
+  const scope = {
     key,
     matchIds,
     databaseRoundId: match.roundId,
   };
+  setFreshCacheValue(usageScopeMemoryCache, cacheKey, scope);
+  return scope;
 }

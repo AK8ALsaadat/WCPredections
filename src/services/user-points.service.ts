@@ -9,57 +9,56 @@ const userTotalPointsCache = new Map<
 >();
 
 async function computeUserTotalPoints(userId: string): Promise<number> {
-  const [user, predictionAgg, scorerAgg, boldAgg, octopusAgg, bracket] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { username: true },
-    }),
-    prisma.prediction.aggregate({
-      where: { userId },
-      _sum: {
-        points: true,
-        doubleBonus: true,
-        finishTypePoints: true,
-        penaltyWinnerPoints: true,
-      },
-    }),
-    prisma.scorerPrediction.aggregate({
-      where: { userId },
-      _sum: { points: true },
-    }),
-    prisma.boldScorerBet.aggregate({
-      where: { userId, cancelledAt: null },
-      _sum: { points: true },
-    }),
-    prisma.octopusGoalkeeperBet.aggregate({
-      where: { userId, cancelledAt: null },
-      _sum: { points: true },
-    }),
-    prisma.knockoutBracketPrediction.findUnique({
-      where: { userId },
-      select: {
-        finalistOnePoints: true,
-        finalistTwoPoints: true,
-        championPoints: true,
-      },
-    }),
-  ]);
+  const rows = await prisma.$queryRaw<
+    { username: string; rawPoints: number | bigint | string }[]
+  >`
+    SELECT
+      "users"."username",
+      (
+        COALESCE((
+          SELECT SUM(
+            "points" +
+            "double_bonus" +
+            "finish_type_points" +
+            "penalty_winner_points"
+          )
+          FROM "predictions"
+          WHERE "user_id" = "users"."id"
+        ), 0) +
+        COALESCE((
+          SELECT SUM("points")
+          FROM "scorer_predictions"
+          WHERE "user_id" = "users"."id"
+        ), 0) +
+        COALESCE((
+          SELECT SUM("points")
+          FROM "bold_scorer_bets"
+          WHERE "user_id" = "users"."id"
+            AND "cancelled_at" IS NULL
+        ), 0) +
+        COALESCE((
+          SELECT SUM("points")
+          FROM "octopus_goalkeeper_bets"
+          WHERE "user_id" = "users"."id"
+            AND "cancelled_at" IS NULL
+        ), 0) +
+        COALESCE((
+          SELECT
+            "finalist_one_points" +
+            "finalist_two_points" +
+            "champion_points"
+          FROM "knockout_bracket_predictions"
+          WHERE "user_id" = "users"."id"
+        ), 0)
+      )::int AS "rawPoints"
+    FROM "users"
+    WHERE "users"."id" = ${userId}
+    LIMIT 1
+  `;
 
-  const rawPoints =
-    (predictionAgg._sum.points ?? 0) +
-    (predictionAgg._sum.doubleBonus ?? 0) +
-    (predictionAgg._sum.finishTypePoints ?? 0) +
-    (predictionAgg._sum.penaltyWinnerPoints ?? 0) +
-    (scorerAgg._sum.points ?? 0) +
-    (boldAgg._sum.points ?? 0) +
-    (octopusAgg._sum.points ?? 0) +
-    (bracket?.finalistOnePoints ?? 0) +
-    (bracket?.finalistTwoPoints ?? 0) +
-    (bracket?.championPoints ?? 0);
-
-  return user
-    ? applyOverallLeaderboardBaseline(user.username, rawPoints)
-    : rawPoints;
+  const row = rows[0];
+  if (!row) return 0;
+  return applyOverallLeaderboardBaseline(row.username, Number(row.rawPoints));
 }
 
 export async function getUserTotalPoints(userId: string): Promise<number> {

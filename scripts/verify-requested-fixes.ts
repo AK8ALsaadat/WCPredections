@@ -11,6 +11,7 @@ import { matchIdentityKey } from "../src/lib/team-identity";
 import { layoutFormation } from "../src/lib/formation-layout";
 import { mergeLineupData } from "../src/lib/lineup-state";
 import { dedupeDisplayMatches } from "../src/lib/match-list-dedupe";
+import { buildMatchHistoryEntries } from "../src/lib/profile-history";
 import { isPredictionAllowed } from "../src/lib/utils";
 import {
   calculateScorerPredictionPoints,
@@ -20,6 +21,8 @@ import {
   mergeProbableBenchWithCurrentRoster,
   mergeTeamViewWithCurrentRoster,
 } from "../src/services/match-players.service";
+import { getMaxDoublesForUsageScope } from "../src/services/usage-round.service";
+import { resolveActualFinishType } from "../src/services/football-api";
 
 let failures = 0;
 
@@ -53,6 +56,33 @@ check(
   "encoded Curacao and Cape Verde aliases share team identities",
   matchIdentityKey("CuraÃ§ao", "Cape Verde Islands") ===
     matchIdentityKey("Curacao", "Cape Verde")
+);
+
+const sourceMatchBase = {
+  apiId: "source-match",
+  homeTeamApiId: "home",
+  awayTeamApiId: "away",
+  matchTime: new Date("2026-07-01T20:00:00Z"),
+  status: "FINISHED" as const,
+  isKnockout: true,
+  homeScore: 2,
+  awayScore: 1,
+};
+check(
+  "finished knockout source match defaults missing finish type to 90 minutes",
+  resolveActualFinishType({ ...sourceMatchBase, finishType: null }) ===
+    "NINETY_MINUTES"
+);
+check(
+  "source match preserves extra time and penalties finish types",
+  resolveActualFinishType({
+    ...sourceMatchBase,
+    finishType: "EXTRA_TIME",
+  }) === "EXTRA_TIME" &&
+    resolveActualFinishType({
+      ...sourceMatchBase,
+      finishType: "PENALTIES",
+    }) === "PENALTIES"
 );
 
 const squad = [
@@ -514,6 +544,97 @@ const fiveAmRiyadhMatch = new Date(
 check(
   "5am Riyadh matches remain inside prediction window",
   isPredictionAllowed(fiveAmRiyadhMatch, "SCHEDULED")
+);
+
+const historyBaseMatch = {
+  homeScore: null,
+  awayScore: null,
+  isKnockout: false,
+  actualFinishType: null,
+  penaltyWinnerTeamId: null,
+  homeTeam: { id: "home", name: "Home", shortName: "H" },
+  awayTeam: { id: "away", name: "Away", shortName: "A" },
+  round: { id: "round", name: "Round" },
+};
+const lockedPredictionMatchTime = new Date(
+  Date.now() + 5 * 60 * 1000
+).toISOString();
+const openPredictionMatchTime = new Date(
+  Date.now() + 60 * 60 * 1000
+).toISOString();
+const historyEntries = buildMatchHistoryEntries({
+  predictions: [
+    {
+      predHome: 1,
+      predAway: 0,
+      isDouble: false,
+      points: 0,
+      doubleBonus: 0,
+      finishTypePoints: 0,
+      penaltyWinnerPoints: 0,
+      predictedFinishType: null,
+      predictedPenaltyWinnerTeamId: null,
+      match: {
+        ...historyBaseMatch,
+        id: "open",
+        matchTime: openPredictionMatchTime,
+        status: "SCHEDULED",
+      },
+    },
+    {
+      predHome: 2,
+      predAway: 0,
+      isDouble: false,
+      points: 0,
+      doubleBonus: 0,
+      finishTypePoints: 0,
+      penaltyWinnerPoints: 0,
+      predictedFinishType: null,
+      predictedPenaltyWinnerTeamId: null,
+      match: {
+        ...historyBaseMatch,
+        id: "locked",
+        matchTime: lockedPredictionMatchTime,
+        status: "SCHEDULED",
+      },
+    },
+    {
+      predHome: 2,
+      predAway: 1,
+      isDouble: false,
+      points: 5,
+      doubleBonus: 0,
+      finishTypePoints: 0,
+      penaltyWinnerPoints: 0,
+      predictedFinishType: null,
+      predictedPenaltyWinnerTeamId: null,
+      match: {
+        ...historyBaseMatch,
+        id: "finished",
+        matchTime: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        status: "FINISHED",
+        homeScore: 2,
+        awayScore: 1,
+      },
+    },
+  ],
+  scorerPredictions: [],
+  boldScorerBets: [],
+  octopusBets: [],
+});
+check(
+  "predictions history hides open-deadline matches and puts locked match first",
+  historyEntries.length === 2 &&
+    historyEntries[0].match.id === "locked" &&
+    !historyEntries.some((entry) => entry.match.id === "open")
+);
+check(
+  "round of 32 allows only one double",
+  getMaxDoublesForUsageScope("wc:stage:round-of-32") === 1
+);
+check(
+  "group stage keeps two doubles",
+  getMaxDoublesForUsageScope("wc:group-gameweek:1") === 2
 );
 
 const fiveHome = new Set(["h1", "h2", "h3", "h4", "h5"]);

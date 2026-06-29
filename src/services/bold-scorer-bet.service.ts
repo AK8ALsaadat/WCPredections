@@ -1,6 +1,7 @@
 import { resolveScorerGoalsForPlayer } from "@/lib/player-matching";
 import { prisma } from "@/lib/prisma";
 import { getPredictionLockReason } from "@/lib/utils";
+import { revalidateTag } from "next/cache";
 import {
   BOLD_SCORER_POINTS,
   calculateBoldScorerBetPoints,
@@ -19,6 +20,15 @@ import {
 
 export { BOLD_SCORER_POINTS };
 export { MIN_POINTS_FOR_BOLD_SCORER_BET };
+
+function revalidateUserMatchSummary(userId: string, matchId: string) {
+  try {
+    revalidateTag(`matches-user-${userId}`);
+    revalidateTag(`match-${matchId}`);
+  } catch {
+    // Background/test contexts may not have a Next cache store.
+  }
+}
 
 export async function getBoldScorerBetEligibility(userId: string) {
   const userPoints = await getUserTotalPoints(userId);
@@ -144,6 +154,7 @@ export async function submitBoldScorerBet(
     if (existing.matchId !== matchId) return null;
 
     await prisma.boldScorerBet.delete({ where: { id: existing.id } });
+    revalidateUserMatchSummary(userId, matchId);
     return null;
   }
 
@@ -218,7 +229,7 @@ export async function submitBoldScorerBet(
     );
   }
 
-  return prisma.$transaction(async (tx) => {
+  const bet = await prisma.$transaction(async (tx) => {
     if (prediction?.isDouble && !allowDoubleWithBold) {
       await tx.prediction.update({
         where: { id: prediction.id },
@@ -252,6 +263,8 @@ export async function submitBoldScorerBet(
       },
     });
   });
+  revalidateUserMatchSummary(userId, matchId);
+  return bet;
 }
 
 export async function calculateBoldScorerBetPointsForMatch(
@@ -314,5 +327,6 @@ export async function calculateBoldScorerBetPointsForMatch(
       data: { points },
     });
     invalidateUserTotalPointsCache(bet.userId);
+    revalidateUserMatchSummary(bet.userId, matchId);
   }
 }

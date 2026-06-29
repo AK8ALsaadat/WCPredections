@@ -95,7 +95,12 @@ async function fetchPredictMatchFresh(matchId: string) {
     12_000
   );
   if (!res.ok || !data?.success) return null;
-  return data.data as MatchData;
+  const payload = data.data as MatchData;
+  const fastLineup = lineupFromMatchPayload(payload);
+  if (fastLineup) {
+    writePredictLineupCache(matchId, fastLineup);
+  }
+  return payload;
 }
 
 function saveTimeoutMessage(locale: string) {
@@ -107,7 +112,6 @@ function saveTimeoutMessage(locale: string) {
 
 async function fetchLineupForMatch(
   matchId: string,
-  matchTime: string | Date | undefined,
   options?: { fresh?: boolean }
 ) {
   const needsFresh = options?.fresh === true;
@@ -149,6 +153,9 @@ type MatchData = {
   } | null;
   _knockoutGated?: boolean;
   octopusCount?: number;
+  predictionsCount?: number;
+  doublesCount?: number;
+  boldCount?: number;
   boldScorerRoundStatus?: {
     used: boolean;
     onThisMatch: boolean;
@@ -219,6 +226,30 @@ type LineupData = {
   awayShortName: string;
 };
 
+function lineupFromMatchPayload(payload: MatchData): LineupData | null {
+  const candidate = payload as MatchData & Partial<LineupData>;
+  if (
+    !Array.isArray(candidate.homePlayers) ||
+    !Array.isArray(candidate.awayPlayers)
+  ) {
+    return null;
+  }
+
+  return {
+    homePlayers: candidate.homePlayers,
+    awayPlayers: candidate.awayPlayers,
+    homeFormation: candidate.homeFormation ?? "4-3-3",
+    awayFormation: candidate.awayFormation ?? "4-3-3",
+    homeLineupSource: candidate.homeLineupSource ?? "estimated",
+    awayLineupSource: candidate.awayLineupSource ?? "estimated",
+    lineupStatus: candidate.lineupStatus ?? "estimated",
+    homeTeamName: candidate.homeTeamName ?? payload.homeTeam.name,
+    awayTeamName: candidate.awayTeamName ?? payload.awayTeam.name,
+    homeShortName: candidate.homeShortName ?? payload.homeTeam.shortName,
+    awayShortName: candidate.awayShortName ?? payload.awayTeam.shortName,
+  };
+}
+
 type FormState = {
   predHome: number;
   predAway: number;
@@ -230,6 +261,28 @@ type FormState = {
   boldEnabled: boolean;
   octopusPlayerId: string;
   octopusEnabled: boolean;
+};
+
+type PredictionSavePayload = {
+  prediction?: {
+    predHome: number;
+    predAway: number;
+    isDouble: boolean;
+    predictedFinishType: string | null;
+    predictedPenaltyWinnerTeamId: string | null;
+  } | null;
+  scorerPredictions?: { playerId: string; predictedGoals: number }[];
+  boldBet?: {
+    playerId: string;
+    points: number;
+    player?: { name?: string | null };
+  } | null;
+  octopusBet?: {
+    playerId: string;
+    points: number;
+    player?: { name?: string | null };
+  } | null;
+  match?: MatchData | null;
 };
 
 const EMPTY_FORM: FormState = {
@@ -244,6 +297,164 @@ const EMPTY_FORM: FormState = {
   octopusPlayerId: "",
   octopusEnabled: false,
 };
+
+function clampCount(value: number, max: number) {
+  return Math.min(max, Math.max(0, value));
+}
+
+function applySavedPayloadToMatch(
+  current: MatchData,
+  payload: PredictionSavePayload,
+  fallback: {
+    prediction: NonNullable<PredictionSavePayload["prediction"]>;
+    scorerPredictions: { playerId: string; predictedGoals: number }[];
+  }
+): MatchData {
+  const prediction = payload.prediction ?? fallback.prediction;
+  const scorerPredictions =
+    payload.scorerPredictions ?? fallback.scorerPredictions;
+  const boldBet = payload.boldBet ?? null;
+  const octopusBet = payload.octopusBet ?? null;
+  const previousPredictionExists = Boolean(current.userPrediction);
+  const previousDouble = Boolean(current.userPrediction?.isDouble);
+  const nextDouble = Boolean(prediction.isDouble);
+  const previousBoldOnThisMatch = Boolean(
+    current.roundUsageLimits?.boldScorer.onThisMatch ||
+      current.userBoldScorerBet
+  );
+  const previousOctopusOnThisMatch = Boolean(
+    current.roundUsageLimits?.octopus.onThisMatch ||
+      current.userOctopusBet
+  );
+  const nextBoldOnThisMatch = Boolean(boldBet);
+  const nextOctopusOnThisMatch = Boolean(octopusBet);
+
+  let roundUsageLimits = current.roundUsageLimits;
+  if (roundUsageLimits) {
+    const maxDoubles = roundUsageLimits.doubles.max;
+    const doublesUsed = clampCount(
+      roundUsageLimits.doubles.used +
+        (nextDouble ? 1 : 0) -
+        (previousDouble ? 1 : 0),
+      maxDoubles
+    );
+    const doublesUsedElsewhere = Math.max(
+      0,
+      doublesUsed - (nextDouble ? 1 : 0)
+    );
+    const boldUsed =
+      roundUsageLimits.boldScorer.onOtherMatch || nextBoldOnThisMatch;
+    const octopusUsed =
+      roundUsageLimits.octopus.onOtherMatch || nextOctopusOnThisMatch;
+
+    roundUsageLimits = {
+      ...roundUsageLimits,
+      doubles: {
+        ...roundUsageLimits.doubles,
+        used: doublesUsed,
+        onThisMatch: nextDouble,
+        canEnable: doublesUsedElsewhere < maxDoubles,
+        remaining: Math.max(0, maxDoubles - doublesUsedElsewhere),
+      },
+      boldScorer: {
+        ...roundUsageLimits.boldScorer,
+        used: boldUsed,
+        onThisMatch: nextBoldOnThisMatch,
+        onOtherMatch:
+          roundUsageLimits.boldScorer.onOtherMatch && !nextBoldOnThisMatch,
+        canUse:
+          nextBoldOnThisMatch ||
+          (roundUsageLimits.boldScorer.hasMinimumPoints && !boldUsed),
+        otherMatchId: nextBoldOnThisMatch
+          ? null
+          : roundUsageLimits.boldScorer.otherMatchId,
+        playerName: boldBet?.player?.name ?? null,
+        playerId: boldBet?.playerId ?? null,
+        points: boldBet?.points ?? 0,
+      },
+      octopus: {
+        ...roundUsageLimits.octopus,
+        used: octopusUsed,
+        onThisMatch: nextOctopusOnThisMatch,
+        onOtherMatch:
+          roundUsageLimits.octopus.onOtherMatch && !nextOctopusOnThisMatch,
+        canUse: nextOctopusOnThisMatch || !octopusUsed,
+        otherMatchId: nextOctopusOnThisMatch
+          ? null
+          : roundUsageLimits.octopus.otherMatchId,
+        playerName: octopusBet?.player?.name ?? null,
+        playerId: octopusBet?.playerId ?? null,
+        points: octopusBet?.points ?? 0,
+      },
+    };
+  }
+
+  return {
+    ...current,
+    userPrediction: prediction,
+    userScorerPredictions: scorerPredictions,
+    userBoldScorerBet: boldBet
+      ? {
+          playerId: boldBet.playerId,
+          points: boldBet.points,
+          player: { name: boldBet.player?.name ?? "" },
+        }
+      : null,
+    userOctopusBet: octopusBet
+      ? {
+          playerId: octopusBet.playerId,
+          points: octopusBet.points,
+          player: { name: octopusBet.player?.name ?? "" },
+        }
+      : null,
+    boldScorerRoundStatus: roundUsageLimits
+      ? {
+          used: roundUsageLimits.boldScorer.used,
+          onThisMatch: roundUsageLimits.boldScorer.onThisMatch,
+          onOtherMatch: roundUsageLimits.boldScorer.onOtherMatch,
+          otherMatchId: roundUsageLimits.boldScorer.otherMatchId,
+        }
+      : current.boldScorerRoundStatus,
+    octopusRoundStatus: roundUsageLimits
+      ? {
+          used: roundUsageLimits.octopus.used,
+          onThisMatch: roundUsageLimits.octopus.onThisMatch,
+          onOtherMatch: roundUsageLimits.octopus.onOtherMatch,
+          otherMatchId: roundUsageLimits.octopus.otherMatchId,
+        }
+      : current.octopusRoundStatus,
+    roundUsageLimits,
+    predictionsCount:
+      current.predictionsCount == null
+        ? current.predictionsCount
+        : current.predictionsCount + (previousPredictionExists ? 0 : 1),
+    doublesCount:
+      current.doublesCount == null
+        ? current.doublesCount
+        : Math.max(
+            0,
+            current.doublesCount + (nextDouble ? 1 : 0) - (previousDouble ? 1 : 0)
+          ),
+    boldCount:
+      current.boldCount == null
+        ? current.boldCount
+        : Math.max(
+            0,
+            current.boldCount +
+              (nextBoldOnThisMatch ? 1 : 0) -
+              (previousBoldOnThisMatch ? 1 : 0)
+          ),
+    octopusCount:
+      current.octopusCount == null
+        ? current.octopusCount
+        : Math.max(
+            0,
+            current.octopusCount +
+              (nextOctopusOnThisMatch ? 1 : 0) -
+              (previousOctopusOnThisMatch ? 1 : 0)
+          ),
+  };
+}
 
 function formStateFromMatch(m: MatchData | null): FormState {
   if (!m) return { ...EMPTY_FORM, scorerPicks: {} };
@@ -319,15 +530,20 @@ export default function PredictPage() {
   const [match, setMatch] = useState<MatchData | null>(() =>
     readPredictMatchCache<MatchData>(matchId)
   );
-  const [lineup, setLineup] = useState<LineupData | null>(() =>
-    readPredictLineupCache<LineupData>(matchId)
-  );
+  const [lineup, setLineup] = useState<LineupData | null>(() => {
+    const cachedLineup = readPredictLineupCache<LineupData>(matchId);
+    if (cachedLineup) return cachedLineup;
+    const cachedMatch = readPredictMatchCache<MatchData>(matchId);
+    return cachedMatch ? lineupFromMatchPayload(cachedMatch) : null;
+  });
   const [loading, setLoading] = useState(
     () => !readPredictMatchCache<MatchData>(matchId)
   );
-  const [lineupLoading, setLineupLoading] = useState(
-    () => !readPredictLineupCache<LineupData>(matchId)
-  );
+  const [lineupLoading, setLineupLoading] = useState(() => {
+    if (readPredictLineupCache<LineupData>(matchId)) return false;
+    const cachedMatch = readPredictMatchCache<MatchData>(matchId);
+    return !(cachedMatch && lineupFromMatchPayload(cachedMatch));
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -437,7 +653,9 @@ export default function PredictPage() {
 
   useEffect(() => {
     const cachedMatch = readPredictMatchCache<MatchData>(matchId);
-    const cachedLineup = readPredictLineupCache<LineupData>(matchId);
+    const cachedLineup =
+      readPredictLineupCache<LineupData>(matchId) ??
+      (cachedMatch ? lineupFromMatchPayload(cachedMatch) : null);
     const draft = readPredictDraft<FormState>(matchId);
 
     setMatch(cachedMatch);
@@ -517,8 +735,6 @@ export default function PredictPage() {
       if (cancelled) return;
       if (!silent && !readPredictLineupCache(matchId)) setLineupLoading(true);
 
-      const matchTime =
-        readPredictMatchCache<MatchData>(matchId)?.matchTime ?? match?.matchTime;
       const cachedLineup = readPredictLineupCache<LineupData>(matchId);
       if (
         !silent &&
@@ -530,7 +746,7 @@ export default function PredictPage() {
       }
 
       try {
-        const payload = await fetchLineupForMatch(matchId, matchTime, {
+        const payload = await fetchLineupForMatch(matchId, {
           fresh: silent,
         });
         if (cancelled) return;
@@ -581,6 +797,16 @@ export default function PredictPage() {
         setMatch(payload);
         setError("");
 
+        const fastLineup = lineupFromMatchPayload(payload);
+        if (fastLineup) {
+          setLineup((previous) => {
+            const merged = mergeLineupData(previous, fastLineup);
+            writePredictLineupCache(matchId, merged);
+            return merged;
+          });
+          setLineupLoading(false);
+        }
+
         const draft = readPredictDraft<FormState>(matchId);
         if (draft) {
           applyFormState(draft, {
@@ -626,7 +852,7 @@ export default function PredictPage() {
       cancelled = true;
       abort.abort();
     };
-  }, [matchId, match?.matchTime, lineup?.lineupStatus, t.errors.loadFailed]);
+  }, [matchId, t.errors.loadFailed]);
 
   // If the lineup finishes loading and there's no local draft, make sure
   // saved scorer picks and bets from the server are applied so the UI
@@ -666,7 +892,7 @@ export default function PredictPage() {
     const startPolling = () => {
       if (interval) return;
       interval = setInterval(() => {
-        void fetchLineupForMatch(matchId, matchTime, { fresh: true }).then(
+        void fetchLineupForMatch(matchId, { fresh: true }).then(
           (payload) => {
             if (payload) {
               setLineup((previous) => {
@@ -687,7 +913,7 @@ export default function PredictPage() {
         msUntilMatchKickoff(matchTime) - LINEUP_FAST_REFRESH_BEFORE_MS;
       if (msUntilWindow > 0) {
         windowTimer = setTimeout(() => {
-          void fetchLineupForMatch(matchId, matchTime, { fresh: true }).then(
+          void fetchLineupForMatch(matchId, { fresh: true }).then(
             (payload) => {
               if (payload) {
                 setLineup((previous) => {
@@ -1203,7 +1429,11 @@ export default function PredictPage() {
     setSubmitting(true);
 
     try {
-      const { res, data } = await fetchJsonWithTimeout("/api/predictions", {
+      const scorerPredictionPayload = picksToArray(scorerPicks).map((pick) => ({
+        playerId: pick.playerId,
+        predictedGoals: pick.goals,
+      }));
+      const { res, data } = await fetchJsonWithTimeout("/api/predictions?fast=1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1225,9 +1455,22 @@ export default function PredictPage() {
         return;
       }
 
+      const savePayload = (data?.data ?? {}) as PredictionSavePayload;
       const freshMatch =
-        (data?.data?.match as MatchData | null | undefined) ??
-        (await fetchPredictMatchFresh(matchId));
+        savePayload.match ??
+        (match
+          ? applySavedPayloadToMatch(match, savePayload, {
+              prediction: {
+                predHome,
+                predAway,
+                isDouble,
+                predictedFinishType: finishType || null,
+                predictedPenaltyWinnerTeamId:
+                  finishType === "PENALTIES" ? penaltyWinner || null : null,
+              },
+              scorerPredictions: scorerPredictionPayload,
+            })
+          : await fetchPredictMatchFresh(matchId));
       if (!freshMatch) {
         throw new Error(
           locale === "ar"
@@ -1256,6 +1499,11 @@ export default function PredictPage() {
         setOctopusEnabled,
       });
       setSuccess(t.matches.predictionSubmitted);
+      void fetchPredictMatchFresh(matchId).then((verifiedMatch) => {
+        if (!verifiedMatch) return;
+        writePredictMatchCache(matchId, { ...verifiedMatch, _complete: true });
+        setMatch(verifiedMatch);
+      });
     } catch (err) {
       setError(
         isAbortError(err)

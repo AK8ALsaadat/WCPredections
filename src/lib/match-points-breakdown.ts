@@ -108,6 +108,13 @@ function computePerfectBonus(input: MatchPointsBreakdownInput): number {
   const exact =
     p.predHome === input.homeScore && p.predAway === input.awayScore;
   if (!exact) return 0;
+  if (
+    input.isKnockout &&
+    (!input.actualFinishType ||
+      p.predictedFinishType !== input.actualFinishType)
+  ) {
+    return 0;
+  }
 
   const picks = input.userScorerPredictions ?? [];
   const totalPredicted = picks.reduce((sum, sp) => sum + sp.predictedGoals, 0);

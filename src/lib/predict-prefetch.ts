@@ -84,6 +84,45 @@ type ListMatchSeed = {
   } | null;
 };
 
+type PredictLineupSeed = {
+  homePlayers?: unknown;
+  awayPlayers?: unknown;
+  homeFormation?: string | null;
+  awayFormation?: string | null;
+  homeLineupSource?: "official" | "probable" | "estimated";
+  awayLineupSource?: "official" | "probable" | "estimated";
+  lineupStatus?: "official" | "probable" | "estimated";
+  homeTeamName?: string;
+  awayTeamName?: string;
+  homeShortName?: string;
+  awayShortName?: string;
+  homeTeam?: { name?: string; shortName?: string };
+  awayTeam?: { name?: string; shortName?: string };
+};
+
+function seedPredictLineupFromMatchPayload(
+  matchId: string,
+  payload: PredictLineupSeed
+) {
+  if (!Array.isArray(payload.homePlayers) || !Array.isArray(payload.awayPlayers)) {
+    return;
+  }
+
+  writeClientCache(predictLineupCacheKey(matchId), {
+    homePlayers: payload.homePlayers,
+    awayPlayers: payload.awayPlayers,
+    homeFormation: payload.homeFormation ?? "4-3-3",
+    awayFormation: payload.awayFormation ?? "4-3-3",
+    homeLineupSource: payload.homeLineupSource ?? "estimated",
+    awayLineupSource: payload.awayLineupSource ?? "estimated",
+    lineupStatus: payload.lineupStatus ?? "estimated",
+    homeTeamName: payload.homeTeamName ?? payload.homeTeam?.name ?? "",
+    awayTeamName: payload.awayTeamName ?? payload.awayTeam?.name ?? "",
+    homeShortName: payload.homeShortName ?? payload.homeTeam?.shortName ?? "",
+    awayShortName: payload.awayShortName ?? payload.awayTeam?.shortName ?? "",
+  });
+}
+
 async function fetchPredictMatch(matchId: string) {
   const res = await fetch(`/api/matches/${matchId}?predict=true`, {
     credentials: "same-origin",
@@ -91,10 +130,12 @@ async function fetchPredictMatch(matchId: string) {
   if (!res.ok) return;
   const data = await res.json();
   if (data.success) {
-    writeClientCache(predictMatchCacheKey(matchId), {
+    const payload = {
       ...data.data,
       _complete: true,
-    });
+    };
+    writeClientCache(predictMatchCacheKey(matchId), payload);
+    seedPredictLineupFromMatchPayload(matchId, payload);
   }
 }
 
@@ -270,10 +311,9 @@ export function hasPredictMatchCache(matchId: string) {
   return readPredictMatchCache(matchId) != null;
 }
 
-/** بعد حفظ التوقع — امسح الكاش حتى ما يظهر بيانات قديمة */
+/** بعد حفظ التوقع — امسح بيانات التوقع فقط واحتفظ بكاش التشكيلة */
 export function invalidatePredictCaches(matchId: string) {
   removeClientCache(predictMatchCacheKey(matchId));
-  removeClientCache(predictLineupCacheKey(matchId));
   inflight.delete(matchId);
 }
 

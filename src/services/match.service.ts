@@ -9,6 +9,15 @@ import { matchIdentityKey } from "@/lib/team-identity";
 import type { MatchStatus } from "@prisma/client";
 import { recalculateMatchScoring } from "@/services/prediction.service";
 import { getRoundUsageLimits } from "@/services/round-usage.service";
+import {
+  primeUsageMatchCache,
+  primeUsageRoundMatchesCache,
+  type UsageMatch,
+} from "@/services/usage-round.service";
+import {
+  clearPredictionMatchMetaCache,
+  setPredictionMatchMetaCache,
+} from "@/services/prediction-match-cache";
 
 const teamSelect = {
   id: true,
@@ -16,6 +25,9 @@ const teamSelect = {
   shortName: true,
   logoUrl: true,
 } as const;
+
+const USER_MATCH_SUMMARY_CACHE_SECONDS = 30;
+const USER_PREDICT_STATE_CACHE_SECONDS = 15;
 
 function dedupeMatches<T extends { matchTime?: unknown; homeTeam?: unknown; awayTeam?: unknown; apiMatchId?: unknown }>(rows: T[]): T[] {
   if (!rows || rows.length <= 1) return rows;
@@ -51,6 +63,156 @@ function dedupeMatches<T extends { matchTime?: unknown; homeTeam?: unknown; away
   return out;
 }
 
+async function fetchUserMatchPredictionRows(userId: string, matchIds: string[]) {
+  const uniqueMatchIds = [...new Set(matchIds)];
+  if (uniqueMatchIds.length === 0) {
+    return {
+      predictions: [],
+      scorerPredictions: [],
+      boldScorerBets: [],
+      octopusBets: [],
+      octopusStats: [],
+    };
+  }
+
+  const [predictions, scorerPredictions, boldScorerBets, octopusBets] =
+    await Promise.all([
+      prisma.prediction.findMany({
+        where: { userId, matchId: { in: uniqueMatchIds } },
+        select: {
+          matchId: true,
+          predHome: true,
+          predAway: true,
+          isDouble: true,
+          points: true,
+          doubleBonus: true,
+          finishTypePoints: true,
+          penaltyWinnerPoints: true,
+          predictedFinishType: true,
+          predictedPenaltyWinnerTeamId: true,
+        },
+      }),
+      prisma.scorerPrediction.findMany({
+        where: { userId, matchId: { in: uniqueMatchIds } },
+        select: {
+          matchId: true,
+          predictedGoals: true,
+          points: true,
+          playerId: true,
+          player: {
+            select: { id: true, name: true, teamId: true, position: true },
+          },
+        },
+      }),
+      prisma.boldScorerBet.findMany({
+        where: { userId, matchId: { in: uniqueMatchIds }, cancelledAt: null },
+        select: {
+          matchId: true,
+          points: true,
+          playerId: true,
+          player: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.octopusGoalkeeperBet.findMany({
+        where: { userId, matchId: { in: uniqueMatchIds }, cancelledAt: null },
+        select: {
+          matchId: true,
+          points: true,
+          playerId: true,
+          player: { select: { id: true, name: true, teamId: true } },
+        },
+      }),
+    ]);
+
+  const octopusStats =
+    octopusBets.length > 0
+      ? await prisma.matchGoalkeeperStat.findMany({
+          where: {
+            matchId: { in: uniqueMatchIds },
+            playerId: { in: octopusBets.map((bet) => bet.playerId) },
+          },
+          select: { matchId: true, playerId: true, saves: true },
+        })
+      : [];
+
+  return {
+    predictions,
+    scorerPredictions,
+    boldScorerBets,
+    octopusBets,
+    octopusStats,
+  };
+}
+
+async function getUserMatchPredictionRows(userId: string, matchIds: string[]) {
+  const uniqueMatchIds = [...new Set(matchIds)].sort();
+  const matchKey = uniqueMatchIds.join("|");
+
+  try {
+    return await unstable_cache(
+      () => fetchUserMatchPredictionRows(userId, uniqueMatchIds),
+      ["user-match-prediction-rows-v2", userId, matchKey],
+      {
+        revalidate: USER_MATCH_SUMMARY_CACHE_SECONDS,
+        tags: [`matches-user-${userId}`],
+      }
+    )();
+  } catch (error) {
+    if (isMissingNextIncrementalCache(error)) {
+      return fetchUserMatchPredictionRows(userId, uniqueMatchIds);
+    }
+    throw error;
+  }
+}
+
+async function buildUserPredictState(
+  userId: string,
+  matchId: string,
+  roundId: string
+) {
+  const [prediction, scorers, limits] = await Promise.all([
+    prisma.prediction.findUnique({
+      where: { userId_matchId: { userId, matchId } },
+      select: {
+        predHome: true,
+        predAway: true,
+        isDouble: true,
+        predictedFinishType: true,
+        predictedPenaltyWinnerTeamId: true,
+      },
+    }),
+    prisma.scorerPrediction.findMany({
+      where: { userId, matchId },
+      select: { playerId: true, predictedGoals: true },
+    }),
+    getRoundUsageLimits(userId, matchId, roundId),
+  ]);
+
+  return { prediction, scorers, limits };
+}
+
+async function getUserPredictState(
+  userId: string,
+  matchId: string,
+  roundId: string
+) {
+  try {
+    return await unstable_cache(
+      () => buildUserPredictState(userId, matchId, roundId),
+      ["user-predict-state-v1", userId, matchId, roundId],
+      {
+        revalidate: USER_PREDICT_STATE_CACHE_SECONDS,
+        tags: [`matches-user-${userId}`, `match-${matchId}`],
+      }
+    )();
+  } catch (error) {
+    if (isMissingNextIncrementalCache(error)) {
+      return buildUserPredictState(userId, matchId, roundId);
+    }
+    throw error;
+  }
+}
+
 export async function enrichMatchesWithUserPredictions<
   T extends { id: string },
 >(matches: T[], userId?: string) {
@@ -69,67 +231,15 @@ export async function enrichMatchesWithUserPredictions<
   }
 
   const matchIds = matches.map((m) => m.id);
-  
-  // استعلام محسّن: استخدم select محدود بدلاً من تحميل كل المعلومات
-  const [predictions, scorerPredictions, boldScorerBets, octopusBets] =
-    await Promise.all([
-    prisma.prediction.findMany({
-      where: { userId, matchId: { in: matchIds } },
-      select: {
-        matchId: true,
-        predHome: true,
-        predAway: true,
-        isDouble: true,
-        points: true,
-        doubleBonus: true,
-        finishTypePoints: true,
-        penaltyWinnerPoints: true,
-        predictedFinishType: true,
-        predictedPenaltyWinnerTeamId: true,
-      },
-    }),
-    prisma.scorerPrediction.findMany({
-      where: { userId, matchId: { in: matchIds } },
-      select: {
-        matchId: true,
-        predictedGoals: true,
-        points: true,
-        playerId: true,
-        player: {
-          select: { id: true, name: true, teamId: true, position: true },
-        },
-      },
-    }),
-      prisma.boldScorerBet.findMany({
-        where: { userId, matchId: { in: matchIds }, cancelledAt: null },
-        select: {
-          matchId: true,
-          points: true,
-          playerId: true,
-          player: { select: { id: true, name: true } },
-        },
-      }),
-      prisma.octopusGoalkeeperBet.findMany({
-        where: { userId, matchId: { in: matchIds }, cancelledAt: null },
-        select: {
-          matchId: true,
-          points: true,
-          playerId: true,
-          player: { select: { id: true, name: true, teamId: true } },
-        },
-      }),
-    ]);
 
-  const octopusStats =
-    octopusBets.length > 0
-      ? await prisma.matchGoalkeeperStat.findMany({
-          where: {
-            matchId: { in: matchIds },
-            playerId: { in: octopusBets.map((bet) => bet.playerId) },
-          },
-          select: { matchId: true, playerId: true, saves: true },
-        })
-      : [];
+  // استعلام محسّن: استخدم select محدود بدلاً من تحميل كل المعلومات
+  const {
+    predictions,
+    scorerPredictions,
+    boldScorerBets,
+    octopusBets,
+    octopusStats,
+  } = await getUserMatchPredictionRows(userId, matchIds);
   const octopusStatsByMatchPlayer = new Map(
     octopusStats.map((stat) => [
       statKey(stat.matchId, stat.playerId),
@@ -370,34 +480,50 @@ export async function getUserPinnedTodayMatches(
 }
 
 export async function getScheduleMatches(roundId?: string) {
-  const rows = await unstable_cache(
-    () => fetchScheduleMatches(roundId),
-    ["schedule-matches", roundId ?? "all"],
-    { revalidate: 60, tags: ["matches-schedule"] }
-  )();
-  return filterVisibleMatches(dedupeMatches(rows));
+  let rows;
+  try {
+    rows = await unstable_cache(
+      () => fetchScheduleMatches(roundId),
+      ["schedule-matches", roundId ?? "all"],
+      { revalidate: 60, tags: ["matches-schedule"] }
+    )();
+  } catch (error) {
+    if (!isMissingNextIncrementalCache(error)) throw error;
+    rows = await fetchScheduleMatches(roundId);
+  }
+  const matches = filterVisibleMatches(dedupeMatches(rows));
+  primeUsageCachesFromMatches(matches);
+  return matches;
 }
 
 export async function getUpcomingMatches(roundId?: string) {
-  const rows = await unstable_cache(
-    () =>
-      prisma.match.findMany({
-        where: {
-          roundId: roundId ?? undefined,
-          status: { in: ["SCHEDULED", "LIVE"] },
-        },
-        include: {
-          homeTeam: { select: teamSelect },
-          awayTeam: { select: teamSelect },
-          round: { select: { id: true, name: true } },
-        },
-        orderBy: { matchTime: "asc" },
-      }),
-    ["upcoming-match-candidates", roundId ?? "all"],
-    { revalidate: 60, tags: ["matches-schedule"] }
-  )();
+  const fetchRows = () =>
+    prisma.match.findMany({
+      where: {
+        roundId: roundId ?? undefined,
+        status: { in: ["SCHEDULED", "LIVE"] },
+      },
+      include: {
+        homeTeam: { select: teamSelect },
+        awayTeam: { select: teamSelect },
+        round: { select: { id: true, name: true } },
+      },
+      orderBy: { matchTime: "asc" },
+    });
+  let rows;
+  try {
+    rows = await unstable_cache(
+      fetchRows,
+      ["upcoming-match-candidates", roundId ?? "all"],
+      { revalidate: 60, tags: ["matches-schedule"] }
+    )();
+  } catch (error) {
+    if (!isMissingNextIncrementalCache(error)) throw error;
+    rows = await fetchRows();
+  }
   const now = Date.now();
   const deduped = filterVisibleMatches(dedupeMatches(rows));
+  primeUsageCachesFromMatches(deduped);
 
   return deduped.filter((match) => {
     if (match.status !== "SCHEDULED" && match.status !== "LIVE") return false;
@@ -410,45 +536,62 @@ export async function getUpcomingMatches(roundId?: string) {
 }
 
 export async function getCompletedMatches(roundId?: string) {
-  const rows = await unstable_cache(
-    () =>
-      (async () => {
-        const rows = await prisma.match.findMany({
-          where: {
-            roundId: roundId ?? undefined,
-            status: "FINISHED",
-          },
-          include: {
-            homeTeam: { select: teamSelect },
-            awayTeam: { select: teamSelect },
-            round: { select: { id: true, name: true } },
-          },
-          orderBy: { matchTime: "desc" },
-        });
-        return dedupeMatches(rows);
-      })(),
-    ["completed-matches", roundId ?? "all"],
-    { revalidate: 60, tags: ["matches-schedule"] }
-  )();
-  return filterVisibleMatches(rows);
+  const fetchRows = async () => {
+    const rows = await prisma.match.findMany({
+      where: {
+        roundId: roundId ?? undefined,
+        status: "FINISHED",
+      },
+      include: {
+        homeTeam: { select: teamSelect },
+        awayTeam: { select: teamSelect },
+        round: { select: { id: true, name: true } },
+      },
+      orderBy: { matchTime: "desc" },
+    });
+    return dedupeMatches(rows);
+  };
+  let rows;
+  try {
+    rows = await unstable_cache(
+      fetchRows,
+      ["completed-matches", roundId ?? "all"],
+      { revalidate: 60, tags: ["matches-schedule"] }
+    )();
+  } catch (error) {
+    if (!isMissingNextIncrementalCache(error)) throw error;
+    rows = await fetchRows();
+  }
+  const matches = filterVisibleMatches(rows);
+  primeUsageCachesFromMatches(matches);
+  return matches;
 }
 
 export async function getAllMatches(roundId?: string) {
-  const rows = await unstable_cache(
-    () =>
-      prisma.match.findMany({
-        where: { roundId: roundId ?? undefined },
-        include: {
-          homeTeam: { select: teamSelect },
-          awayTeam: { select: teamSelect },
-          round: { select: { id: true, name: true } },
-        },
-        orderBy: { matchTime: "asc" },
-      }),
-    ["all-matches", roundId ?? "all"],
-    { revalidate: 60, tags: ["matches-schedule"] }
-  )();
-  return filterVisibleMatches(dedupeMatches(rows));
+  const fetchRows = () =>
+    prisma.match.findMany({
+      where: { roundId: roundId ?? undefined },
+      include: {
+        homeTeam: { select: teamSelect },
+        awayTeam: { select: teamSelect },
+        round: { select: { id: true, name: true } },
+      },
+      orderBy: { matchTime: "asc" },
+    });
+  let rows;
+  try {
+    rows = await unstable_cache(
+      fetchRows,
+      ["all-matches", roundId ?? "all"],
+      { revalidate: 60, tags: ["matches-schedule"] }
+    )();
+  } catch (error) {
+    if (!isMissingNextIncrementalCache(error)) throw error;
+    rows = await fetchRows();
+  }
+  const matches = filterVisibleMatches(dedupeMatches(rows));
+  primeUsageCachesFromMatches(matches);
+  return matches;
 }
 
 const matchLineupCache = new Map<
@@ -458,6 +601,7 @@ const matchLineupCache = new Map<
 const MATCH_LINEUP_CACHE_MS = 5 * 60 * 1000;
 const MATCH_LINEUP_SHARED_CACHE_SECONDS = 5 * 60;
 const MATCH_SHELL_REVALIDATE_SECONDS = 60;
+const MATCH_SHELL_MEMORY_CACHE_MS = 60 * 1000;
 
 async function fetchMatchShell(matchId: string) {
   return prisma.match.findUnique({
@@ -468,18 +612,153 @@ async function fetchMatchShell(matchId: string) {
       status: true,
       isKnockout: true,
       roundId: true,
+      homeTeamId: true,
+      awayTeamId: true,
+      stageName: true,
+      groupCode: true,
       homeTeam: { select: teamSelect },
       awayTeam: { select: teamSelect },
+      round: { select: { name: true } },
     },
   });
 }
 
-function getCachedMatchShell(matchId: string) {
-  return unstable_cache(
-    () => fetchMatchShell(matchId),
-    ["match-shell-v2", matchId],
-    { revalidate: MATCH_SHELL_REVALIDATE_SECONDS, tags: [`match-${matchId}`] }
-  )();
+function toUsageMatch(match: {
+  id: string;
+  roundId: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  matchTime: Date | string;
+  stageName: string | null;
+  groupCode: string | null;
+  homeTeam?: { name: string } | null;
+  awayTeam?: { name: string } | null;
+  round?: { name: string } | null;
+}): UsageMatch {
+  return {
+    id: match.id,
+    roundId: match.roundId,
+    homeTeamId: match.homeTeamId,
+    awayTeamId: match.awayTeamId,
+    matchTime: match.matchTime,
+    stageName: match.stageName,
+    groupCode: match.groupCode,
+    homeTeam: { name: match.homeTeam?.name ?? match.homeTeamId },
+    awayTeam: { name: match.awayTeam?.name ?? match.awayTeamId },
+    round: { name: match.round?.name ?? "" },
+  };
+}
+
+function primeUsageCachesFromMatches(
+  matches: {
+    id: string;
+    roundId: string;
+    homeTeamId: string;
+    awayTeamId: string;
+    matchTime: Date | string;
+    status?: MatchStatus;
+    isKnockout?: boolean;
+    stageName: string | null;
+    groupCode: string | null;
+    homeTeam?: {
+      id?: string;
+      name: string;
+      shortName?: string;
+      logoUrl?: string | null;
+    } | null;
+    awayTeam?: {
+      id?: string;
+      name: string;
+      shortName?: string;
+      logoUrl?: string | null;
+    } | null;
+    round?: { name: string } | null;
+  }[]
+) {
+  const byRound = new Map<string, UsageMatch[]>();
+  for (const match of matches) {
+    const usageMatch = toUsageMatch(match);
+    const roundMatches = byRound.get(match.roundId) ?? [];
+    roundMatches.push(usageMatch);
+    byRound.set(match.roundId, roundMatches);
+    if (
+      match.status &&
+      typeof match.isKnockout === "boolean" &&
+      match.homeTeam?.shortName &&
+      match.awayTeam?.shortName
+    ) {
+      matchShellMemoryCache.set(match.id, {
+        data: {
+          id: match.id,
+          matchTime: match.matchTime instanceof Date
+            ? match.matchTime
+            : new Date(match.matchTime),
+          status: match.status,
+          isKnockout: match.isKnockout,
+          roundId: match.roundId,
+          homeTeamId: match.homeTeamId,
+          awayTeamId: match.awayTeamId,
+          stageName: match.stageName,
+          groupCode: match.groupCode,
+          homeTeam: {
+            id: match.homeTeam.id ?? match.homeTeamId,
+            name: match.homeTeam.name,
+            shortName: match.homeTeam.shortName,
+            logoUrl: match.homeTeam.logoUrl ?? null,
+          },
+          awayTeam: {
+            id: match.awayTeam.id ?? match.awayTeamId,
+            name: match.awayTeam.name,
+            shortName: match.awayTeam.shortName,
+            logoUrl: match.awayTeam.logoUrl ?? null,
+          },
+          round: { name: match.round?.name ?? "" },
+        },
+        expiresAt: Date.now() + MATCH_SHELL_MEMORY_CACHE_MS,
+      });
+    }
+  }
+  for (const [roundId, roundMatches] of byRound) {
+    primeUsageRoundMatchesCache(roundId, roundMatches);
+  }
+}
+
+const matchShellMemoryCache = new Map<
+  string,
+  { data: Awaited<ReturnType<typeof fetchMatchShell>>; expiresAt: number }
+>();
+
+async function getCachedMatchShell(matchId: string) {
+  const memory = matchShellMemoryCache.get(matchId);
+  if (memory && memory.expiresAt > Date.now()) {
+    return memory.data;
+  }
+  if (memory) {
+    matchShellMemoryCache.delete(matchId);
+  }
+
+  try {
+    const match = await unstable_cache(
+      () => fetchMatchShell(matchId),
+      ["match-shell-v2", matchId],
+      { revalidate: MATCH_SHELL_REVALIDATE_SECONDS, tags: [`match-${matchId}`] }
+    )();
+    matchShellMemoryCache.set(matchId, {
+      data: match,
+      expiresAt: Date.now() + MATCH_SHELL_MEMORY_CACHE_MS,
+    });
+    return match;
+  } catch (error) {
+    if (isMissingNextIncrementalCache(error)) {
+      const match = await fetchMatchShell(matchId);
+      matchShellMemoryCache.set(matchId, {
+        data: match,
+        expiresAt: Date.now() + MATCH_SHELL_MEMORY_CACHE_MS,
+      });
+      return match;
+    }
+    throw error;
+  }
 }
 
 async function fetchMatchDetailBase(matchId: string) {
@@ -690,6 +969,24 @@ export function prewarmFastMatchLineups(matchIds: string[]) {
   }, 0);
 }
 
+function prewarmFullMatchLineup(matchId: string) {
+  setTimeout(() => {
+    void (async () => {
+      try {
+        const data = await getCachedFullMatchLineup(matchId);
+        if (data) {
+          matchLineupCache.set(matchId, {
+            data,
+            expiresAt: Date.now() + MATCH_LINEUP_CACHE_MS,
+          });
+        }
+      } catch {
+        // Background warming is best-effort only.
+      }
+    })();
+  }, 0);
+}
+
 export function clearMatchLineupMemoryCache(matchId: string) {
   matchLineupCache.delete(matchId);
 }
@@ -729,6 +1026,12 @@ export async function getMatchLineup(
     return hit.data;
   }
 
+  const fast = await getCachedFastMatchLineup(matchId).catch(() => null);
+  if (fast) {
+    prewarmFullMatchLineup(matchId);
+    return fast;
+  }
+
   let data: Awaited<ReturnType<typeof buildMatchLineup>> = null;
   try {
     data = await getCachedFullMatchLineup(matchId);
@@ -754,6 +1057,29 @@ export async function getMatchLineup(
 export async function getMatchByIdForPredict(matchId: string, userId?: string) {
   const match = await getCachedMatchShell(matchId);
   if (!match) return null;
+  setPredictionMatchMetaCache({
+    id: match.id,
+    roundId: match.roundId,
+    homeTeamId: match.homeTeamId,
+    awayTeamId: match.awayTeamId,
+    matchTime: match.matchTime,
+    status: match.status,
+    isKnockout: match.isKnockout,
+    homeTeam: { shortName: match.homeTeam.shortName },
+    awayTeam: { shortName: match.awayTeam.shortName },
+  });
+  primeUsageMatchCache({
+    id: match.id,
+    roundId: match.roundId,
+    homeTeamId: match.homeTeamId,
+    awayTeamId: match.awayTeamId,
+    matchTime: match.matchTime,
+    stageName: match.stageName,
+    groupCode: match.groupCode,
+    homeTeam: { name: match.homeTeam.name },
+    awayTeam: { name: match.awayTeam.name },
+    round: { name: match.round.name },
+  });
 
   let userPrediction = null;
   let userScorerPredictions: { playerId: string; predictedGoals: number }[] = [];
@@ -764,23 +1090,11 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
   let roundUsageLimits = null;
 
   if (userId) {
-    const [prediction, scorers, limits] = await Promise.all([
-      prisma.prediction.findUnique({
-        where: { userId_matchId: { userId, matchId } },
-        select: {
-          predHome: true,
-          predAway: true,
-          isDouble: true,
-          predictedFinishType: true,
-          predictedPenaltyWinnerTeamId: true,
-        },
-      }),
-      prisma.scorerPrediction.findMany({
-        where: { userId, matchId },
-        select: { playerId: true, predictedGoals: true },
-      }),
-      getRoundUsageLimits(userId, matchId, match.roundId),
-    ]);
+    const { prediction, scorers, limits } = await getUserPredictState(
+      userId,
+      matchId,
+      match.roundId
+    );
     const boldStatus = limits.boldScorer;
     const octopusStatus = limits.octopus;
     userPrediction = prediction;
@@ -814,13 +1128,6 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
     }
   }
 
-  const [octopusCount, predictionsCount, doublesCount, boldCount] = await Promise.all([
-    prisma.octopusGoalkeeperBet.count({ where: { matchId, cancelledAt: null } }),
-    prisma.prediction.count({ where: { matchId } }),
-    prisma.prediction.count({ where: { matchId, isDouble: true } }),
-    prisma.boldScorerBet.count({ where: { matchId, cancelledAt: null } }),
-  ]);
-
   const baseResult = {
     ...match,
     userPrediction,
@@ -830,25 +1137,7 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
     boldScorerRoundStatus,
     octopusRoundStatus,
     roundUsageLimits,
-    octopusCount,
-    predictionsCount,
-    doublesCount,
-    boldCount,
   };
-
-  // If a user is present, include a lightweight fast lineup so the client
-  // can show predicted player names and enable interaction immediately
-  // while the full lineup is fetched in the background.
-  if (userId) {
-    try {
-      const fastLineup = await getCachedFastMatchLineup(matchId);
-      if (fastLineup) {
-        return { ...baseResult, ...fastLineup };
-      }
-    } catch {
-      // best-effort only; fallthrough to baseResult
-    }
-  }
 
   return baseResult;
 }
@@ -1021,6 +1310,17 @@ export async function updateMatchResult(
     scorerPlayerIds?: string[];
   }
 ) {
+  const current = await prisma.match.findUniqueOrThrow({
+    where: { id: matchId },
+    select: { status: true, isKnockout: true },
+  });
+  const effectiveStatus = data.status ?? current.status;
+  const effectiveIsKnockout = data.isKnockout ?? current.isKnockout;
+  const nextActualFinishType =
+    data.actualFinishType ??
+    (effectiveStatus === "FINISHED" && effectiveIsKnockout
+      ? "NINETY_MINUTES"
+      : data.actualFinishType);
   const match = await prisma.match.update({
     where: { id: matchId },
     data: {
@@ -1028,7 +1328,7 @@ export async function updateMatchResult(
       awayScore: data.awayScore,
       status: data.status,
       isKnockout: data.isKnockout,
-      actualFinishType: data.actualFinishType,
+      actualFinishType: nextActualFinishType,
       penaltyWinnerTeamId: data.penaltyWinnerTeamId,
     },
     include: {
@@ -1037,6 +1337,8 @@ export async function updateMatchResult(
       round: true,
     },
   });
+  matchShellMemoryCache.delete(matchId);
+  clearPredictionMatchMetaCache(matchId);
 
   if (data.scorerPlayerIds) {
     await prisma.matchScorer.deleteMany({ where: { matchId } });
@@ -1078,19 +1380,36 @@ export async function getRounds() {
   )();
 }
 
+function isMissingNextIncrementalCache(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("incrementalCache missing")
+  );
+}
+
+function fetchTournamentRound() {
+  return prisma.round.findFirst({
+    where: { name: getTournamentRoundName() },
+    orderBy: { startsAt: "desc" },
+    include: { _count: { select: { matches: true } } },
+  });
+}
+
 const getCachedTournamentRound = unstable_cache(
-  async () =>
-    prisma.round.findFirst({
-      where: { name: getTournamentRoundName() },
-      orderBy: { startsAt: "desc" },
-      include: { _count: { select: { matches: true } } },
-    }),
+  fetchTournamentRound,
   ["tournament-round"],
   { revalidate: 300 }
 );
 
 export async function getTournamentRound() {
-  return getCachedTournamentRound();
+  try {
+    return await getCachedTournamentRound();
+  } catch (error) {
+    if (isMissingNextIncrementalCache(error)) {
+      return fetchTournamentRound();
+    }
+    throw error;
+  }
 }
 
 /** جولات فرعية داخل بطولة الاستراحة — ليست الجولة الرئيسية */

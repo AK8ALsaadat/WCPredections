@@ -5,7 +5,6 @@ export async function GET() {
   try {
     const leaderboard = await getOverallLeaderboard({
       withTrend: false,
-      fresh: true,
     });
     return apiSuccess(leaderboard, 200, {
       headers: {

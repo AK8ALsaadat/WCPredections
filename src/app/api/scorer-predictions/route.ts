@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/session";
 import { getPredictionLockReason } from "@/lib/utils";
 import { parseBody, scorerPredictionSchema } from "@/lib/validations";
 import { submitScorerPredictions } from "@/services/prediction.service";
+import { revalidateTag } from "next/cache";
 
 export async function POST(request: Request) {
   try {
@@ -45,6 +46,12 @@ export async function DELETE(request: Request) {
     await prisma.scorerPrediction.deleteMany({
       where: { userId: user.userId, matchId },
     });
+    try {
+      revalidateTag(`matches-user-${user.userId}`);
+      revalidateTag(`match-${matchId}`);
+    } catch {
+      // Background/test contexts may not have a Next cache store.
+    }
 
     return apiSuccess({ message: "Scorer predictions cleared" });
   } catch (error) {

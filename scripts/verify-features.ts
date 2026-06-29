@@ -116,6 +116,14 @@ ok(
     { predictedGoals: 1, actualGoals: 1 },
   ]) === 0
 );
+ok(
+  "perfect bonus requires correct finish type when enforced",
+  calculatePerfectPredictionBonus(
+    true,
+    [{ predictedGoals: 1, actualGoals: 1 }],
+    { finishTypeCorrect: false }
+  ) === 0
+);
 
 console.log("\n=== نقاط الإقصائي ===");
 ok(
@@ -128,6 +136,10 @@ ok(
 );
 ok(
   "finish type ninety minutes = 1",
+  calculateFinishTypePoints("NINETY_MINUTES", "NINETY_MINUTES") === 1
+);
+ok(
+  "finish type point is independent from score correctness",
   calculateFinishTypePoints("NINETY_MINUTES", "NINETY_MINUTES") === 1
 );
 ok(
@@ -214,6 +226,31 @@ ok(
   "stale penalty winner is hidden unless penalties were predicted",
   !stalePenaltyBreakdown.lines.some((line) => line.id === "penalty")
 );
+const wrongScoreRightFinishBreakdown = buildMatchPointsBreakdown({
+  homeScore: 2,
+  awayScore: 1,
+  isKnockout: true,
+  actualFinishType: "NINETY_MINUTES",
+  homeTeamName: "home",
+  awayTeamName: "away",
+  userPrediction: {
+    predHome: 0,
+    predAway: 0,
+    isDouble: false,
+    points: 0,
+    doubleBonus: 0,
+    finishTypePoints: 1,
+    penaltyWinnerPoints: 0,
+    predictedFinishType: "NINETY_MINUTES",
+  },
+}, ar);
+ok(
+  "finish type appears in breakdown even when score is wrong",
+  wrongScoreRightFinishBreakdown.total === 1 &&
+    wrongScoreRightFinishBreakdown.lines.some(
+      (line) => line.id === "finish-type" && line.points === 1
+    )
+);
 
 console.log("\n=== بونص التوقع المثالي ضمن تفصيل المباراة ===");
 const perfectBreakdown = buildMatchPointsBreakdown({
@@ -248,6 +285,31 @@ ok(
 ok(
   "بند النتيجة = 2 (5 - بونص 3)",
   perfectBreakdown.lines.find((l) => l.id === "score")?.points === 2
+);
+const wrongFinishPerfectBreakdown = buildMatchPointsBreakdown({
+  homeScore: 1,
+  awayScore: 0,
+  isKnockout: true,
+  actualFinishType: "EXTRA_TIME",
+  homeTeamName: "A",
+  awayTeamName: "B",
+  userPrediction: {
+    predHome: 1,
+    predAway: 0,
+    isDouble: false,
+    points: 5,
+    doubleBonus: 0,
+    finishTypePoints: 0,
+    penaltyWinnerPoints: 0,
+    predictedFinishType: "NINETY_MINUTES",
+  },
+  userScorerPredictions: [
+    { predictedGoals: 1, points: 1, player: { name: "X" } },
+  ],
+}, ar);
+ok(
+  "wrong finish type blocks perfect bonus in breakdown",
+  !wrongFinishPerfectBreakdown.lines.some((line) => line.id === "perfect-bonus")
 );
 ok(
   "getMatchTotalUserPoints",
@@ -356,7 +418,15 @@ ok(
 );
 
 console.log("\n=== حدود الجولة ===");
-ok("مضاعفة: حد أقصى 2 لكل جولة", MAX_DOUBLES_PER_ROUND === 2);
+ok("مضاعفة: الحد العام الحالي مرة واحدة", MAX_DOUBLES_PER_ROUND === 1);
+ok(
+  "group gameweek allows two doubles",
+  getMaxDoublesForUsageScope("wc:group-gameweek:1") === 2
+);
+ok(
+  "round of 32 allows one double",
+  getMaxDoublesForUsageScope("wc:stage:round-of-32") === 1
+);
 ok("البطاقة الجريئة: مرة واحدة لكل جولة", MAX_BOLD_SCORER_BETS_PER_ROUND === 1);
 ok(
   "round of 16 allows one double",

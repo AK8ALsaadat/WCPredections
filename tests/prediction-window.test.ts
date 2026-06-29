@@ -5,7 +5,17 @@ import { shouldShowMatchInUpcomingList } from "../src/lib/tournament-gates";
 
 test("allows predictions for today and tomorrow matches before kickoff lock", () => {
   const todayMatch = new Date(Date.now() + 2 * 60 * 60 * 1000);
-  const tomorrowMatch = new Date(Date.now() + 26 * 60 * 60 * 1000);
+  const riyadhNow = new Date(Date.now() + 3 * 60 * 60 * 1000);
+  const tomorrowMatch = new Date(
+    Date.UTC(
+      riyadhNow.getUTCFullYear(),
+      riyadhNow.getUTCMonth(),
+      riyadhNow.getUTCDate() + 1,
+      12 - 3,
+      0,
+      0
+    )
+  );
   const farFutureMatch = new Date(Date.now() + 80 * 60 * 60 * 1000);
   const lockedMatch = new Date(Date.now() + 5 * 60 * 1000);
 

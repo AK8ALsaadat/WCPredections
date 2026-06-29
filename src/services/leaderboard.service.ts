@@ -14,6 +14,13 @@ const LB_CACHE_SECONDS = 300;
 // Riyadh timezone offset (UTC+3) used for day boundaries and night window logic
 const RIYADH_OFFSET_MS = 3 * 60 * 60 * 1000;
 
+function isMissingNextIncrementalCache(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("incrementalCache missing")
+  );
+}
+
 type PointsFilter = {
   roundId?: string;
   roundIds?: string[];
@@ -480,14 +487,21 @@ export async function getOverallLeaderboard(options?: {
     return buildOverallLeaderboard(withTrend);
   }
 
-  return unstable_cache(
-    () => buildOverallLeaderboard(withTrend),
-    ["overall-leaderboard", withTrend ? "trend" : "plain"],
-    {
-      revalidate: isNowInNightWindow() ? 30 : LB_CACHE_SECONDS,
-      tags: ["leaderboard-overall"],
+  try {
+    return await unstable_cache(
+      () => buildOverallLeaderboard(withTrend),
+      ["overall-leaderboard", withTrend ? "trend" : "plain"],
+      {
+        revalidate: isNowInNightWindow() ? 30 : LB_CACHE_SECONDS,
+        tags: ["leaderboard-overall"],
+      }
+    )();
+  } catch (error) {
+    if (isMissingNextIncrementalCache(error)) {
+      return buildOverallLeaderboard(withTrend);
     }
-  )();
+    throw error;
+  }
 }
 
 export async function getRoundLeaderboard(
@@ -498,11 +512,18 @@ export async function getRoundLeaderboard(
     return buildRoundLeaderboard(roundId);
   }
 
-  return unstable_cache(
-    () => buildRoundLeaderboard(roundId),
-    ["round-leaderboard", roundId],
-    { revalidate: LB_CACHE_SECONDS, tags: [`leaderboard-round-${roundId}`] }
-  )();
+  try {
+    return await unstable_cache(
+      () => buildRoundLeaderboard(roundId),
+      ["round-leaderboard", roundId],
+      { revalidate: LB_CACHE_SECONDS, tags: [`leaderboard-round-${roundId}`] }
+    )();
+  } catch (error) {
+    if (isMissingNextIncrementalCache(error)) {
+      return buildRoundLeaderboard(roundId);
+    }
+    throw error;
+  }
 }
 
 export function computeRoundAveragePoints(

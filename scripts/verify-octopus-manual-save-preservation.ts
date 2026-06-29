@@ -67,7 +67,7 @@ async function main() {
     });
     created.matchId = match.id;
 
-    const [manualKeeper, apiKeeper] = await prisma.player.createManyAndReturn({
+    const [manualKeeper, apiKeeper, unmarkedKeeper] = await prisma.player.createManyAndReturn({
       data: [
         {
           teamId: home.id,
@@ -81,10 +81,16 @@ async function main() {
           name: "QA Api Keeper",
           position: "Goalkeeper",
         },
+        {
+          teamId: away.id,
+          apiPlayerId: `${tag}-unmarked-keeper`,
+          name: "QA Unmarked Keeper",
+          position: null,
+        },
       ],
       select: { id: true, name: true, apiPlayerId: true },
     });
-    created.playerIds.push(manualKeeper.id, apiKeeper.id);
+    created.playerIds.push(manualKeeper.id, apiKeeper.id, unmarkedKeeper.id);
 
     await prisma.matchGoalkeeperStat.create({
       data: {
@@ -123,6 +129,13 @@ async function main() {
           teamName: away.name,
           saves: 2,
         },
+        {
+          playerApiId: unmarkedKeeper.apiPlayerId!,
+          playerName: unmarkedKeeper.name,
+          teamApiId: away.apiTeamId!,
+          teamName: away.name,
+          saves: 4,
+        },
       ],
       {
         matchTime: match.matchTime,
@@ -132,9 +145,9 @@ async function main() {
       }
     );
 
-    assert(count === 2, "replaceGoalkeeperSaves should resolve both API keepers");
+    assert(count === 3, "replaceGoalkeeperSaves should resolve all API keepers");
 
-    const [manualStat, apiStat, bet] = await Promise.all([
+    const [manualStat, apiStat, unmarkedStat, unmarkedPlayer, bet] = await Promise.all([
       prisma.matchGoalkeeperStat.findUnique({
         where: {
           matchId_playerId: { matchId: match.id, playerId: manualKeeper.id },
@@ -144,6 +157,15 @@ async function main() {
         where: {
           matchId_playerId: { matchId: match.id, playerId: apiKeeper.id },
         },
+      }),
+      prisma.matchGoalkeeperStat.findUnique({
+        where: {
+          matchId_playerId: { matchId: match.id, playerId: unmarkedKeeper.id },
+        },
+      }),
+      prisma.player.findUnique({
+        where: { id: unmarkedKeeper.id },
+        select: { position: true },
       }),
       prisma.octopusGoalkeeperBet.findFirst({
         where: { userId: user.id, matchId: match.id },
@@ -156,6 +178,14 @@ async function main() {
       "manual source must be preserved"
     );
     assert(apiStat?.saves === 2, "API keeper saves should still be stored");
+    assert(
+      unmarkedStat?.saves === 4,
+      "unmarked goalkeeper saves should be stored"
+    );
+    assert(
+      unmarkedPlayer?.position === "Goalkeeper",
+      "unmarked goalkeeper should be marked as goalkeeper"
+    );
     assert(bet?.points === 4, "octopus points should stay based on manual saves");
 
     console.log("Octopus manual save preservation passed.");

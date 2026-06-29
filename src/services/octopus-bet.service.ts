@@ -22,6 +22,15 @@ import {
 
 export { calculateOctopusPoints, getOctopusConcededCapPoints, OCTOPUS_POINTS };
 
+function revalidateUserMatchSummary(userId: string, matchId: string) {
+  try {
+    revalidateTag(`matches-user-${userId}`);
+    revalidateTag(`match-${matchId}`);
+  } catch {
+    // Background/test contexts may not have a Next cache store.
+  }
+}
+
 type MatchForGoalkeeperStats = {
   matchTime?: Date | null;
   roundId?: string;
@@ -89,12 +98,13 @@ export async function replaceGoalkeeperSaves(
   if (!match) throw new Error("Match not found");
 
   const resolved = new Map<string, { playerId: string; saves: number }>();
+  const matchTeamIds = [match.homeTeam.id, match.awayTeam.id];
 
   for (const { playerApiId, playerName, teamApiId, teamName, saves } of apiStats) {
     if (saves < 0) continue;
 
     let player = await prisma.player.findFirst({
-      where: { apiPlayerId: playerApiId },
+      where: { apiPlayerId: playerApiId, teamId: { in: matchTeamIds } },
       select: { id: true, name: true, position: true },
     });
 
@@ -131,6 +141,17 @@ export async function replaceGoalkeeperSaves(
             },
             select: { id: true, name: true, position: true },
           }));
+      }
+    }
+
+    if (player && !isGoalkeeperPosition(player.position)) {
+      const hasNoPosition = !player.position?.trim();
+      if (hasNoPosition || saves > 0) {
+        await prisma.player.update({
+          where: { id: player.id },
+          data: { position: "Goalkeeper" },
+        });
+        player = { ...player, position: "Goalkeeper" };
       }
     }
 
@@ -322,6 +343,9 @@ export async function calculateOctopusPointsForMatch(matchId: string) {
     revalidateTag("leaderboard-overall");
     revalidateTag(`match-${matchId}`);
     if (match.roundId) revalidateTag(`leaderboard-round-${match.roundId}`);
+    for (const userId of new Set(bets.map((bet) => bet.userId))) {
+      revalidateTag(`matches-user-${userId}`);
+    }
   } catch (err) {
     console.warn(
       "[revalidate] skipped due to missing store:",
@@ -437,6 +461,7 @@ export async function submitOctopusBet(
     if (!existing || existing.matchId !== matchId) return null;
 
     await prisma.octopusGoalkeeperBet.delete({ where: { id: existing.id } });
+    revalidateUserMatchSummary(userId, matchId);
     return null;
   }
 
@@ -471,7 +496,7 @@ export async function submitOctopusBet(
     throw new Error("اختيار الحارس غير صالح للأخطبوط");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const bet = await prisma.$transaction(async (tx) => {
     if (prediction?.isDouble) {
       await tx.prediction.update({
         where: { id: prediction.id },
@@ -503,4 +528,6 @@ export async function submitOctopusBet(
       },
     });
   });
+  revalidateUserMatchSummary(userId, matchId);
+  return bet;
 }
