@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -60,6 +62,52 @@ function ChampionBadge({ name }: { name: string }) {
       <span className="text-amber-200">البطل المتوقع</span>
       <span className="text-foreground">{name}</span>
     </span>
+  );
+}
+
+function TeamLogo({
+  team,
+  className = "h-12 w-12",
+}: {
+  team: TeamRef | null;
+  className?: string;
+}) {
+  const label = team?.shortName || team?.name?.slice(0, 3) || "--";
+
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-background/70 text-xs font-black text-muted shadow-inner ${className}`}
+    >
+      {team?.logoUrl ? (
+        <img
+          src={team.logoUrl}
+          alt={team.name}
+          className="h-full w-full object-contain p-1.5"
+        />
+      ) : (
+        <span>{label}</span>
+      )}
+    </span>
+  );
+}
+
+function FinalistTile({
+  team,
+  label,
+}: {
+  team: TeamRef | null;
+  label: string;
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-background/45 px-3 py-3">
+      <p className="text-[10px] font-bold text-muted">{label}</p>
+      <div className="mt-2 flex items-center gap-3">
+        <TeamLogo team={team} />
+        <p className="min-w-0 truncate text-sm font-black text-foreground">
+          {team?.name ?? "لم يتم الاختيار"}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -212,46 +260,66 @@ export function KnockoutBracketPredictionCard() {
   const hasTeams = (status?.finalistCandidates.length ?? 0) > 1;
   const disabled = loading || saving || status?.locked || !hasTeams;
   const countdown = formatCountdown(status?.deadline ?? null, now);
+  const selectedFinalistOne =
+    status?.finalistCandidates.find((team) => team.id === finalistOneTeamId) ??
+    status?.prediction?.finalistOneTeam ??
+    null;
+  const selectedFinalistTwo =
+    status?.finalistCandidates.find((team) => team.id === finalistTwoTeamId) ??
+    status?.prediction?.finalistTwoTeam ??
+    null;
+  const selectedChampion =
+    status?.finalistCandidates.find((team) => team.id === championTeamId) ??
+    status?.prediction?.championTeam ??
+    null;
 
   return (
-    <section className="rounded-lg border border-primary/35 bg-gradient-to-l from-primary/10 via-card to-card p-4 shadow-sm">
-      <div className="mb-4 grid gap-3 md:grid-cols-2">
-        <div className="rounded-lg border border-primary/35 bg-primary/10 px-4 py-3 text-sm text-primary">
-          <p className="font-black">توقع طرفي النهائي والبطل</p>
-          <p className="mt-1 text-primary/90">
-            يقفل مع مباراة البرازيل الساعة 8:00 مساء. كل طرف نهائي صحيح +3،
-            والبطل الصحيح +10 وتضاف للترتيب العام.
-          </p>
-        </div>
-        <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
-          <p className="font-black">نظام المضاعفة والرهان</p>
-          <p className="mt-1">
-            دور 16: مضاعفة واحدة فقط. من ربع النهائي: تقدر تجمع مضاعفة واحدة
-            مع الرهان؛ إذا كان الرهان على مباراة مضاعفة يصير +10 إذا صح و-10 إذا خطأ،
-            وبدون المضاعفة يبقى +5 / -5.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="text-end">
+    <section className="overflow-hidden rounded-lg border border-amber-300/35 bg-gradient-to-l from-amber-500/12 via-card to-card p-4 shadow-[0_18px_55px_rgba(0,0,0,0.28)] md:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
+        <div className="flex-1 text-end">
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="rounded-lg border border-primary/40 bg-background/60 px-3 py-1.5 text-sm font-black tabular-nums text-primary">
+            <span className="rounded-lg border border-amber-300/45 bg-background/70 px-3 py-1.5 text-sm font-black tabular-nums text-amber-200 shadow-inner">
               {countdown}
             </span>
-            <p className="text-xs font-black uppercase tracking-wider text-primary">
+            <p className="text-xs font-black uppercase tracking-wider text-amber-200">
               توقع النهائي
             </p>
           </div>
-          <h2 className="mt-2 text-lg font-black text-foreground">
-            اختر طرفي النهائي والبطل
+          <h2 className="mt-2 text-xl font-black text-foreground">
+            طرفا النهائي والبطل
           </h2>
           <p className="mt-1 text-sm text-muted">
-            الديدلاين {formatDeadline(status?.deadline ?? null)} بتوقيت الرياض. كل طرف نهائي صحيح +3، والبطل الصحيح +10.
+            الديدلاين {formatDeadline(status?.deadline ?? null)} بتوقيت الرياض
           </p>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <FinalistTile team={selectedFinalistOne} label="طرف النهائي" />
+            <span className="mx-auto hidden rounded-lg border border-card-border bg-background/60 px-3 py-2 text-xs font-black text-muted sm:block">
+              VS
+            </span>
+            <FinalistTile team={selectedFinalistTwo} label="طرف النهائي" />
+          </div>
+
+          <div className="mt-3 rounded-lg border border-amber-300/35 bg-amber-400/10 px-3 py-3">
+            <div className="flex items-center justify-end gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-amber-200">
+                  البطل المتوقع
+                </p>
+                <p className="mt-1 truncate text-lg font-black text-foreground">
+                  {selectedChampion?.name ?? "لم يتم الاختيار"}
+                </p>
+              </div>
+              <TeamLogo team={selectedChampion} className="h-14 w-14" />
+              <ChampionCrownIcon className="h-7 w-7 shrink-0 text-amber-200" />
+            </div>
+          </div>
         </div>
 
-        <form onSubmit={handleSave} className="grid w-full gap-3 lg:max-w-xl">
+        <form
+          onSubmit={handleSave}
+          className="grid w-full content-between gap-3 rounded-lg border border-white/10 bg-background/35 p-3 lg:max-w-xl"
+        >
           <div className="grid gap-3 sm:grid-cols-3">
             <Select
               label="طرف النهائي الأول"

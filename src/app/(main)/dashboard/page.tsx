@@ -185,12 +185,18 @@ export default async function DashboardPage() {
               ? {
                   finalistOneTeam: {
                     name: finalistsStatus.prediction.finalistOneTeam.name,
+                    shortName: finalistsStatus.prediction.finalistOneTeam.shortName,
+                    logoUrl: finalistsStatus.prediction.finalistOneTeam.logoUrl,
                   },
                   finalistTwoTeam: {
                     name: finalistsStatus.prediction.finalistTwoTeam.name,
+                    shortName: finalistsStatus.prediction.finalistTwoTeam.shortName,
+                    logoUrl: finalistsStatus.prediction.finalistTwoTeam.logoUrl,
                   },
                   championTeam: {
                     name: finalistsStatus.prediction.championTeam.name,
+                    shortName: finalistsStatus.prediction.championTeam.shortName,
+                    logoUrl: finalistsStatus.prediction.championTeam.logoUrl,
                   },
                   totalPoints: finalistsStatus.prediction.totalPoints,
                 }

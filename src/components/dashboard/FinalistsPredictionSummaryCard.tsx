@@ -1,11 +1,15 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 
 type TeamRef = {
   name: string;
+  shortName?: string | null;
+  logoUrl?: string | null;
 };
 
 type FinalistsPredictionSummaryCardProps = {
@@ -49,6 +53,46 @@ function ChampionBadge({ name }: { name: string }) {
       <span className="text-amber-200">البطل المتوقع</span>
       <span className="text-foreground">{name}</span>
     </span>
+  );
+}
+
+function TeamLogo({
+  team,
+  className = "h-14 w-14",
+}: {
+  team: TeamRef | null;
+  className?: string;
+}) {
+  const label = team?.shortName || team?.name?.slice(0, 3) || "--";
+
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-background/70 text-xs font-black text-muted shadow-inner ${className}`}
+    >
+      {team?.logoUrl ? (
+        <img
+          src={team.logoUrl}
+          alt={team.name}
+          className="h-full w-full object-contain p-1.5"
+        />
+      ) : (
+        <span>{label}</span>
+      )}
+    </span>
+  );
+}
+
+function FinalistPanel({ team }: { team: TeamRef }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-background/45 px-3 py-3 text-end">
+      <p className="text-[10px] font-bold text-muted">طرف النهائي</p>
+      <div className="mt-2 flex items-center justify-end gap-3">
+        <p className="min-w-0 truncate text-base font-black text-foreground">
+          {team.name}
+        </p>
+        <TeamLogo team={team} />
+      </div>
+    </div>
   );
 }
 
@@ -97,38 +141,43 @@ export function FinalistsPredictionSummaryCard({
   const hasPrediction = prediction != null;
 
   return (
-    <Card className="border-primary/25 bg-primary/5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-bold uppercase tracking-wide text-primary">
-              توقع النهائي
-            </p>
-            <span className="rounded-lg border border-primary/35 bg-background/70 px-2.5 py-1 text-xs font-black tabular-nums text-primary">
+    <Card className="overflow-hidden border-amber-300/30 bg-gradient-to-l from-amber-500/10 via-card to-card shadow-[0_18px_55px_rgba(0,0,0,0.25)]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="rounded-lg border border-amber-300/45 bg-background/70 px-3 py-1.5 text-xs font-black tabular-nums text-amber-200 shadow-inner">
               {formatCountdown(deadline, now)}
             </span>
+            <p className="text-xs font-black uppercase tracking-wide text-amber-200">
+              توقع النهائي
+            </p>
           </div>
           {hasPrediction ? (
-            <h2 className="mt-2 text-lg font-bold text-foreground">
-              {prediction.finalistOneTeam.name} ضد {prediction.finalistTwoTeam.name}
-            </h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
+              <FinalistPanel team={prediction.finalistOneTeam} />
+              <span className="mx-auto hidden rounded-lg border border-card-border bg-background/60 px-3 py-2 text-xs font-black text-muted md:block">
+                VS
+              </span>
+              <FinalistPanel team={prediction.finalistTwoTeam} />
+            </div>
           ) : (
-            <h2 className="mt-2 text-lg font-bold text-foreground">
-              اختر طرفي النهائي والبطل قبل إغلاق التوقع
-            </h2>
+            <div className="mt-3 rounded-lg border border-white/10 bg-background/45 px-4 py-4 text-end">
+              <h2 className="text-lg font-black text-foreground">
+                اختر طرفي النهائي والبطل
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                الديدلاين {formatDeadline(deadline)}
+              </p>
+            </div>
           )}
-          <p className="mt-1 text-sm text-muted">
-            {hasPrediction
-              ? `الديدلاين ${formatDeadline(deadline)}`
-              : `كل طرف نهائي صحيح +3، والبطل الصحيح +10. الديدلاين ${formatDeadline(deadline)}`}
-          </p>
           {hasPrediction && (
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
               <ChampionBadge name={prediction.championTeam.name} />
+              <TeamLogo team={prediction.championTeam} className="h-16 w-16" />
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-end gap-3">
           {hasPrediction && (
             <div className="text-end">
               <p className="text-xs text-muted">نقاط توقع النهائي</p>
