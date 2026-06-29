@@ -38,6 +38,16 @@ function getPositionLabel(position: string | null | undefined): string {
   return "";
 }
 
+function boldScorerDetail(messages: Messages, highValue: boolean): string {
+  if (!highValue) return messages.pointsBreakdown.boldScorerDetail;
+
+  const base = messages.pointsBreakdown.boldScorerDetail;
+  const english = base.toLowerCase().includes("once");
+  return english
+    ? "Double + bet from the quarter-finals: +10 / -10"
+    : "مع المضاعفة من ربع النهائي: +10 / -10";
+}
+
 export type PointsBreakdownLine = {
   id: string;
   label: string;
@@ -270,7 +280,7 @@ export function buildMatchPointsBreakdown(
           bold.points > 0
             ? messages.pointsBreakdown.boldScorerWin(bold.player.name)
             : messages.pointsBreakdown.boldScorerMiss(bold.player.name),
-        detail: messages.pointsBreakdown.boldScorerDetail,
+        detail: boldScorerDetail(messages, Math.abs(bold.points) >= 10),
         points: bold.points,
         correct: bold.points > 0,
       });
@@ -448,7 +458,7 @@ export function buildLeaguePendingBreakdown(
     lines.push({
       id: "bold-scorer",
       label: messages.pointsBreakdown.pendingBold(row.boldScorerBet.player.name),
-      detail: messages.pointsBreakdown.boldScorerDetail,
+      detail: boldScorerDetail(messages, Boolean(row.prediction?.isDouble)),
       points: 0,
     });
   }

@@ -15,17 +15,18 @@ export function PredictNavLink({
   children,
   className,
 }: PredictNavLinkProps) {
+  const warmPrediction = () => {
+    void prefetchPredictData(matchId, { urgent: true, includeLineup: true });
+  };
+
   return (
     <Link
       href={`/predict/${matchId}`}
-      prefetch={false}
       className={className}
-      onMouseEnter={() =>
-        prefetchPredictData(matchId, { urgent: true, includeLineup: true })
-      }
-      onFocus={() =>
-        prefetchPredictData(matchId, { urgent: true, includeLineup: true })
-      }
+      onFocus={warmPrediction}
+      onPointerDown={warmPrediction}
+      onPointerEnter={warmPrediction}
+      onTouchStart={warmPrediction}
     >
       {children}
     </Link>

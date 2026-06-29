@@ -168,10 +168,7 @@ export function prefetchPredictData(
 ) {
   if (DISABLE_PREFETCH) return Promise.resolve();
   const includeLineup = options?.includeLineup === true;
-  const matchFresh = isClientCacheFresh(
-    predictMatchCacheKey(matchId),
-    MATCH_FRESH_MS
-  );
+  const matchFresh = isPredictMatchCacheFresh(matchId);
   const cachedLineup = readClientCache<LineupCacheMeta>(
     predictLineupCacheKey(matchId)
   );

@@ -13,6 +13,7 @@ import {
 } from "@/services/usage-round.service";
 import {
   getUserTotalPoints,
+  invalidateUserTotalPointsCache,
   MIN_POINTS_FOR_BOLD_SCORER_BET,
 } from "@/services/user-points.service";
 
@@ -312,5 +313,6 @@ export async function calculateBoldScorerBetPointsForMatch(
       where: { id: bet.id },
       data: { points },
     });
+    invalidateUserTotalPointsCache(bet.userId);
   }
 }

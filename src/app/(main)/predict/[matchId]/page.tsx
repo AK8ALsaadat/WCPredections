@@ -1314,20 +1314,21 @@ export default function PredictPage() {
     match.octopusRoundStatus?.onOtherMatch ??
     false;
   const matchLockReason = getPredictionLockReason(match.matchTime, match.status);
+  const waitingForUsageLimits = !match.roundUsageLimits;
   const boldCheckboxDisabled =
-    loading || !match.roundUsageLimits ||
+    waitingForUsageLimits ||
     Boolean(matchLockReason) ||
     (boldLimits != null && !boldLimits.canUse && !boldLimits.onThisMatch) ||
     (octopusEnabled && !boldEnabled);
   const octopusCheckboxDisabled =
-    loading || !match.roundUsageLimits ||
+    waitingForUsageLimits ||
     Boolean(matchLockReason) ||
     (octopusLimits != null &&
       !octopusLimits.canUse &&
       !octopusLimits.onThisMatch) ||
     (boldEnabled && !octopusEnabled);
   const doubleCheckboxDisabled =
-    loading || !match.roundUsageLimits ||
+    waitingForUsageLimits ||
     (doubleLimits != null &&
       !doubleLimits.canEnable &&
       !doubleLimits.onThisMatch);

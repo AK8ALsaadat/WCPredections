@@ -25,6 +25,7 @@ import {
 } from "../src/services/prediction.service";
 import { MAX_BOLD_SCORER_BETS_PER_ROUND } from "../src/services/round-usage.service";
 import {
+  buildLeaguePendingBreakdown,
   buildMatchPointsBreakdown,
   getMatchTotalUserPoints,
 } from "../src/lib/match-points-breakdown";
@@ -450,6 +451,45 @@ ok(
   isHighValueBoldScorerRound("wc:stage:quarter-finals") &&
     calculateBoldScorerBetPoints(1, { highValue: true }) === 10 &&
     calculateBoldScorerBetPoints(0, { highValue: true }) === -10
+);
+const highValueBoldBreakdown = buildMatchPointsBreakdown({
+  homeScore: 0,
+  awayScore: 0,
+  isKnockout: true,
+  homeTeamName: "A",
+  awayTeamName: "B",
+  userBoldScorerBet: { points: -10, player: { name: "X" } },
+}, ar, { showMisses: true });
+ok(
+  "high-value bold scorer detail explains +10/-10",
+  highValueBoldBreakdown.lines
+    .find((line) => line.id === "bold-scorer")
+    ?.detail?.includes("+10 / -10") === true
+);
+const pendingHighValueBold = buildLeaguePendingBreakdown(
+  {
+    prediction: {
+      predHome: 1,
+      predAway: 0,
+      isDouble: true,
+    },
+    scorerPredictions: [],
+    boldScorerBet: { player: { name: "X" } },
+  },
+  {
+    isKnockout: true,
+    homeTeamId: "home",
+    awayTeamId: "away",
+    homeShortName: "H",
+    awayShortName: "A",
+  },
+  ar
+);
+ok(
+  "pending double+bold detail explains +10/-10",
+  pendingHighValueBold.lines
+    .find((line) => line.id === "bold-scorer")
+    ?.detail?.includes("+10 / -10") === true
 );
 const boldBreakdown = buildMatchPointsBreakdown({
   homeScore: 1,

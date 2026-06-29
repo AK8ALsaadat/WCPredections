@@ -177,7 +177,7 @@ export function FinalistsPredictionSummaryCard({
             </div>
           )}
         </div>
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {hasPrediction && (
             <div className="text-end">
               <p className="text-xs text-muted">نقاط توقع النهائي</p>
@@ -185,6 +185,14 @@ export function FinalistsPredictionSummaryCard({
                 {pointsTotal ?? prediction.totalPoints}
               </p>
             </div>
+          )}
+          {locked && hasPrediction && (
+            <Link
+              href="/finalists-predictions"
+              className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white transition hover:bg-primary-hover"
+            >
+              شف توقعات الدوري
+            </Link>
           )}
           <Link
             href="/matches"

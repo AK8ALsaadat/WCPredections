@@ -2,8 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { applyOverallLeaderboardBaseline } from "@/services/baseline-points.service";
 
 export const MIN_POINTS_FOR_BOLD_SCORER_BET = 5;
+const USER_TOTAL_POINTS_CACHE_MS = 15_000;
+const userTotalPointsCache = new Map<
+  string,
+  { points: number; expiresAt: number }
+>();
 
-export async function getUserTotalPoints(userId: string): Promise<number> {
+async function computeUserTotalPoints(userId: string): Promise<number> {
   const [user, predictionAgg, scorerAgg, boldAgg, octopusAgg, bracket] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -55,4 +60,26 @@ export async function getUserTotalPoints(userId: string): Promise<number> {
   return user
     ? applyOverallLeaderboardBaseline(user.username, rawPoints)
     : rawPoints;
+}
+
+export async function getUserTotalPoints(userId: string): Promise<number> {
+  const cached = userTotalPointsCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.points;
+  }
+
+  const points = await computeUserTotalPoints(userId);
+  userTotalPointsCache.set(userId, {
+    points,
+    expiresAt: Date.now() + USER_TOTAL_POINTS_CACHE_MS,
+  });
+  return points;
+}
+
+export function invalidateUserTotalPointsCache(userId?: string) {
+  if (userId) {
+    userTotalPointsCache.delete(userId);
+    return;
+  }
+  userTotalPointsCache.clear();
 }
