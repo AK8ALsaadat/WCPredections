@@ -9,6 +9,13 @@ export { getUserTotalPoints } from "@/services/user-points.service";
 type PointsRow = { username: string; points: number };
 
 const LB_CACHE_SECONDS = 300;
+const INITIAL_LEADERBOARD_POINTS = new Map<string, number>([
+  ["nawafmd", 155],
+  ["bdr", 152],
+  ["mohannad", 152],
+  ["mohammed", 147],
+  ["abood9af", 146],
+]);
 
 // Riyadh timezone offset (UTC+3) used for day boundaries and night window logic
 const RIYADH_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -48,7 +55,10 @@ function matchWhere(filter: PointsFilter) {
   };
 }
 
-async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, PointsRow>> {
+async function getUserPointsMap(
+  filter: PointsFilter = {},
+  options: { includeBracketPoints?: boolean } = {}
+): Promise<Map<string, PointsRow>> {
   const hasMatchFilter = Boolean(
     filter.roundId || filter.roundIds?.length || filter.before || filter.from || filter.to
   );
@@ -63,44 +73,66 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
     cancelledAt: null,
   };
 
+  const allUsersPromise = prisma.user.findMany({
+    select: { id: true, username: true },
+    orderBy: { username: "asc" },
+  });
+
+  const predictionGroupsPromise = prisma.prediction.groupBy({
+    by: ["userId"],
+    where,
+    _sum: {
+      points: true,
+      doubleBonus: true,
+      finishTypePoints: true,
+      penaltyWinnerPoints: true,
+    },
+  });
+
+  const scorerGroupsPromise = prisma.scorerPrediction.groupBy({
+    by: ["userId"],
+    where,
+    _sum: { points: true },
+  });
+
+  const boldGroupsPromise = prisma.boldScorerBet.groupBy({
+    by: ["userId"],
+    where: boldWhere,
+    _sum: { points: true },
+  });
+
+  const octopusGroupsPromise = prisma.octopusGoalkeeperBet.groupBy({
+    by: ["userId"],
+    where: octopusWhere,
+    _sum: { points: true },
+  });
+
+  const bracketGroupsPromise = options.includeBracketPoints
+    ? prisma.knockoutBracketPrediction.groupBy({
+        by: ["userId"],
+        _sum: {
+          finalistOnePoints: true,
+          finalistTwoPoints: true,
+          championPoints: true,
+        },
+      })
+    : Promise.resolve([] as Array<{ userId: string; _sum: Record<string, number | null> }>);
+
   const [
     allUsers,
     predictionGroups,
     scorerGroups,
     boldGroups,
     octopusGroups,
-  ] =
-    await Promise.all([
-      prisma.user.findMany({
-        select: { id: true, username: true },
-        orderBy: { username: "asc" },
-      }),
-      prisma.prediction.groupBy({
-        by: ["userId"],
-        where,
-        _sum: {
-          points: true,
-          doubleBonus: true,
-          finishTypePoints: true,
-          penaltyWinnerPoints: true,
-        },
-      }),
-      prisma.scorerPrediction.groupBy({
-        by: ["userId"],
-        where,
-        _sum: { points: true },
-      }),
-      prisma.boldScorerBet.groupBy({
-        by: ["userId"],
-        where: boldWhere,
-        _sum: { points: true },
-      }),
-      prisma.octopusGoalkeeperBet.groupBy({
-        by: ["userId"],
-        where: octopusWhere,
-        _sum: { points: true },
-      }),
-    ]);
+    bracketGroups,
+  ] = await Promise.all([
+    allUsersPromise,
+    predictionGroupsPromise,
+    scorerGroupsPromise,
+    boldGroupsPromise,
+    octopusGroupsPromise,
+    bracketGroupsPromise,
+  ]);
 
   const pointsMap = new Map<string, PointsRow>();
   for (const user of allUsers) {
@@ -140,6 +172,28 @@ async function getUserPointsMap(filter: PointsFilter = {}): Promise<Map<string, 
     const existing = pointsMap.get(g.userId);
     if (existing) {
       existing.points += pts;
+    }
+  }
+
+  if (options.includeBracketPoints && bracketGroups) {
+    for (const g of bracketGroups) {
+      const pts =
+        (g._sum.finalistOnePoints ?? 0) +
+        (g._sum.finalistTwoPoints ?? 0) +
+        (g._sum.championPoints ?? 0);
+      const existing = pointsMap.get(g.userId);
+      if (existing) {
+        existing.points += pts;
+      }
+    }
+  }
+
+  if (
+    !hasMatchFilter &&
+    process.env.LEADERBOARD_BASELINE_POINTS !== "false"
+  ) {
+    for (const row of pointsMap.values()) {
+      row.points += INITIAL_LEADERBOARD_POINTS.get(row.username.toLowerCase()) ?? 0;
     }
   }
 
@@ -376,13 +430,15 @@ async function computeLeaderStreakDays(
 
 async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardEntry[]> {
   if (!withTrend) {
-    return attachNightChampion(buildLeaderboard(await getUserPointsMap()));
+    return attachNightChampion(
+      buildLeaderboard(await getUserPointsMap({}, { includeBracketPoints: true }))
+    );
   }
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const [currentMap, previousMap] = await Promise.all([
-    getUserPointsMap(),
-    getUserPointsMap({ before: weekAgo }),
+    getUserPointsMap({}, { includeBracketPoints: true }),
+    getUserPointsMap({ before: weekAgo }, { includeBracketPoints: true }),
   ]);
 
   const current = buildLeaderboard(currentMap);
