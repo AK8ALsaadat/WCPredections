@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/ui/TeamLogo";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
@@ -38,7 +38,6 @@ import {
   msUntilMatchKickoff,
 } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
-import { FEATURE_FLAGS } from '@/lib/feature-flags';
 import { mergeLineupData } from "@/lib/lineup-state";
 import { isGoalkeeperPosition } from "@/lib/goalkeeper";
 import {
@@ -285,6 +284,13 @@ type PredictionSavePayload = {
   match?: MatchData | null;
 };
 
+type NoticeState = {
+  title: string;
+  message: string;
+  variant: "success" | "error";
+  redirectHref?: string;
+};
+
 const EMPTY_FORM: FormState = {
   predHome: 0,
   predAway: 0,
@@ -525,6 +531,7 @@ function applySavedPrediction(m: MatchData, setters: {
 export default function PredictPage() {
   const { messages: t, locale } = useI18n();
   const params = useParams();
+  const router = useRouter();
   const matchId = params.matchId as string;
 
   const [match, setMatch] = useState<MatchData | null>(() =>
@@ -545,8 +552,9 @@ export default function PredictPage() {
     return !(cachedMatch && lineupFromMatchPayload(cachedMatch));
   });
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setErrorMessage] = useState("");
+  const [, setSuccessMessage] = useState("");
+  const [notice, setNotice] = useState<NoticeState | null>(null);
 
   const initialCachedMatch = readPredictMatchCache<MatchData>(matchId);
   const initialDraft = readPredictDraft<FormState>(matchId);
@@ -572,6 +580,79 @@ export default function PredictPage() {
     () => initialDraft != null || initialCachedMatch != null
   );
   const draftMatchIdRef = useRef(matchId);
+
+  const noticeCopy = useMemo(
+    () =>
+      locale === "ar"
+        ? {
+            successTitle: "تم الحفظ",
+            errorTitle: "تنبيه",
+            close: "إغلاق",
+            understood: "فهمت",
+          }
+        : {
+            successTitle: "Saved",
+            errorTitle: "Notice",
+            close: "Close",
+            understood: "Got it",
+          },
+    [locale]
+  );
+
+  const showNotice = useCallback(
+    (
+      message: string,
+      variant: NoticeState["variant"],
+      redirectHref?: string
+    ) => {
+      setNotice({
+        title:
+          variant === "success"
+            ? noticeCopy.successTitle
+            : noticeCopy.errorTitle,
+        message,
+        variant,
+        redirectHref,
+      });
+    },
+    [noticeCopy]
+  );
+
+  const setError = useCallback((message: string) => {
+    setErrorMessage(message);
+    if (message) {
+      setSuccessMessage("");
+      showNotice(message, "error");
+    } else {
+      setNotice((current) => (current?.variant === "error" ? null : current));
+    }
+  }, [showNotice]);
+
+  const setSuccess = useCallback((message: string) => {
+    setSuccessMessage(message);
+    if (message) {
+      setErrorMessage("");
+      showNotice(message, "success");
+    } else {
+      setNotice((current) =>
+        current?.variant === "success" ? null : current
+      );
+    }
+  }, [showNotice]);
+
+  const setSaveSuccess = useCallback((message: string) => {
+    setSuccessMessage(message);
+    setErrorMessage("");
+    showNotice(message, "success", "/matches");
+  }, [showNotice]);
+
+  const closeNotice = useCallback(() => {
+    const redirectHref = notice?.redirectHref;
+    setNotice(null);
+    if (redirectHref) {
+      router.push(redirectHref);
+    }
+  }, [notice?.redirectHref, router]);
 
   const teamSets = useMemo(() => {
     if (!lineup) return { home: new Set<string>(), away: new Set<string>() };
@@ -692,7 +773,13 @@ export default function PredictPage() {
       setOctopusEnabled(false);
       setFormReady(false);
     }
-  }, [matchId, match?.matchTime, lineup?.lineupStatus, t.errors.loadFailed]);
+  }, [
+    matchId,
+    match?.matchTime,
+    lineup?.lineupStatus,
+    setError,
+    setSuccess,
+  ]);
 
   useEffect(() => {
     if (draftMatchIdRef.current !== matchId) {
@@ -852,7 +939,7 @@ export default function PredictPage() {
       cancelled = true;
       abort.abort();
     };
-  }, [matchId, t.errors.loadFailed]);
+  }, [matchId, setError, t.errors.loadFailed]);
 
   // If the lineup finishes loading and there's no local draft, make sure
   // saved scorer picks and bets from the server are applied so the UI
@@ -1471,34 +1558,28 @@ export default function PredictPage() {
               scorerPredictions: scorerPredictionPayload,
             })
           : await fetchPredictMatchFresh(matchId));
-      if (!freshMatch) {
-        throw new Error(
-          locale === "ar"
-            ? "تم إرسال الحفظ لكن تعذر تأكيده من السيرفر. حدث الصفحة وتأكد قبل بداية المباراة."
-            : "Save was sent, but the server confirmation failed. Refresh and confirm before kickoff."
-        );
-      }
-
       invalidatePredictCaches(matchId);
       invalidateMatchDetailCache(matchId);
       invalidateLeaguePredictionsCache(matchId);
       clearPredictDraft(matchId);
       invalidateMatchesListCaches();
-      writePredictMatchCache(matchId, { ...freshMatch, _complete: true });
-      setMatch(freshMatch);
-      applySavedPrediction(freshMatch, {
-        setPredHome,
-        setPredAway,
-        setIsDouble,
-        setFinishType,
-        setPenaltyWinner,
-        setScorerPicks,
-        setBoldPlayerId,
-        setBoldEnabled,
-        setOctopusPlayerId,
-        setOctopusEnabled,
-      });
-      setSuccess(t.matches.predictionSubmitted);
+      if (freshMatch) {
+        writePredictMatchCache(matchId, { ...freshMatch, _complete: true });
+        setMatch(freshMatch);
+        applySavedPrediction(freshMatch, {
+          setPredHome,
+          setPredAway,
+          setIsDouble,
+          setFinishType,
+          setPenaltyWinner,
+          setScorerPicks,
+          setBoldPlayerId,
+          setBoldEnabled,
+          setOctopusPlayerId,
+          setOctopusEnabled,
+        });
+      }
+      setSaveSuccess(t.matches.predictionSubmitted);
       void fetchPredictMatchFresh(matchId).then((verifiedMatch) => {
         if (!verifiedMatch) return;
         writePredictMatchCache(matchId, { ...verifiedMatch, _complete: true });
@@ -1654,6 +1735,49 @@ export default function PredictPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      {notice && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="prediction-notice-title"
+          dir={locale === "ar" ? "rtl" : "ltr"}
+        >
+          <div className="relative w-full max-w-md rounded-2xl border border-card-border bg-card p-6 text-center shadow-2xl shadow-black/50">
+            <button
+              type="button"
+              aria-label={noticeCopy.close}
+              onClick={closeNotice}
+              className="absolute end-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full text-xl leading-none text-muted transition-colors hover:bg-card-border hover:text-foreground"
+            >
+              ×
+            </button>
+            <div
+              className={cn(
+                "mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-black ring-1",
+                notice.variant === "success"
+                  ? "bg-primary/15 text-primary ring-primary/40"
+                  : "bg-danger/15 text-danger ring-danger/40"
+              )}
+            >
+              {notice.variant === "success" ? "✓" : "!"}
+            </div>
+            <h2
+              id="prediction-notice-title"
+              className="text-xl font-black text-foreground"
+            >
+              {notice.title}
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-muted">
+              {notice.message}
+            </p>
+            <Button type="button" className="mt-6 w-full" onClick={closeNotice}>
+              {noticeCopy.understood}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Link href={`/matches/${matchId}`} className="text-sm text-primary hover:underline">
         {t.matches.back}
       </Link>
@@ -1685,12 +1809,6 @@ export default function PredictPage() {
       </Card>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {error && <ErrorMessage message={error} />}
-        {FEATURE_FLAGS.showNotifications && success && (
-          <div className="rounded-lg border border-primary/50 bg-primary/10 px-4 py-3 text-sm text-primary">
-            {success}
-          </div>
-        )}
         {match.isKnockout && match.roundUsageLimits && (
           <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
             {knockoutRulesNotice}
