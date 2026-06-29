@@ -15,6 +15,13 @@ const INITIAL_LEADERBOARD_POINTS = new Map<string, number>([
   ["mohannad", 152],
   ["mohammed", 147],
   ["abood9af", 146],
+  ["danger", 144],
+  ["alsaadat", 142],
+  ["alfaris14", 141],
+  ["dawoad", 128],
+  ["dawood", 128],
+  ["abdullah", 127],
+  ["nawaf", 100],
 ]);
 
 // Riyadh timezone offset (UTC+3) used for day boundaries and night window logic
