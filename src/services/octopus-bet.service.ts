@@ -10,6 +10,7 @@ import { getPredictionLockReason } from "@/lib/utils";
 import { revalidateTag } from "next/cache";
 import { ApiFootballProvider } from "@/services/football-api/api-football.provider";
 import { getFootballApiProvider } from "@/services/football-api";
+import { fetchEspnGoalkeeperTeamSaves } from "@/services/football-api/espn-live.provider";
 import type {
   ExternalGoalkeeperSave,
   FootballApiProvider,
@@ -97,10 +98,20 @@ export async function replaceGoalkeeperSaves(
     }));
   if (!match) throw new Error("Match not found");
 
-  const resolved = new Map<string, { playerId: string; saves: number }>();
+  const resolved = new Map<
+    string,
+    { playerId: string; saves: number; source: string }
+  >();
   const matchTeamIds = [match.homeTeam.id, match.awayTeam.id];
 
-  for (const { playerApiId, playerName, teamApiId, teamName, saves } of apiStats) {
+  for (const {
+    playerApiId,
+    playerName,
+    teamApiId,
+    teamName,
+    saves,
+    source,
+  } of apiStats) {
     if (saves < 0) continue;
 
     let player = await prisma.player.findFirst({
@@ -156,7 +167,11 @@ export async function replaceGoalkeeperSaves(
     }
 
     if (!player || !isGoalkeeperPosition(player.position)) continue;
-    resolved.set(player.id, { playerId: player.id, saves });
+    resolved.set(player.id, {
+      playerId: player.id,
+      saves,
+      source: source ?? "api-football",
+    });
   }
 
   const manualStats = await prisma.matchGoalkeeperStat.findMany({
@@ -181,7 +196,7 @@ export async function replaceGoalkeeperSaves(
           matchId,
           playerId: row.playerId,
           saves: row.saves,
-          source: "api-football",
+          source: row.source,
         })),
       });
     }
@@ -208,6 +223,55 @@ export async function replaceGoalkeeperSaves(
   }
 
   return resolved.size;
+}
+
+async function fetchEspnSavesForActiveOctopusBets(
+  matchId: string,
+  match: MatchForGoalkeeperStats
+): Promise<ExternalGoalkeeperSave[]> {
+  if (!match.matchTime) return [];
+
+  const teamSaves = await fetchEspnGoalkeeperTeamSaves({
+    matchTime: match.matchTime,
+    homeTeamName: match.homeTeam.name,
+    awayTeamName: match.awayTeam.name,
+  });
+  if (!teamSaves) return [];
+
+  const bets = await prisma.octopusGoalkeeperBet.findMany({
+    where: { matchId, cancelledAt: null },
+    include: {
+      player: {
+        select: {
+          id: true,
+          apiPlayerId: true,
+          name: true,
+          teamId: true,
+        },
+      },
+    },
+  });
+
+  const uniqueByPlayer = new Map<string, (typeof bets)[number]["player"]>();
+  for (const bet of bets) {
+    uniqueByPlayer.set(bet.playerId, bet.player);
+  }
+
+  return Array.from(uniqueByPlayer.values()).flatMap((player) => {
+    const isHome = player.teamId === match.homeTeam.id;
+    const isAway = player.teamId === match.awayTeam.id;
+    if (!isHome && !isAway) return [];
+
+    const team = isHome ? match.homeTeam : match.awayTeam;
+    return {
+      playerApiId: player.apiPlayerId ?? `espn-team-stats:${player.id}`,
+      playerName: player.name,
+      teamApiId: team.apiTeamId ?? slugifyTeamName(team.name),
+      teamName: team.name,
+      saves: isHome ? teamSaves.homeSaves : teamSaves.awaySaves,
+      source: "espn-team-stats",
+    };
+  });
 }
 
 export async function syncGoalkeeperSavesFromApi(
@@ -262,6 +326,16 @@ export async function syncGoalkeeperSavesFromApi(
       "[octopus] goalkeeper saves provider failed:",
       providerError instanceof Error ? providerError.message : providerError
     );
+  }
+  if (stats.length === 0) {
+    try {
+      stats = await fetchEspnSavesForActiveOctopusBets(matchId, match);
+    } catch (error) {
+      console.warn(
+        "[octopus] ESPN goalkeeper saves fallback failed:",
+        error instanceof Error ? error.message : error
+      );
+    }
   }
   if (stats.length === 0) return 0;
   return replaceGoalkeeperSaves(matchId, stats, match);

@@ -39,6 +39,30 @@ function mapStatus(status: string): ExternalMatch["status"] {
   return map[status] ?? "SCHEDULED";
 }
 
+function mapFinishType(
+  status: string,
+  duration: string | null | undefined,
+  isKnockout: boolean,
+  homeScore: number | null,
+  awayScore: number | null
+): ExternalMatch["finishType"] {
+  if (mapStatus(status) !== "FINISHED") return null;
+
+  const normalizedDuration = (duration ?? "").trim().toUpperCase();
+  if (normalizedDuration.includes("PENALTY")) return "PENALTIES";
+  if (normalizedDuration.includes("EXTRA")) return "EXTRA_TIME";
+  if (
+    isKnockout &&
+    homeScore != null &&
+    awayScore != null &&
+    homeScore === awayScore
+  ) {
+    return "PENALTIES";
+  }
+
+  return "NINETY_MINUTES";
+}
+
 export class FootballDataProvider implements FootballApiProvider {
   name = "football-data";
   private baseUrl: string;
@@ -137,6 +161,7 @@ export class FootballDataProvider implements FootballApiProvider {
         awayTeam: { id: number | null; name: string | null; shortName?: string | null };
         score: {
           fullTime: { home: number | null; away: number | null };
+          duration?: string | null;
         };
         stage: string;
         group: string | null;
@@ -166,8 +191,13 @@ export class FootballDataProvider implements FootballApiProvider {
       isKnockout: isKnockoutStage(match.stage),
       homeScore: match.score.fullTime.home,
       awayScore: match.score.fullTime.away,
-      finishType:
-        match.status === "FINISHED" ? "NINETY_MINUTES" : null,
+      finishType: mapFinishType(
+        match.status,
+        match.score.duration,
+        isKnockoutStage(match.stage),
+        match.score.fullTime.home,
+        match.score.fullTime.away
+      ),
     };
     });
   }

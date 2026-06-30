@@ -6,7 +6,10 @@ import type { LeaderboardEntry } from "@/types";
 import { Card } from "@/components/ui/Card";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { clientFetch } from "@/lib/client-fetch";
-import { getRelegationStatus } from "@/lib/leaderboard-relegation";
+import {
+  getRelegationStatus,
+  splitLeaderboardLeagues,
+} from "@/lib/leaderboard-relegation";
 
 function CrownIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -543,19 +546,19 @@ export function LeaderboardTable({
     );
   }
 
-  const mainEntries = showYeloLeague ? liveEntries.slice(0, 10) : liveEntries;
-  const yeloEntries = showYeloLeague ? liveEntries.slice(10) : [];
+  const { mainEntries, yeloEntries, exemptionAppliedUserIds } =
+    splitLeaderboardLeagues(liveEntries, showYeloLeague);
   const leader = mainEntries[0];
   const remainingEntries = mainEntries.slice(1);
-  const yeloRelegatedUserIds = showYeloLeague
-    ? new Set(mainEntries.slice(-3).map((entry) => entry.userId))
-    : null;
-  const relegationStatus = getRelegationStatus(mainEntries, showRelegationZone);
-  const relegatedUserIds =
-    yeloRelegatedUserIds ?? relegationStatus.relegatedUserIds;
-  const exemptUserIds = showYeloLeague
-    ? new Set<string>()
-    : relegationStatus.exemptUserIds;
+  const relegationStatus = getRelegationStatus(
+    mainEntries,
+    showRelegationZone || showYeloLeague
+  );
+  const relegatedUserIds = relegationStatus.relegatedUserIds;
+  const exemptUserIds = new Set([
+    ...relegationStatus.exemptUserIds,
+    ...exemptionAppliedUserIds,
+  ]);
 
   return (
     <div className="space-y-4">

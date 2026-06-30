@@ -16,9 +16,15 @@ import { buildMatchHistoryEntries } from "../src/lib/profile-history";
 import { isPredictionAllowed } from "../src/lib/utils";
 import { fullPredictionBundleSchema } from "../src/lib/validations";
 import {
+  getRelegationStatus,
+  MAIN_LEAGUE_SIZE,
+  splitLeaderboardLeagues,
+} from "../src/lib/leaderboard-relegation";
+import {
   calculateScorerPredictionPoints,
   getPositionPointsMultiplier,
 } from "../src/services/scoring.service";
+import { parseEspnGoalkeeperTeamSaves } from "../src/services/football-api/espn-live.provider";
 import {
   mergeProbableBenchWithCurrentRoster,
   mergeTeamViewWithCurrentRoster,
@@ -76,6 +82,15 @@ check(
     "NINETY_MINUTES"
 );
 check(
+  "finished knockout draw source match defaults missing finish type to penalties",
+  resolveActualFinishType({
+    ...sourceMatchBase,
+    homeScore: 1,
+    awayScore: 1,
+    finishType: null,
+  }) === "PENALTIES"
+);
+check(
   "source match preserves extra time and penalties finish types",
   resolveActualFinishType({
     ...sourceMatchBase,
@@ -113,6 +128,101 @@ check(
     boldPlayerId: null,
     octopusPlayerId: null,
   }).success
+);
+
+const leagueEntries = [
+  "nawafmd",
+  "bdr",
+  "danger",
+  "mohammed",
+  "mohannad",
+  "alfaris14",
+  "abood9af",
+  "dawoad",
+  "abdullah",
+  "nawaf",
+  "mmg",
+  "mhk",
+  "ali",
+].map((username, index) => ({
+  userId: `user-${username}`,
+  username,
+  points: 200 - index,
+  rank: index + 1,
+}));
+const splitLeagues = splitLeaderboardLeagues(leagueEntries, true);
+check(
+  "Yelo split moves two first league users down",
+  splitLeagues.mainEntries.length === MAIN_LEAGUE_SIZE &&
+    splitLeagues.yeloEntries[0]?.username === "abdullah" &&
+    splitLeagues.yeloEntries[1]?.username === "nawaf"
+);
+check(
+  "Yelo split hides ali and mmg",
+  !splitLeagues.yeloEntries.some((entry) =>
+    ["ali", "mmg"].includes(entry.username)
+  )
+);
+
+const alsaadatDropEntries = leagueEntries.map((entry, index) =>
+  entry.username === "abood9af"
+    ? { ...entry, username: "alsaadat", userId: "user-alsaadat", rank: 11 }
+    : entry.rank === 11
+      ? { ...entry, username: "abood9af", userId: "user-abood9af", rank: 7 }
+      : entry
+).sort((a, b) => a.rank - b.rank);
+const splitWithExemption = splitLeaderboardLeagues(alsaadatDropEntries, true);
+const exemptionStatus = getRelegationStatus(splitWithExemption.mainEntries, true);
+check(
+  "alsaadat stays in first league when he would fall to Yelo",
+  splitWithExemption.mainEntries.some((entry) => entry.username === "alsaadat") &&
+    splitWithExemption.exemptionAppliedUserIds.has("user-alsaadat") &&
+    !splitWithExemption.yeloEntries.some((entry) => entry.username === "alsaadat")
+);
+check(
+  "alsaadat relegation exception is highlighted green",
+  exemptionStatus.exemptUserIds.has("user-alsaadat") ||
+    splitWithExemption.exemptionAppliedUserIds.has("user-alsaadat")
+);
+
+const espnTeamSaves = parseEspnGoalkeeperTeamSaves(
+  [
+    {
+      id: "espn-germany-paraguay",
+      date: "2026-06-29T20:30:00Z",
+      competitions: [
+        {
+          competitors: [
+            {
+              homeAway: "home",
+              score: "1",
+              team: { displayName: "Germany" },
+              statistics: [
+                { name: "shotsOnTarget", displayValue: "6" },
+              ],
+            },
+            {
+              homeAway: "away",
+              score: "1",
+              team: { displayName: "Paraguay" },
+              statistics: [
+                { name: "shotsOnTarget", displayValue: "3" },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  {
+    matchTime: new Date("2026-06-29T20:30:00Z"),
+    homeTeamName: "Germany",
+    awayTeamName: "Paraguay",
+  }
+);
+check(
+  "ESPN team stats derive goalkeeper saves for octopus fallback",
+  espnTeamSaves?.homeSaves === 2 && espnTeamSaves.awaySaves === 5
 );
 
 const squad = [

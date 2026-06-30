@@ -37,9 +37,123 @@ export function resolveActualFinishType(
 ): ExternalMatch["finishType"] {
   if (mapped.finishType) return mapped.finishType;
   if (mapped.status === "FINISHED" && mapped.isKnockout) {
+    if (
+      mapped.homeScore != null &&
+      mapped.awayScore != null &&
+      mapped.homeScore === mapped.awayScore
+    ) {
+      return "PENALTIES";
+    }
     return "NINETY_MINUTES";
   }
   return mapped.finishType ?? null;
+}
+
+async function inferKnockoutDrawWinnerFromFutureMatches(
+  homeTeam: { id: string; name?: string | null; shortName?: string | null },
+  awayTeam: { id: string; name?: string | null; shortName?: string | null },
+  matchTime: Date
+) {
+  const homeIdentity = normalizeTeamIdentity(
+    homeTeam.name ?? homeTeam.shortName ?? ""
+  );
+  const awayIdentity = normalizeTeamIdentity(
+    awayTeam.name ?? awayTeam.shortName ?? ""
+  );
+  const futureMatches = await prisma.match.findMany({
+    where: {
+      isKnockout: true,
+      matchTime: { gt: matchTime },
+      OR: [
+        { homeTeamId: { in: [homeTeam.id, awayTeam.id] } },
+        { awayTeamId: { in: [homeTeam.id, awayTeam.id] } },
+        ...(homeIdentity || awayIdentity
+          ? [
+              {
+                homeTeam: {
+                  name: {
+                    in: [
+                      homeTeam.name,
+                      homeTeam.shortName,
+                      awayTeam.name,
+                      awayTeam.shortName,
+                    ].filter((value): value is string => Boolean(value)),
+                    mode: "insensitive" as const,
+                  },
+                },
+              },
+              {
+                awayTeam: {
+                  name: {
+                    in: [
+                      homeTeam.name,
+                      homeTeam.shortName,
+                      awayTeam.name,
+                      awayTeam.shortName,
+                    ].filter((value): value is string => Boolean(value)),
+                    mode: "insensitive" as const,
+                  },
+                },
+              },
+            ]
+          : []),
+      ],
+    },
+    select: {
+      homeTeamId: true,
+      awayTeamId: true,
+      homeTeam: { select: { name: true, shortName: true } },
+      awayTeam: { select: { name: true, shortName: true } },
+    },
+    orderBy: { matchTime: "asc" },
+    take: 6,
+  });
+
+  const candidates = new Set<string>();
+  const matchesTeam = (
+    team: { id: string; name: string; shortName: string },
+    target: typeof homeTeam,
+    targetIdentity: string
+  ) =>
+    team.id === target.id ||
+    (targetIdentity &&
+      [
+        team.name,
+        team.shortName,
+      ].some((name) => normalizeTeamIdentity(name) === targetIdentity));
+
+  for (const match of futureMatches) {
+    if (
+      matchesTeam(
+        { id: match.homeTeamId, ...match.homeTeam },
+        homeTeam,
+        homeIdentity
+      ) ||
+      matchesTeam(
+        { id: match.awayTeamId, ...match.awayTeam },
+        homeTeam,
+        homeIdentity
+      )
+    ) {
+      candidates.add(homeTeam.id);
+    }
+    if (
+      matchesTeam(
+        { id: match.homeTeamId, ...match.homeTeam },
+        awayTeam,
+        awayIdentity
+      ) ||
+      matchesTeam(
+        { id: match.awayTeamId, ...match.awayTeam },
+        awayTeam,
+        awayIdentity
+      )
+    ) {
+      candidates.add(awayTeam.id);
+    }
+  }
+
+  return candidates.size === 1 ? [...candidates][0] : null;
 }
 
 async function upsertTeam(
@@ -479,9 +593,10 @@ export async function reconcileDuplicateMatchesInRound(roundId: string) {
     if (group.length < 2) continue;
 
     const rank = (m: (typeof group)[0]) => {
-      if (m.status === "LIVE") return 1_000;
-      if (m.status === "FINISHED") return 900;
-      return m._count.predictions + m._count.scorerPredictions;
+      const engagement = m._count.predictions + m._count.scorerPredictions;
+      if (m.status === "FINISHED") return 1_000_000 + engagement;
+      if (m.status === "LIVE") return 900_000 + engagement;
+      return engagement;
     };
 
     group.sort(
@@ -539,6 +654,22 @@ async function syncMatch(
       mapped.penaltyWinnerTeamApiId
     );
   }
+  const actualFinishType = resolveActualFinishType(mapped);
+  if (!penaltyWinnerTeamId && actualFinishType === "PENALTIES") {
+    penaltyWinnerTeamId = await inferKnockoutDrawWinnerFromFutureMatches(
+      {
+        id: homeTeamId,
+        name: mapped.homeTeamName,
+        shortName: mapped.homeTeamShortName,
+      },
+      {
+        id: awayTeamId,
+        name: mapped.awayTeamName,
+        shortName: mapped.awayTeamShortName,
+      },
+      mapped.matchTime
+    );
+  }
 
   const existing = await findExistingMatch(
     roundId,
@@ -548,7 +679,17 @@ async function syncMatch(
   );
 
   const wasFinished = existing?.status === "FINISHED";
-  const isNowFinished = mapped.status === "FINISHED";
+  const preserveFinishedState = wasFinished && mapped.status !== "FINISHED";
+  const nextStatus = preserveFinishedState ? existing.status : mapped.status;
+  const nextHomeScore = preserveFinishedState ? existing.homeScore : mapped.homeScore;
+  const nextAwayScore = preserveFinishedState ? existing.awayScore : mapped.awayScore;
+  const nextActualFinishType = preserveFinishedState
+    ? existing.actualFinishType
+    : actualFinishType;
+  const nextPenaltyWinnerTeamId = preserveFinishedState
+    ? existing.penaltyWinnerTeamId
+    : penaltyWinnerTeamId;
+  const isNowFinished = nextStatus === "FINISHED";
   const bracket = getBracketByApiMatchId(mapped.apiId);
   const stageName = bracket
     ? getBracketRoundLabel(bracket.matchNo) ?? mapped.stageName
@@ -562,12 +703,12 @@ async function syncMatch(
     matchTime: mapped.matchTime,
     groupCode: mapped.groupCode,
     stageName,
-    status: mapped.status,
+    status: nextStatus,
     isKnockout: mapped.isKnockout,
-    homeScore: mapped.homeScore,
-    awayScore: mapped.awayScore,
-    actualFinishType: resolveActualFinishType(mapped),
-    penaltyWinnerTeamId,
+    homeScore: nextHomeScore,
+    awayScore: nextAwayScore,
+    actualFinishType: nextActualFinishType,
+    penaltyWinnerTeamId: nextPenaltyWinnerTeamId,
   };
 
   const match = existing
@@ -580,15 +721,15 @@ async function syncMatch(
 
   const scoresChanged =
     existing &&
-    (existing.homeScore !== mapped.homeScore ||
-      existing.awayScore !== mapped.awayScore ||
-      existing.status !== mapped.status ||
+    (existing.homeScore !== matchData.homeScore ||
+      existing.awayScore !== matchData.awayScore ||
+      existing.status !== matchData.status ||
       existing.actualFinishType !== matchData.actualFinishType ||
-      existing.penaltyWinnerTeamId !== penaltyWinnerTeamId);
+      existing.penaltyWinnerTeamId !== matchData.penaltyWinnerTeamId);
 
   const shouldSyncScorers =
-    mapped.status === "LIVE" ||
-    (mapped.status === "FINISHED" && (!existing || !!scoresChanged));
+    nextStatus === "LIVE" ||
+    (nextStatus === "FINISHED" && (!existing || !!scoresChanged));
 
   if (shouldSyncScorers) {
     try {
@@ -621,7 +762,7 @@ async function syncMatch(
   const canRecalculate =
     match.homeScore !== null &&
     match.awayScore !== null &&
-    (mapped.status === "LIVE" || isNowFinished);
+    (match.status === "LIVE" || isNowFinished);
 
   if (canRecalculate && shouldSyncScorers) {
     try {

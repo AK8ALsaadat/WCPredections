@@ -212,6 +212,28 @@ function mapStatus(status: string): ExternalMatch["status"] {
   return "SCHEDULED";
 }
 
+function mapFinishType(item: SportScoreMatchSummary, isKnockout: boolean): ExternalMatch["finishType"] {
+  if (mapStatus(item.status) !== "FINISHED") return null;
+
+  const statusText = `${item.status} ${item.status_text ?? ""}`.toLowerCase();
+  if (/\bpen|penalt|shootout|ركلات|ترجيح/.test(statusText)) {
+    return "PENALTIES";
+  }
+  if (/\baet\b|extra\s*time|after\s*extra|اشواط|إضاف/.test(statusText)) {
+    return "EXTRA_TIME";
+  }
+  if (
+    isKnockout &&
+    item.home_score != null &&
+    item.away_score != null &&
+    item.home_score === item.away_score
+  ) {
+    return "PENALTIES";
+  }
+
+  return "NINETY_MINUTES";
+}
+
 function isPlaceholderTeam(name: string): boolean {
   const normalized = name.trim().toLowerCase();
   return (
@@ -406,8 +428,7 @@ export class SportScoreProvider implements FootballApiProvider {
       isKnockout,
       homeScore: item.home_score,
       awayScore: item.away_score,
-      finishType:
-        mapStatus(item.status) === "FINISHED" ? "NINETY_MINUTES" : null,
+      finishType: mapFinishType(item, isKnockout),
     };
   }
 
@@ -528,6 +549,51 @@ export class SportScoreProvider implements FootballApiProvider {
     );
   }
 
+  private async buildMatchSlugCandidates(
+    fixtureApiId: string,
+    options: SyncOptions
+  ) {
+    const candidates: string[] = [];
+
+    if (options.homeTeamName && options.awayTeamName) {
+      const { teamSlugByName } = await this.getStandingsMaps();
+      const homeSlug =
+        teamSlugByName.get(options.homeTeamName) ??
+        slugify(options.homeTeamName);
+      const awaySlug =
+        teamSlugByName.get(options.awayTeamName) ??
+        slugify(options.awayTeamName);
+      candidates.push(`${homeSlug}-vs-${awaySlug}`);
+      candidates.push(`${awaySlug}-vs-${homeSlug}`);
+    }
+
+    candidates.push(fixtureApiId);
+    return [...new Set(candidates.filter(Boolean))];
+  }
+
+  private async fetchMatchWidget<T>(
+    fixtureApiId: string,
+    options: SyncOptions
+  ) {
+    let lastError: unknown = null;
+
+    for (const slug of await this.buildMatchSlugCandidates(
+      fixtureApiId,
+      options
+    )) {
+      try {
+        return await this.fetch<T>("/api/widget/match/", {
+          sport: "football",
+          slug,
+        });
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError ?? new Error(`SportScore match not found: ${fixtureApiId}`);
+  }
+
   async fetchMatches(options: SyncOptions): Promise<ExternalMatch[]> {
     if (options.quickSync) {
       return this.fetchMatchesQuick();
@@ -538,18 +604,15 @@ export class SportScoreProvider implements FootballApiProvider {
 
   async fetchMatchScorers(
     fixtureApiId: string,
-    _options: SyncOptions
+    options: SyncOptions
   ): Promise<ExternalMatchScorer[]> {
-    const detail = await this.fetch<{
+    const detail = await this.fetchMatchWidget<{
       match: {
         home: string;
         away: string;
         incidents?: SportScoreIncident[];
       };
-    }>("/api/widget/match/", {
-      sport: "football",
-      slug: fixtureApiId,
-    });
+    }>(fixtureApiId, options);
 
     const match = detail.match;
     if (!match?.incidents?.length) return [];
@@ -585,9 +648,9 @@ export class SportScoreProvider implements FootballApiProvider {
 
   async fetchGoalkeeperSaves(
     fixtureApiId: string,
-    _options: SyncOptions
+    options: SyncOptions
   ): Promise<ExternalGoalkeeperSave[]> {
-    const detail = await this.fetch<{
+    const detail = await this.fetchMatchWidget<{
       match: {
         home: string;
         away: string;
@@ -598,10 +661,7 @@ export class SportScoreProvider implements FootballApiProvider {
           away_xi?: SportScoreLineupPlayer[];
         };
       };
-    }>("/api/widget/match/", {
-      sport: "football",
-      slug: fixtureApiId,
-    });
+    }>(fixtureApiId, options);
 
     const { teamSlugByName } = await this.getStandingsMaps();
     const match = detail.match;

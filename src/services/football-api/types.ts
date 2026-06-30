@@ -66,6 +66,7 @@ export type ExternalGoalkeeperSave = {
   playerName?: string;
   teamApiId?: string;
   teamName?: string;
+  source?: string;
 };
 
 export interface FootballApiProvider {

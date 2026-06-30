@@ -49,12 +49,27 @@ function dedupeMatches<T extends { matchTime?: unknown; homeTeam?: unknown; away
       out.push(arr[0]);
       continue;
     }
-    // Score candidates: prefer apiMatchId, then logo availability, then longer names
+    // Prefer the row that carries user-facing state when duplicate providers overlap.
     arr.sort((a, b) => {
-      const score = (x: any) =>
-        (x.apiMatchId ? 100 : 0) +
-        (((x.homeTeam?.logoUrl ? 1 : 0) + (x.awayTeam?.logoUrl ? 1 : 0)) as number) * 5 +
-        (((x.homeTeam?.shortName?.length ?? 0) + (x.awayTeam?.shortName?.length ?? 0)) as number);
+      const score = (x: any) => {
+        const engagement =
+          (x._count?.predictions ?? 0) +
+          (x._count?.scorerPredictions ?? 0) +
+          (x._count?.boldScorerBets ?? 0) +
+          (x._count?.octopusBets ?? 0);
+        const statusScore =
+          x.status === "FINISHED" ? 40 : x.status === "LIVE" ? 25 : 0;
+        return (
+          engagement * 100 +
+          statusScore +
+          (x.apiMatchId ? 100 : 0) +
+          (((x.homeTeam?.logoUrl ? 1 : 0) +
+            (x.awayTeam?.logoUrl ? 1 : 0)) as number) *
+            5 +
+          (((x.homeTeam?.shortName?.length ?? 0) +
+            (x.awayTeam?.shortName?.length ?? 0)) as number)
+        );
+      };
       return score(b) - score(a);
     });
     out.push(arr[0]);
@@ -1299,12 +1314,15 @@ export async function getMatchById(
   };
 
   if (!options?.includeLineup) {
-    const [octopusCount, predictionsCount, doublesCount, boldCount] = await Promise.all([
-      prisma.octopusGoalkeeperBet.count({ where: { matchId, cancelledAt: null } }),
-      prisma.prediction.count({ where: { matchId } }),
-      prisma.prediction.count({ where: { matchId, isDouble: true } }),
-      prisma.boldScorerBet.count({ where: { matchId, cancelledAt: null } }),
-    ]);
+    const [octopusCount, predictionsCount, doublesCount, boldCount] =
+      await Promise.all([
+        prisma.octopusGoalkeeperBet.count({
+          where: { matchId, cancelledAt: null },
+        }),
+        prisma.prediction.count({ where: { matchId } }),
+        prisma.prediction.count({ where: { matchId, isDouble: true } }),
+        prisma.boldScorerBet.count({ where: { matchId, cancelledAt: null } }),
+      ]);
     return { ...base, octopusCount, predictionsCount, doublesCount, boldCount };
   }
 
@@ -1326,14 +1344,25 @@ export async function updateMatchResult(
 ) {
   const current = await prisma.match.findUniqueOrThrow({
     where: { id: matchId },
-    select: { status: true, isKnockout: true },
+    select: {
+      status: true,
+      isKnockout: true,
+      homeScore: true,
+      awayScore: true,
+    },
   });
   const effectiveStatus = data.status ?? current.status;
   const effectiveIsKnockout = data.isKnockout ?? current.isKnockout;
+  const effectiveHomeScore = data.homeScore ?? current.homeScore;
+  const effectiveAwayScore = data.awayScore ?? current.awayScore;
   const nextActualFinishType =
     data.actualFinishType ??
     (effectiveStatus === "FINISHED" && effectiveIsKnockout
-      ? "NINETY_MINUTES"
+      ? effectiveHomeScore != null &&
+        effectiveAwayScore != null &&
+        effectiveHomeScore === effectiveAwayScore
+        ? "PENALTIES"
+        : "NINETY_MINUTES"
       : data.actualFinishType);
   const match = await prisma.match.update({
     where: { id: matchId },

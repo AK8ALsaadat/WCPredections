@@ -12,6 +12,11 @@ type EspnCompetitor = {
   homeAway?: "home" | "away";
   score?: string;
   team?: EspnTeam;
+  statistics?: Array<{
+    name?: string;
+    displayValue?: string;
+    value?: number;
+  }>;
 };
 
 type EspnAthlete = {
@@ -67,6 +72,12 @@ export type EspnLiveMatchSnapshot = {
   awayScore: number;
   scorers: ExternalMatchScorer[];
   scorersComplete: boolean;
+};
+
+export type EspnGoalkeeperTeamSavesSnapshot = {
+  sourceId: string;
+  homeSaves: number;
+  awaySaves: number;
 };
 
 const SCOREBOARD_TTL_MS = 3_000;
@@ -136,6 +147,19 @@ function teamSimilarity(expected: string, candidate: EspnTeam | undefined) {
 function parseScore(value: string | undefined) {
   const score = Number.parseInt(value ?? "0", 10);
   return Number.isFinite(score) ? score : 0;
+}
+
+function parseStatisticNumber(
+  competitor: EspnCompetitor,
+  statName: string
+) {
+  const stat = competitor.statistics?.find((row) => row.name === statName);
+  if (!stat) return null;
+  if (typeof stat.value === "number" && Number.isFinite(stat.value)) {
+    return stat.value;
+  }
+  const parsed = Number.parseFloat(stat.displayValue ?? "");
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function parseMinute(detail: EspnDetail) {
@@ -262,6 +286,36 @@ export function parseEspnLiveMatch(
   };
 }
 
+export function parseEspnGoalkeeperTeamSaves(
+  events: EspnEvent[],
+  input: EspnLiveMatchInput
+): EspnGoalkeeperTeamSavesSnapshot | null {
+  const event = findEvent(events, input);
+  const competition = event?.competitions?.[0];
+  if (!event || !competition) return null;
+
+  const home = competition.competitors?.find(
+    (row) => row.homeAway === "home"
+  );
+  const away = competition.competitors?.find(
+    (row) => row.homeAway === "away"
+  );
+  if (!home || !away) return null;
+
+  const homeShotsOnTarget = parseStatisticNumber(home, "shotsOnTarget");
+  const awayShotsOnTarget = parseStatisticNumber(away, "shotsOnTarget");
+  if (homeShotsOnTarget == null || awayShotsOnTarget == null) return null;
+
+  const homeScore = parseScore(home.score);
+  const awayScore = parseScore(away.score);
+
+  return {
+    sourceId: event.id ?? "",
+    homeSaves: Math.max(0, Math.round(awayShotsOnTarget - awayScore)),
+    awaySaves: Math.max(0, Math.round(homeShotsOnTarget - homeScore)),
+  };
+}
+
 function dateKey(date: Date) {
   return date.toISOString().slice(0, 10).replaceAll("-", "");
 }
@@ -313,4 +367,21 @@ export async function fetchEspnLiveMatch(
   );
 
   return parseEspnLiveMatch(eventGroups.flat(), input);
+}
+
+export async function fetchEspnGoalkeeperTeamSaves(
+  input: EspnLiveMatchInput
+): Promise<EspnGoalkeeperTeamSavesSnapshot | null> {
+  const keys = new Set<string>();
+  for (const offset of [-1, 0, 1]) {
+    const date = new Date(input.matchTime);
+    date.setUTCDate(date.getUTCDate() + offset);
+    keys.add(dateKey(date));
+  }
+
+  const eventGroups = await Promise.all(
+    Array.from(keys).map((key) => fetchScoreboard(key))
+  );
+
+  return parseEspnGoalkeeperTeamSaves(eventGroups.flat(), input);
 }

@@ -305,16 +305,16 @@ function isNowInNightWindow(now = new Date()) {
 }
 
 async function attachNightChampion(
-  entries: LeaderboardEntry[]
+  entries: LeaderboardEntry[],
+  windowPoints?: Map<string, PointsRow>
 ): Promise<LeaderboardEntry[]> {
   if (entries.length === 0) return entries;
 
-  const { start, end } = currentNightWindow();
-  const windowPoints = await getUserPointsMap({ from: start, to: end });
+  const nightWindowPoints = windowPoints ?? (await getNightWindowPointsMap());
   let championUserId: string | null = null;
   let championPoints = 0;
 
-  for (const [userId, row] of windowPoints.entries()) {
+  for (const [userId, row] of nightWindowPoints.entries()) {
     if (row.points > championPoints) {
       championUserId = userId;
       championPoints = row.points;
@@ -322,14 +322,20 @@ async function attachNightChampion(
   }
 
   return entries.map((entry) => {
-    const nightWindowPoints = windowPoints.get(entry.userId)?.points ?? 0;
+    const userNightWindowPoints =
+      nightWindowPoints.get(entry.userId)?.points ?? 0;
     return {
       ...entry,
-      nightWindowPoints,
+      nightWindowPoints: userNightWindowPoints,
       isNightChampion:
         championPoints > 0 && entry.userId === championUserId,
     };
   });
+}
+
+function getNightWindowPointsMap() {
+  const { start, end } = currentNightWindow();
+  return getUserPointsMap({ from: start, to: end });
 }
 
 function startOfDayUTC(d: Date) {
@@ -428,21 +434,24 @@ async function computeLeaderStreakDays(
 
 async function buildOverallLeaderboard(withTrend: boolean): Promise<LeaderboardEntry[]> {
   if (!withTrend) {
-    return attachNightChampion(
-      buildLeaderboard(await getUserPointsMap({}, { includeBracketPoints: true }))
-    );
+    const [currentMap, nightWindowPoints] = await Promise.all([
+      getUserPointsMap({}, { includeBracketPoints: true }),
+      getNightWindowPointsMap(),
+    ]);
+    return attachNightChampion(buildLeaderboard(currentMap), nightWindowPoints);
   }
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [currentMap, previousMap] = await Promise.all([
+  const [currentMap, previousMap, nightWindowPoints] = await Promise.all([
     getUserPointsMap({}, { includeBracketPoints: true }),
     getUserPointsMap({ before: weekAgo }, { includeBracketPoints: true }),
+    getNightWindowPointsMap(),
   ]);
 
   const current = buildLeaderboard(currentMap);
   const previous = buildLeaderboard(previousMap);
   const withRank = attachRankChange(current, previous);
-  const withNight = await attachNightChampion(withRank);
+  const withNight = await attachNightChampion(withRank, nightWindowPoints);
 
   // حساب الستريك لمستخدم الصدارة (إن وُجد) — يظهر فقط إذا تساوى أو تجاوز 3 أيام
   if (withNight.length > 0) {
