@@ -1342,7 +1342,18 @@ export async function getUserPredictionHistory(userId: string) {
     }),
   ]);
 
-  return { predictions, scorerPredictions, boldScorerBets, octopusBets };
+  const isVisibleAfterDeadline = (item: {
+    match: { matchTime: Date; status: string };
+  }) =>
+    item.match.status !== "SCHEDULED" ||
+    !isPredictionAllowed(item.match.matchTime, item.match.status);
+
+  return {
+    predictions: predictions.filter(isVisibleAfterDeadline),
+    scorerPredictions: scorerPredictions.filter(isVisibleAfterDeadline),
+    boldScorerBets: boldScorerBets.filter(isVisibleAfterDeadline),
+    octopusBets: octopusBets.filter(isVisibleAfterDeadline),
+  };
 }
 
 async function fetchLeagueMatchPredictions(matchId: string) {

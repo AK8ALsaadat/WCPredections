@@ -960,7 +960,7 @@ function getCachedFastMatchLineup(matchId: string) {
 function getCachedFullMatchLineup(matchId: string) {
   return unstable_cache(
     () => buildMatchLineup(matchId),
-    ["match-lineup-full-v3", matchId],
+    ["match-lineup-full-v4", matchId],
     {
       revalidate: MATCH_LINEUP_SHARED_CACHE_SECONDS,
       tags: [`lineup-${matchId}`],
@@ -980,24 +980,6 @@ export function prewarmFastMatchLineups(matchIds: string[]) {
         } catch {
           // Background warming is best-effort only.
         }
-      }
-    })();
-  }, 0);
-}
-
-function prewarmFullMatchLineup(matchId: string) {
-  setTimeout(() => {
-    void (async () => {
-      try {
-        const data = await getCachedFullMatchLineup(matchId);
-        if (data) {
-          matchLineupCache.set(matchId, {
-            data,
-            expiresAt: Date.now() + MATCH_LINEUP_CACHE_MS,
-          });
-        }
-      } catch {
-        // Background warming is best-effort only.
       }
     })();
   }, 0);
@@ -1042,15 +1024,6 @@ export async function getMatchLineup(
     return hit.data;
   }
 
-  const fast = await getCachedFastMatchLineup(matchId).catch(() => null);
-  if (fast) {
-    if (hasCompleteStartingLineups(fast)) {
-      prewarmFullMatchLineup(matchId);
-      return fast;
-    }
-    clearMatchLineupMemoryCache(matchId);
-  }
-
   let data: Awaited<ReturnType<typeof buildMatchLineup>> = null;
   try {
     data = await getCachedFullMatchLineup(matchId);
@@ -1059,7 +1032,9 @@ export async function getMatchLineup(
       try {
         data = await buildMatchLineup(matchId);
       } catch {
-        data = await buildFastMatchLineup(matchId);
+        data = await getCachedFastMatchLineup(matchId).catch(() =>
+          buildFastMatchLineup(matchId)
+        );
       }
     } else {
       console.warn(
@@ -1070,6 +1045,12 @@ export async function getMatchLineup(
         buildFastMatchLineup(matchId)
       );
     }
+  }
+
+  if (!data || !hasCompleteStartingLineups(data)) {
+    data = await getCachedFastMatchLineup(matchId).catch(() =>
+      buildFastMatchLineup(matchId)
+    );
   }
 
   if (data) {
