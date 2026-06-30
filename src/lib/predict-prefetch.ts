@@ -5,6 +5,7 @@ import {
   removeClientCache,
   writeClientCache,
 } from "@/lib/client-page-cache";
+import { hasCompleteStartingLineups } from "@/lib/lineup-completeness";
 import { isWithinLineupFastRefreshWindow } from "@/lib/utils";
 import { enqueueBackgroundPrefetch } from "@/lib/prefetch-queue";
 
@@ -46,7 +47,7 @@ export function predictMatchCacheKey(matchId: string) {
 }
 
 export function predictLineupCacheKey(matchId: string) {
-  return `predict:lineup:v11:${matchId}`;
+  return `predict:lineup:v12:${matchId}`;
 }
 
 function predictDraftCacheKey(matchId: string) {
@@ -210,16 +211,16 @@ export function prefetchPredictData(
   if (DISABLE_PREFETCH) return Promise.resolve();
   const includeLineup = options?.includeLineup === true;
   const matchFresh = isPredictMatchCacheFresh(matchId);
-  const cachedLineup = readClientCache<LineupCacheMeta>(
-    predictLineupCacheKey(matchId)
-  );
+  const cachedLineup = readPredictLineupCache<LineupCacheMeta>(matchId);
   const matchCached = readClientCache<{ matchTime?: string }>(
     predictMatchCacheKey(matchId)
   );
-  const lineupFresh = isClientCacheFresh(
-    predictLineupCacheKey(matchId),
-    lineupFreshMs(cachedLineup, matchCached?.matchTime)
-  );
+  const lineupFresh =
+    cachedLineup != null &&
+    isClientCacheFresh(
+      predictLineupCacheKey(matchId),
+      lineupFreshMs(cachedLineup, matchCached?.matchTime)
+    );
   if (matchFresh && (!includeLineup || lineupFresh)) return Promise.resolve();
 
   const existing = inflight.get(matchId);
@@ -264,7 +265,8 @@ export function readPredictMatchCache<T>(matchId: string): T | null {
 }
 
 export function readPredictLineupCache<T>(matchId: string): T | null {
-  return readClientCache<T>(predictLineupCacheKey(matchId));
+  const cached = readClientCache<T>(predictLineupCacheKey(matchId));
+  return hasCompleteStartingLineups(cached) ? cached : null;
 }
 
 export function writePredictMatchCache<T>(matchId: string, data: T) {
@@ -272,6 +274,10 @@ export function writePredictMatchCache<T>(matchId: string, data: T) {
 }
 
 export function writePredictLineupCache<T>(matchId: string, data: T) {
+  if (!hasCompleteStartingLineups(data)) {
+    removeClientCache(predictLineupCacheKey(matchId));
+    return;
+  }
   writeClientCache(predictLineupCacheKey(matchId), data);
 }
 
@@ -301,9 +307,12 @@ export function isPredictMatchCacheFresh(matchId: string) {
 export function isPredictLineupCacheFresh(matchId: string) {
   const cached = readPredictLineupCache<LineupCacheMeta>(matchId);
   const matchCached = readPredictMatchCache<{ matchTime?: string }>(matchId);
-  return isClientCacheFresh(
-    predictLineupCacheKey(matchId),
-    lineupFreshMs(cached, matchCached?.matchTime)
+  return (
+    cached != null &&
+    isClientCacheFresh(
+      predictLineupCacheKey(matchId),
+      lineupFreshMs(cached, matchCached?.matchTime)
+    )
   );
 }
 

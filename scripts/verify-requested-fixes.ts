@@ -10,6 +10,7 @@ import { playerNamesMatch } from "../src/lib/player-matching";
 import { matchIdentityKey } from "../src/lib/team-identity";
 import { layoutFormation } from "../src/lib/formation-layout";
 import { mergeLineupData } from "../src/lib/lineup-state";
+import { hasCompleteStartingLineups } from "../src/lib/lineup-completeness";
 import { dedupeDisplayMatches } from "../src/lib/match-list-dedupe";
 import { buildMatchHistoryEntries } from "../src/lib/profile-history";
 import { isPredictionAllowed } from "../src/lib/utils";
@@ -539,6 +540,25 @@ check(
   retainedLineup.homePlayers.some(
     (player) => player.id === "yamal" && player.section === "bench"
   )
+);
+const completeSide = Array.from({ length: 11 }, (_, index) => ({
+  id: `starter-${index}`,
+  name: `Starter ${index}`,
+  section: "lineup" as const,
+}));
+check(
+  "lineup completeness rejects cached payloads missing a starter",
+  !hasCompleteStartingLineups({
+    homePlayers: completeSide.slice(0, 10),
+    awayPlayers: completeSide,
+  })
+);
+check(
+  "lineup completeness accepts both teams with eleven starters",
+  hasCompleteStartingLineups({
+    homePlayers: completeSide,
+    awayPlayers: completeSide,
+  })
 );
 
 const lightMatchesWithoutLineup = dedupeDisplayMatches([

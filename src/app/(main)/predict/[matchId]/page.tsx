@@ -28,6 +28,7 @@ import {
 } from "@/lib/predict-prefetch";
 import { invalidateLeaguePredictionsCache } from "@/lib/league-predictions-prefetch";
 import { invalidateMatchDetailCache } from "@/lib/match-detail-cache";
+import { hasCompleteStartingLineups } from "@/lib/lineup-completeness";
 import {
   cn,
   formatDate,
@@ -121,6 +122,7 @@ async function fetchLineupForMatch(
   const data = await res.json();
   if (!data.success) return null;
   const payload = data.data as LineupData;
+  if (!hasCompleteStartingLineups(payload)) return null;
   writePredictLineupCache(matchId, payload);
   return payload;
 }
@@ -234,7 +236,7 @@ function lineupFromMatchPayload(payload: MatchData): LineupData | null {
     return null;
   }
 
-  return {
+  const lineup = {
     homePlayers: candidate.homePlayers,
     awayPlayers: candidate.awayPlayers,
     homeFormation: candidate.homeFormation ?? "4-3-3",
@@ -247,6 +249,7 @@ function lineupFromMatchPayload(payload: MatchData): LineupData | null {
     homeShortName: candidate.homeShortName ?? payload.homeTeam.shortName,
     awayShortName: candidate.awayShortName ?? payload.awayTeam.shortName,
   };
+  return hasCompleteStartingLineups(lineup) ? lineup : null;
 }
 
 type FormState = {

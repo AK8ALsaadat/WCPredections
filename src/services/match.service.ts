@@ -2,6 +2,7 @@
 import { revalidateTag, unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { isPredictionAllowed } from "@/lib/utils";
+import { hasCompleteStartingLineups } from "@/lib/lineup-completeness";
 import { shouldShowMatchInUpcomingList } from "@/lib/tournament-gates";
 import { getTournamentRoundName } from "@/lib/rounds";
 import { filterVisibleMatches } from "@/lib/tournament-gates";
@@ -933,7 +934,7 @@ async function buildFastMatchLineup(matchId: string) {
 function getCachedFastMatchLineup(matchId: string) {
   return unstable_cache(
     () => buildFastMatchLineup(matchId),
-    ["match-lineup-fast-v1", matchId],
+    ["match-lineup-fast-v2", matchId],
     {
       revalidate: MATCH_LINEUP_SHARED_CACHE_SECONDS,
       tags: [`lineup-${matchId}`],
@@ -944,7 +945,7 @@ function getCachedFastMatchLineup(matchId: string) {
 function getCachedFullMatchLineup(matchId: string) {
   return unstable_cache(
     () => buildMatchLineup(matchId),
-    ["match-lineup-full-v2", matchId],
+    ["match-lineup-full-v3", matchId],
     {
       revalidate: MATCH_LINEUP_SHARED_CACHE_SECONDS,
       tags: [`lineup-${matchId}`],
@@ -1028,19 +1029,32 @@ export async function getMatchLineup(
 
   const fast = await getCachedFastMatchLineup(matchId).catch(() => null);
   if (fast) {
-    prewarmFullMatchLineup(matchId);
-    return fast;
+    if (hasCompleteStartingLineups(fast)) {
+      prewarmFullMatchLineup(matchId);
+      return fast;
+    }
+    clearMatchLineupMemoryCache(matchId);
   }
 
   let data: Awaited<ReturnType<typeof buildMatchLineup>> = null;
   try {
     data = await getCachedFullMatchLineup(matchId);
   } catch (error) {
-    console.warn(
-      "[lineup] full lineup failed, falling back to local squad:",
-      error instanceof Error ? error.message : error
-    );
-    data = await getCachedFastMatchLineup(matchId);
+    if (isMissingNextIncrementalCache(error)) {
+      try {
+        data = await buildMatchLineup(matchId);
+      } catch {
+        data = await buildFastMatchLineup(matchId);
+      }
+    } else {
+      console.warn(
+        "[lineup] full lineup failed, falling back to local squad:",
+        error instanceof Error ? error.message : error
+      );
+      data = await getCachedFastMatchLineup(matchId).catch(() =>
+        buildFastMatchLineup(matchId)
+      );
+    }
   }
 
   if (data) {
