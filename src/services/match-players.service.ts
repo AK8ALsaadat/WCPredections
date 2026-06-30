@@ -371,39 +371,6 @@ async function within<T>(promise: Promise<T>, ms: number, fallback: T) {
   }
 }
 
-async function firstAvailable<T>(
-  promises: Promise<T | null>[]
-): Promise<T | null> {
-  return new Promise((resolve) => {
-    let pending = promises.length;
-    let settled = false;
-
-    if (pending === 0) {
-      resolve(null);
-      return;
-    }
-
-    for (const promise of promises) {
-      promise
-        .then((value) => {
-          if (settled) return;
-          if (value != null) {
-            settled = true;
-            resolve(value);
-            return;
-          }
-          pending--;
-          if (pending === 0) resolve(null);
-        })
-        .catch(() => {
-          if (settled) return;
-          pending--;
-          if (pending === 0) resolve(null);
-        });
-    }
-  });
-}
-
 function formationFromGrid(players: { grid?: string | null }[]) {
   const rows = new Map<number, number>();
   for (const player of players) {
@@ -1126,31 +1093,26 @@ async function syncProbableLineup(
     return cached.data;
   }
 
-  type ProbableCandidate = {
-    source: "history" | "espn" | "api-football";
-    data: {
-      formation: string | null;
-      lineup: ExternalLineupPlayer[];
-      bench: ExternalLineupPlayer[];
-    };
-  };
-
   const currentRosterPromise = within(fetchEspnRoster(teamName), 2_000, []);
-  const candidate = await firstAvailable<ProbableCandidate>([
-    within(
-      fetchLastFootballDataLineup(apiTeamId, targetMatchTime),
-      2_500,
-      null
-    ).then((data) => data ? { source: "history" as const, data } : null),
-    within(fetchLastEspnLineup(teamName, targetMatchTime), 2_500, null).then(
-      (data) => data ? { source: "espn" as const, data } : null
-    ),
-    within(
-      fetchProbableLineupFromApiFootball(teamName, targetMatchTime),
-      2_500,
-      null
-    ).then((data) => data ? { source: "api-football" as const, data } : null),
-  ]);
+  const historyCandidate = within(
+    fetchLastFootballDataLineup(apiTeamId, targetMatchTime),
+    2_500,
+    null
+  ).then((data) => data ? { source: "history" as const, data } : null);
+  const espnCandidate = within(
+    fetchLastEspnLineup(teamName, targetMatchTime),
+    2_500,
+    null
+  ).then((data) => data ? { source: "espn" as const, data } : null);
+  const apiFootballCandidate = within(
+    fetchProbableLineupFromApiFootball(teamName, targetMatchTime),
+    2_500,
+    null
+  ).then((data) => data ? { source: "api-football" as const, data } : null);
+  const candidate =
+    (await historyCandidate) ??
+    (await espnCandidate) ??
+    (await apiFootballCandidate);
   const currentRoster = await currentRosterPromise;
   const candidateBench = candidate
     ? mergeProbableBenchWithCurrentRoster(

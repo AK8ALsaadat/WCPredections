@@ -186,7 +186,7 @@ export function FinalistsPredictionSummaryCard({
               </p>
             </div>
           )}
-          {locked && hasPrediction && (
+          {locked && (
             <Link
               href="/finalists-predictions"
               className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white transition hover:bg-primary-hover"

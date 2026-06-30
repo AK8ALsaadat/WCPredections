@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { clientFetch } from "@/lib/client-fetch";
@@ -362,9 +363,19 @@ export function KnockoutBracketPredictionCard() {
               {error && <span className="text-danger">{error}</span>}
               {status?.locked && <span className="text-warning">انتهى وقت التوقع</span>}
             </div>
-            <Button type="submit" size="sm" loading={saving} disabled={disabled}>
-              حفظ توقع النهائي
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {status?.locked && (
+                <Link
+                  href="/finalists-predictions"
+                  className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white transition hover:bg-primary-hover"
+                >
+                  شف توقعات الدوري
+                </Link>
+              )}
+              <Button type="submit" size="sm" loading={saving} disabled={disabled}>
+                حفظ توقع النهائي
+              </Button>
+            </div>
           </div>
         </form>
       </div>

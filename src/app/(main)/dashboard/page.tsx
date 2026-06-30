@@ -172,39 +172,37 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {(!finalistsStatus.locked || finalistsStatus.prediction) && (
-        <FinalistsPredictionSummaryCard
-          deadline={
-            finalistsStatus.deadline
-              ? new Date(finalistsStatus.deadline).toISOString()
-              : null
-          }
-          locked={finalistsStatus.locked}
-          prediction={
-            finalistsStatus.prediction
-              ? {
-                  finalistOneTeam: {
-                    name: finalistsStatus.prediction.finalistOneTeam.name,
-                    shortName: finalistsStatus.prediction.finalistOneTeam.shortName,
-                    logoUrl: finalistsStatus.prediction.finalistOneTeam.logoUrl,
-                  },
-                  finalistTwoTeam: {
-                    name: finalistsStatus.prediction.finalistTwoTeam.name,
-                    shortName: finalistsStatus.prediction.finalistTwoTeam.shortName,
-                    logoUrl: finalistsStatus.prediction.finalistTwoTeam.logoUrl,
-                  },
-                  championTeam: {
-                    name: finalistsStatus.prediction.championTeam.name,
-                    shortName: finalistsStatus.prediction.championTeam.shortName,
-                    logoUrl: finalistsStatus.prediction.championTeam.logoUrl,
-                  },
-                  totalPoints: finalistsStatus.prediction.totalPoints,
-                }
-              : null
-          }
-          pointsTotal={finalistsStatus.points?.total ?? null}
-        />
-      )}
+      <FinalistsPredictionSummaryCard
+        deadline={
+          finalistsStatus.deadline
+            ? new Date(finalistsStatus.deadline).toISOString()
+            : null
+        }
+        locked={finalistsStatus.locked}
+        prediction={
+          finalistsStatus.prediction
+            ? {
+                finalistOneTeam: {
+                  name: finalistsStatus.prediction.finalistOneTeam.name,
+                  shortName: finalistsStatus.prediction.finalistOneTeam.shortName,
+                  logoUrl: finalistsStatus.prediction.finalistOneTeam.logoUrl,
+                },
+                finalistTwoTeam: {
+                  name: finalistsStatus.prediction.finalistTwoTeam.name,
+                  shortName: finalistsStatus.prediction.finalistTwoTeam.shortName,
+                  logoUrl: finalistsStatus.prediction.finalistTwoTeam.logoUrl,
+                },
+                championTeam: {
+                  name: finalistsStatus.prediction.championTeam.name,
+                  shortName: finalistsStatus.prediction.championTeam.shortName,
+                  logoUrl: finalistsStatus.prediction.championTeam.logoUrl,
+                },
+                totalPoints: finalistsStatus.prediction.totalPoints,
+              }
+            : null
+        }
+        pointsTotal={finalistsStatus.points?.total ?? null}
+      />
 
       <section className="grid gap-6 md:gap-8">
         <div>
