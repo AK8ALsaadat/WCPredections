@@ -84,14 +84,24 @@ export async function replaceMatchScorers(
   } of apiScorers) {
     if (goals <= 0) continue;
 
-    let player = await prisma.player.findFirst({
-      where: { apiPlayerId: playerApiId },
-      select: { id: true },
-    });
+    const teamId = teamApiId
+      ? await resolveScorerTeamId(match, teamApiId)
+      : null;
 
-    if (!player && playerName && teamApiId) {
-      const teamId = await resolveScorerTeamId(match, teamApiId);
-      if (teamId) {
+    let player: { id: string } | null = null;
+
+    if (teamId) {
+      player = await prisma.player.findUnique({
+        where: {
+          teamId_apiPlayerId: {
+            teamId,
+            apiPlayerId: playerApiId,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!player && playerName) {
         const squad = await prisma.player.findMany({
           where: { teamId },
           select: { id: true, name: true, apiPlayerId: true },
@@ -121,6 +131,13 @@ export async function replaceMatchScorers(
           });
         }
       }
+    }
+
+    if (!player) {
+      player = await prisma.player.findFirst({
+        where: { apiPlayerId: playerApiId },
+        select: { id: true },
+      });
     }
 
     if (player) {

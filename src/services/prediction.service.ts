@@ -973,7 +973,12 @@ type ScorerPredictionWithPlayer = {
   userId: string;
   playerId: string;
   predictedGoals: number;
-  player: { name: string; teamId: string; position?: string | null };
+  player: {
+    name: string;
+    teamId: string;
+    position?: string | null;
+    team?: { name?: string | null } | null;
+  };
 };
 
 async function applyScorerAndBoldPoints(
@@ -988,7 +993,11 @@ async function applyScorerAndBoldPoints(
     matchScorers: {
       playerId: string;
       goals: number;
-      player: { teamId: string; name: string };
+      player: {
+        teamId: string;
+        name: string;
+        team?: { name?: string | null } | null;
+      };
     }[];
   },
   scorerGoalsByPlayer: Map<string, number>,
@@ -1035,8 +1044,18 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
   const match = await prisma.match.findUniqueOrThrow({
     where: { id: matchId },
     include: {
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
       matchScorers: {
-        include: { player: { select: { teamId: true, name: true } } },
+        include: {
+          player: {
+            select: {
+              teamId: true,
+              name: true,
+              team: { select: { name: true } },
+            },
+          },
+        },
       },
     },
   });
@@ -1054,6 +1073,8 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
           actualFinishType: match.actualFinishType,
           homeTeamId: match.homeTeamId,
           awayTeamId: match.awayTeamId,
+          homeTeamName: match.homeTeam.name,
+          awayTeamName: match.awayTeam.name,
           homeScore: match.homeScore!,
           awayScore: match.awayScore!,
         },
@@ -1064,7 +1085,16 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
   const scorerPredictions = canScoreScorers
     ? await prisma.scorerPrediction.findMany({
         where: { matchId },
-        include: { player: { select: { name: true, teamId: true, position: true } } },
+        include: {
+          player: {
+            select: {
+              name: true,
+              teamId: true,
+              position: true,
+              team: { select: { name: true } },
+            },
+          },
+        },
       })
     : [];
 
@@ -1107,7 +1137,16 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
           prediction.predAway,
           match.homeScore!,
           match.awayScore!,
-          false
+          false,
+          {
+            homeTeamId: match.homeTeamId,
+            awayTeamId: match.awayTeamId,
+            predictedFinishType: prediction.predictedFinishType,
+            predictedPenaltyWinnerTeamId:
+              prediction.predictedPenaltyWinnerTeamId,
+            actualFinishType: match.actualFinishType,
+            actualPenaltyWinnerTeamId: match.penaltyWinnerTeamId,
+          }
         )
       : 0;
 

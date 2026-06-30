@@ -75,6 +75,27 @@ function ok(name: string, cond: boolean, detail?: string) {
 
 console.log("\n=== نقاط النتيجة ===");
 ok("EXACT_SCORE_POINTS = 5", EXACT_SCORE_POINTS === 5);
+ok(
+  "penalty-picked winner earns result point if the same team wins earlier",
+  calculateScorePredictionPoints(1, 1, 2, 1, false, {
+    homeTeamId: "home-team",
+    awayTeamId: "away-team",
+    predictedFinishType: "PENALTIES",
+    predictedPenaltyWinnerTeamId: "home-team",
+    actualFinishType: "NINETY_MINUTES",
+  }) === 1
+);
+ok(
+  "wrong shootout winner does not get result point just because score is tied",
+  calculateScorePredictionPoints(2, 2, 1, 1, false, {
+    homeTeamId: "home-team",
+    awayTeamId: "away-team",
+    predictedFinishType: "PENALTIES",
+    predictedPenaltyWinnerTeamId: "home-team",
+    actualFinishType: "PENALTIES",
+    actualPenaltyWinnerTeamId: "away-team",
+  }) === 0
+);
 ok("نتيجة دقيقة = 5", calculateScorePredictionPoints(2, 1, 2, 1, false) === 5);
 ok("فائز صح = 1", calculateScorePredictionPoints(2, 0, 3, 1, false) === 1);
 ok("خطأ = 0", calculateScorePredictionPoints(1, 0, 0, 2, false) === 0);
@@ -382,6 +403,35 @@ const regMap = buildRegulationScorerGoalsMap(homeId, awayId, 1, 1, [
   { playerId: "striker", goals: 1, player: { teamId: homeId } },
   { playerId: "pen-taker", goals: 1, player: { teamId: homeId } },
 ]);
+const duplicatedTeamPenaltyScorers = getScorerGoalsForPoints(
+  {
+    actualFinishType: "PENALTIES",
+    homeTeamId: homeId,
+    awayTeamId: awayId,
+    homeTeamName: "Netherlands",
+    awayTeamName: "Morocco",
+    homeScore: 1,
+    awayScore: 1,
+  },
+  [
+    {
+      playerId: "source-gakpo",
+      goals: 1,
+      player: {
+        teamId: "duplicate-netherlands",
+        team: { name: "Netherlands" },
+      },
+    },
+    {
+      playerId: "source-diop",
+      goals: 1,
+      player: {
+        teamId: awayId,
+        team: { name: "Morocco" },
+      },
+    },
+  ]
+);
 ok(
   "1-1 وركلات: هدف ملعب واحد فقط للفريق",
   regMap.get("striker") === 1 && regMap.get("pen-taker") === 0
@@ -399,6 +449,12 @@ ok(
     !shouldIgnorePositionMultiplierForScorerPrediction("new-prediction")
 );
 
+ok(
+  "penalty match scorer goals survive duplicate team ids when they are regulation goals",
+  duplicatedTeamPenaltyScorers.get("source-gakpo") === 1 &&
+    duplicatedTeamPenaltyScorers.get("source-diop") === 1
+);
+
 const goalsById = new Map([
   ["api-scorer-id", 1],
 ]);
@@ -412,6 +468,31 @@ ok(
       {
         playerId: "api-scorer-id",
         player: { name: "K. Mbappe", teamId: "france" },
+      },
+    ]
+  ) === 1
+);
+const duplicateTeamGoalsById = new Map([
+  ["source-gakpo", 1],
+]);
+ok(
+  "resolveScorerGoalsForPlayer: duplicate team id still matches by team identity",
+  resolveScorerGoalsForPlayer(
+    "lineup-gakpo",
+    {
+      name: "Cody Gakpo",
+      teamId: homeId,
+      team: { name: "Netherlands" },
+    },
+    duplicateTeamGoalsById,
+    [
+      {
+        playerId: "source-gakpo",
+        player: {
+          name: "C. Gakpo",
+          teamId: "duplicate-netherlands",
+          team: { name: "Netherlands" },
+        },
       },
     ]
   ) === 1

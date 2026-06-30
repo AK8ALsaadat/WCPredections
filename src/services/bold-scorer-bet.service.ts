@@ -272,7 +272,11 @@ export async function calculateBoldScorerBetPointsForMatch(
   regulationGoalsByPlayer: Map<string, number>,
   actualScorers: {
     playerId: string;
-    player: { name: string; teamId: string };
+    player: {
+      name: string;
+      teamId: string;
+      team?: { name?: string | null } | null;
+    };
   }[] = []
 ) {
   const [match, bets] = await Promise.all([
@@ -283,7 +287,13 @@ export async function calculateBoldScorerBetPointsForMatch(
     prisma.boldScorerBet.findMany({
       where: { matchId, cancelledAt: null },
       include: {
-        player: { select: { name: true, teamId: true } },
+        player: {
+          select: {
+            name: true,
+            teamId: true,
+            team: { select: { name: true } },
+          },
+        },
       },
     }),
   ]);

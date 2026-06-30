@@ -1,4 +1,5 @@
 import type { FinishType, Match } from "@prisma/client";
+import { normalizeTeamIdentity } from "@/lib/team-identity";
 import { getMatchResult } from "@/lib/utils";
 
 /** نقاط النتيجة الصحيحة بالضبط */
@@ -12,21 +13,85 @@ export function calculateScorePredictionPoints(
   predAway: number,
   actualHome: number,
   actualAway: number,
-  _isDouble = false
+  _isDouble = false,
+  context?: {
+    homeTeamId?: string | null;
+    awayTeamId?: string | null;
+    predictedFinishType?: FinishType | null;
+    predictedPenaltyWinnerTeamId?: string | null;
+    actualFinishType?: FinishType | null;
+    actualPenaltyWinnerTeamId?: string | null;
+  }
 ): number {
   let basePoints = 0;
 
   if (predHome === actualHome && predAway === actualAway) {
     basePoints = EXACT_SCORE_POINTS;
   } else {
-    const predicted = getMatchResult(predHome, predAway);
-    const actual = getMatchResult(actualHome, actualAway);
+    const predicted = getPredictedMatchOutcome(predHome, predAway, context);
+    const actual = getActualMatchOutcome(actualHome, actualAway, context);
     if (predicted === actual) {
       basePoints = 1;
     }
   }
 
   return basePoints;
+}
+
+type MatchOutcome = "home" | "away" | "draw";
+
+function teamIdToOutcome(
+  teamId: string | null | undefined,
+  context?: { homeTeamId?: string | null; awayTeamId?: string | null }
+): MatchOutcome | null {
+  if (!teamId) return null;
+  if (context?.homeTeamId && teamId === context.homeTeamId) return "home";
+  if (context?.awayTeamId && teamId === context.awayTeamId) return "away";
+  return null;
+}
+
+function getPredictedMatchOutcome(
+  predHome: number,
+  predAway: number,
+  context?: {
+    homeTeamId?: string | null;
+    awayTeamId?: string | null;
+    predictedFinishType?: FinishType | null;
+    predictedPenaltyWinnerTeamId?: string | null;
+  }
+): MatchOutcome {
+  if (predHome > predAway) return "home";
+  if (predAway > predHome) return "away";
+
+  if (context?.predictedFinishType === "PENALTIES") {
+    return (
+      teamIdToOutcome(context.predictedPenaltyWinnerTeamId, context) ?? "draw"
+    );
+  }
+
+  return getMatchResult(predHome, predAway) as MatchOutcome;
+}
+
+function getActualMatchOutcome(
+  actualHome: number,
+  actualAway: number,
+  context?: {
+    homeTeamId?: string | null;
+    awayTeamId?: string | null;
+    actualFinishType?: FinishType | null;
+    actualPenaltyWinnerTeamId?: string | null;
+  }
+): MatchOutcome {
+  if (actualHome > actualAway) return "home";
+  if (actualAway > actualHome) return "away";
+
+  if (context?.actualFinishType === "PENALTIES") {
+    return (
+      teamIdToOutcome(context.actualPenaltyWinnerTeamId, context) ?? "draw"
+    );
+  }
+
+  return getMatchResult(actualHome, actualAway) as MatchOutcome;
 }
 
 export function calculateDoubleBonus(
@@ -189,7 +254,11 @@ export function isMatchEligibleForScorerPoints(match: Match): boolean {
 export type MatchScorerRow = {
   playerId: string;
   goals: number;
-  player: { teamId: string };
+  player: {
+    teamId: string;
+    name?: string | null;
+    team?: { name?: string | null } | null;
+  };
 };
 
 /** توزيع أهداف الملعب فقط — بدون ركلات الترجيح بعد 120 دقيقة */
@@ -210,16 +279,41 @@ function allocateRegulationGoals(
   }
 }
 
+function scorerBelongsToTeam(
+  scorer: MatchScorerRow,
+  team: { id: string; name?: string | null }
+) {
+  if (scorer.player.teamId === team.id) return true;
+
+  const scorerTeamName = scorer.player.team?.name;
+  if (!team.name || !scorerTeamName) return false;
+
+  return (
+    normalizeTeamIdentity(team.name) === normalizeTeamIdentity(scorerTeamName)
+  );
+}
+
 export function buildRegulationScorerGoalsMap(
   homeTeamId: string,
   awayTeamId: string,
   homeScore: number,
   awayScore: number,
-  scorers: MatchScorerRow[]
+  scorers: MatchScorerRow[],
+  options?: { homeTeamName?: string | null; awayTeamName?: string | null }
 ): Map<string, number> {
   const result = new Map<string, number>();
-  const home = scorers.filter((s) => s.player.teamId === homeTeamId);
-  const away = scorers.filter((s) => s.player.teamId === awayTeamId);
+  const home = scorers.filter((s) =>
+    scorerBelongsToTeam(s, {
+      id: homeTeamId,
+      name: options?.homeTeamName,
+    })
+  );
+  const away = scorers.filter((s) =>
+    scorerBelongsToTeam(s, {
+      id: awayTeamId,
+      name: options?.awayTeamName,
+    })
+  );
 
   allocateRegulationGoals(home, homeScore, result);
   allocateRegulationGoals(away, awayScore, result);
@@ -232,6 +326,8 @@ export function getScorerGoalsForPoints(
     actualFinishType: FinishType | null;
     homeTeamId: string;
     awayTeamId: string;
+    homeTeamName?: string | null;
+    awayTeamName?: string | null;
     homeScore: number;
     awayScore: number;
   },
@@ -241,12 +337,25 @@ export function getScorerGoalsForPoints(
     return new Map(scorers.map((s) => [s.playerId, s.goals]));
   }
 
+  const expectedRegulationGoals = match.homeScore + match.awayScore;
+  const knownScorerGoals = scorers.reduce(
+    (sum, scorer) => sum + scorer.goals,
+    0
+  );
+  if (knownScorerGoals <= expectedRegulationGoals) {
+    return new Map(scorers.map((s) => [s.playerId, s.goals]));
+  }
+
   return buildRegulationScorerGoalsMap(
     match.homeTeamId,
     match.awayTeamId,
     match.homeScore,
     match.awayScore,
-    scorers
+    scorers,
+    {
+      homeTeamName: match.homeTeamName,
+      awayTeamName: match.awayTeamName,
+    }
   );
 }
 

@@ -145,6 +145,16 @@ function octopusSummary(
   };
 }
 
+function finishBadgeClass(type: string | null | undefined) {
+  if (type === "PENALTIES") {
+    return "border-fuchsia-300/40 bg-fuchsia-500/15 text-fuchsia-100";
+  }
+  if (type === "EXTRA_TIME") {
+    return "border-sky-300/40 bg-sky-500/15 text-sky-100";
+  }
+  return "border-emerald-300/35 bg-emerald-500/15 text-emerald-100";
+}
+
 export function MatchCard({
   match,
   showPredictButton,
@@ -157,6 +167,26 @@ export function MatchCard({
   const isFinished = match.status === "FINISHED";
   const isLive = match.status === "LIVE";
   const hasPrediction = !!match.userPrediction;
+  const actualFinishType = asFinishType(match.actualFinishType);
+  const predictedFinishType = asFinishType(
+    match.userPrediction?.predictedFinishType
+  );
+  const visibleFinishType = isFinished ? actualFinishType : predictedFinishType;
+  const visibleFinishLabel =
+    match.isKnockout && visibleFinishType
+      ? t.finishType[visibleFinishType]
+      : null;
+  const accentClass = match.userBoldScorerBet
+    ? "bg-gradient-to-r from-red-400 via-rose-300 to-orange-300"
+    : match.userOctopusBet
+      ? "bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-300"
+      : match.userPrediction?.isDouble
+        ? "bg-gradient-to-r from-orange-300 via-amber-200 to-yellow-300"
+        : isLive
+          ? "bg-gradient-to-r from-primary via-cyan-300 to-primary"
+          : isFinished
+            ? "bg-gradient-to-r from-emerald-300 via-card-border to-primary/70"
+            : "bg-gradient-to-r from-card-border via-primary/50 to-card-border";
   const hasAnyUserEntry =
     hasPrediction ||
     (match.userScorerPredictions?.length ?? 0) > 0 ||
@@ -239,7 +269,7 @@ export function MatchCard({
 
   return (
     <Card
-      className={`transition-colors ${
+      className={`relative overflow-hidden transition-colors ${
         match.userBoldScorerBet
           ? "border-red-400/60 bg-red-950/25 hover:border-red-300"
           : match.userOctopusBet
@@ -249,12 +279,22 @@ export function MatchCard({
             : "hover:border-primary/30"
       }`}
     >
+      <div className={`absolute inset-x-0 top-0 h-1 ${accentClass}`} />
       <div className="mb-3 flex items-center justify-between text-xs text-muted">
         <span>{stageLabel}</span>
         <div className="flex items-center gap-2">
           {match.isKnockout && (
             <span className="rounded bg-warning/20 px-2 py-0.5 text-warning">
               {t.matches.knockoutBadge}
+            </span>
+          )}
+          {visibleFinishLabel && (
+            <span
+              className={`rounded-md border px-2 py-0.5 font-semibold ${finishBadgeClass(
+                visibleFinishType
+              )}`}
+            >
+              {visibleFinishLabel}
             </span>
           )}
           {hasPrediction && !isFinished && (
@@ -291,7 +331,17 @@ export function MatchCard({
             <span className="truncate font-medium">{safeHome.shortName}</span>
           </div>
 
-          <div className="flex shrink-0 flex-col items-center px-1">
+          <div
+            className={`flex min-w-[5.75rem] shrink-0 flex-col items-center rounded-xl border px-3 py-2 shadow-inner ${
+              isLive
+                ? "border-primary/35 bg-primary/10"
+                : isFinished
+                  ? "border-card-border/80 bg-background/60"
+                  : showUserPrediction
+                    ? "border-warning/30 bg-warning/10"
+                    : "border-card-border/60 bg-background/35"
+            }`}
+          >
             {isLive ? (
               <div className="text-center">
                 <span className="text-2xl font-bold">

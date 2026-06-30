@@ -1,3 +1,5 @@
+import { normalizeTeamIdentity } from "@/lib/team-identity";
+
 export function normalizePlayerName(name: string): string {
   return name
     .replace(/[ıİ]/g, "i")
@@ -158,12 +160,33 @@ export function resolvePlayerInSquad<T extends SquadPlayer>(
 
 type ScorerRow = {
   playerId: string;
-  player: { name: string; teamId: string };
+  player: {
+    name: string;
+    teamId: string;
+    team?: { name?: string | null } | null;
+  };
 };
+
+function sameTeamIdentity(
+  a: { teamId: string; team?: { name?: string | null } | null },
+  b: { teamId: string; team?: { name?: string | null } | null }
+) {
+  if (a.teamId === b.teamId) return true;
+
+  const aName = a.team?.name;
+  const bName = b.team?.name;
+  if (!aName || !bName) return false;
+
+  return normalizeTeamIdentity(aName) === normalizeTeamIdentity(bName);
+}
 
 export function resolveScorerGoalsForPlayer(
   predictedPlayerId: string,
-  predictedPlayer: { name: string; teamId: string },
+  predictedPlayer: {
+    name: string;
+    teamId: string;
+    team?: { name?: string | null } | null;
+  },
   goalsByPlayerId: Map<string, number>,
   actualScorers: ScorerRow[]
 ): number | undefined {
@@ -172,7 +195,7 @@ export function resolveScorerGoalsForPlayer(
 
   // Prefer same-team exact/approx name matches
   for (const scorer of actualScorers) {
-    if (scorer.player.teamId !== predictedPlayer.teamId) continue;
+    if (!sameTeamIdentity(scorer.player, predictedPlayer)) continue;
     if (!playerNamesMatch(predictedPlayer.name, scorer.player.name)) continue;
     const goals = goalsByPlayerId.get(scorer.playerId);
     if (goals != null && goals > 0) return goals;
