@@ -208,6 +208,7 @@ function penaltyLine(
   ) {
     return null;
   }
+  if (p.penaltyWinnerPoints === 0) return null;
   if (!showMisses && !p.penaltyWinnerPoints) return null;
 
   const hit = p.penaltyWinnerPoints > 0;

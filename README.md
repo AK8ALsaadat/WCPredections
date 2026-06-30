@@ -114,7 +114,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Knockout Matches
 - Correct finish type (90 min / extra time / penalties): +1
-- Correct penalty shootout winner: +1
+- Correct penalty shootout winner counts as the normal winner/result point, not an extra point
 
 ## API Routes
 

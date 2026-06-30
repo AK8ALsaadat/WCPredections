@@ -169,18 +169,12 @@ export async function submitBoldScorerBet(
 
   const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(scope);
 
-  const [prediction, octopusBet] = await Promise.all([
-    prisma.prediction.findUnique({
-      where: { userId_matchId: { userId, matchId } },
-      select: { id: true, isDouble: true },
-    }),
-    prisma.octopusGoalkeeperBet.findUnique({
-      where: {
-        userId_usageRoundKey: { userId, usageRoundKey: scope.key },
-      },
-      select: { id: true, matchId: true, cancelledAt: true },
-    }),
-  ]);
+  const octopusBet = await prisma.octopusGoalkeeperBet.findUnique({
+    where: {
+      userId_usageRoundKey: { userId, usageRoundKey: scope.key },
+    },
+    select: { id: true, matchId: true, cancelledAt: true },
+  });
   if (octopusBet && octopusBet.matchId !== matchId && !octopusBet.cancelledAt) {
     throw new Error("ما تقدر تستخدم الرهان والأخطبوط معاً على نفس المباراة");
   }
@@ -230,10 +224,14 @@ export async function submitBoldScorerBet(
   }
 
   const bet = await prisma.$transaction(async (tx) => {
-    if (prediction?.isDouble && !allowDoubleWithBold) {
-      await tx.prediction.update({
-        where: { id: prediction.id },
-        data: { isDouble: false },
+    if (!allowDoubleWithBold) {
+      await tx.prediction.updateMany({
+        where: {
+          userId,
+          isDouble: true,
+          matchId: { in: scope.matchIds },
+        },
+        data: { isDouble: false, doubleBonus: 0 },
       });
     }
 

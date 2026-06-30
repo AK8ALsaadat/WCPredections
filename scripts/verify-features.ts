@@ -168,8 +168,8 @@ ok(
   calculateFinishTypePoints("NINETY_MINUTES", "PENALTIES") === 0
 );
 ok(
-  "ركلات صح = 1",
-  calculatePenaltyWinnerPoints("team-a", "team-a") === 1
+  "ركلات صح = 0 كنقطة منفصلة",
+  calculatePenaltyWinnerPoints("team-a", "team-a") === 0
 );
 ok(
   "ركلات خطأ = 0",
@@ -184,8 +184,16 @@ ok(
   )
 );
 ok(
-  "penalty winner point requires a penalties prediction",
-  calculateKnockoutPenaltyWinnerPoints("PENALTIES", "team-a", "team-a") === 1 &&
+  "penalty winner is scored through the normal result point only",
+  calculateScorePredictionPoints(2, 2, 1, 1, false, {
+    homeTeamId: "team-a",
+    awayTeamId: "team-b",
+    predictedFinishType: "PENALTIES",
+    predictedPenaltyWinnerTeamId: "team-a",
+    actualFinishType: "PENALTIES",
+    actualPenaltyWinnerTeamId: "team-a",
+  }) === 1 &&
+    calculateKnockoutPenaltyWinnerPoints("PENALTIES", "team-a", "team-a") === 0 &&
     calculateKnockoutPenaltyWinnerPoints("PENALTIES", "team-a", "team-b") === 0 &&
     calculateKnockoutPenaltyWinnerPoints("EXTRA_TIME", "team-a", "team-a") === 0 &&
     calculateKnockoutPenaltyWinnerPoints("NINETY_MINUTES", "team-a", "team-a") === 0
@@ -208,7 +216,7 @@ const breakdown = buildMatchPointsBreakdown({
     points: 5,
     doubleBonus: 0,
     finishTypePoints: 4,
-    penaltyWinnerPoints: 1,
+    penaltyWinnerPoints: 0,
     predictedFinishType: "PENALTIES",
     predictedPenaltyWinnerTeamId: "home-id",
   },
@@ -216,10 +224,10 @@ const breakdown = buildMatchPointsBreakdown({
     { predictedGoals: 2, points: 1, player: { name: "سالم" } },
   ],
 }, ar);
-ok("match breakdown total with penalties = 11", breakdown.total === 11);
+ok("match breakdown total with penalties = 10", breakdown.total === 10);
 ok(
   "عدد بنود التفصيل = 4",
-  breakdown.lines.length === 4,
+  breakdown.lines.length === 3,
   `got ${breakdown.lines.length}`
 );
 const stalePenaltyBreakdown = buildMatchPointsBreakdown({
@@ -527,6 +535,7 @@ ok(
 );
 const knockoutSchedule = Array.from({ length: 16 }, (_, index) => ({
   id: `ko-${index}`,
+  apiMatchId: null,
   roundId: "tournament",
   homeTeamId: `home-${index}`,
   awayTeamId: `away-${index}`,
@@ -553,22 +562,54 @@ ok(
     canCombineDoubleAndBoldForUsageScope(knockoutKeys[8]) &&
     isHighValueBoldScorerRound(knockoutKeys[8])
 );
+const partialWorldCupKnockoutSchedule = Array.from({ length: 19 }, (_, index) => ({
+  id: `wc-ko-${index}`,
+  apiMatchId: null,
+  roundId: "world-cup",
+  homeTeamId: `wc-home-${index}`,
+  awayTeamId: `wc-away-${index}`,
+  matchTime: new Date(Date.UTC(2026, 5, 28 + index, 17, 0, 0)),
+  stageName: index === 4 ? "Round of 32" : "Knockout Stage",
+  groupCode: null,
+  homeTeam: { name: `WC Home ${index}` },
+  awayTeam: { name: `WC Away ${index}` },
+  round: { name: "World Cup 26" },
+}));
+const partialWorldCupKeys = partialWorldCupKnockoutSchedule.map((match) =>
+  buildUsageRoundKey(match, partialWorldCupKnockoutSchedule)
+);
+ok(
+  "partial World Cup knockout schedule keeps first sixteen matches in round of 32",
+  getUsageRoundPhase(partialWorldCupKeys[5]) === "round-of-32" &&
+    getUsageRoundPhase(partialWorldCupKeys[15]) === "round-of-32" &&
+    getUsageRoundPhase(partialWorldCupKeys[16]) === "round-of-16"
+);
 const usageRoundMatches = [
   {
     id: "a1",
+    apiMatchId: null,
     roundId: "tournament",
     homeTeamId: "a",
     awayTeamId: "b",
     matchTime: new Date("2026-06-11T19:00:00Z"),
     stageName: "Group Stage",
+    groupCode: null,
+    homeTeam: { name: "A" },
+    awayTeam: { name: "B" },
+    round: { name: "Main Tournament 26" },
   },
   {
     id: "a2",
+    apiMatchId: null,
     roundId: "tournament",
     homeTeamId: "a",
     awayTeamId: "c",
     matchTime: new Date("2026-06-18T19:00:00Z"),
     stageName: "Group Stage",
+    groupCode: null,
+    homeTeam: { name: "A" },
+    awayTeam: { name: "C" },
+    round: { name: "Main Tournament 26" },
   },
 ];
 ok(

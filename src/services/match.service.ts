@@ -624,6 +624,7 @@ async function fetchMatchShell(matchId: string) {
     where: { id: matchId },
     select: {
       id: true,
+      apiMatchId: true,
       matchTime: true,
       status: true,
       isKnockout: true,
@@ -641,6 +642,7 @@ async function fetchMatchShell(matchId: string) {
 
 function toUsageMatch(match: {
   id: string;
+  apiMatchId?: string | null;
   roundId: string;
   homeTeamId: string;
   awayTeamId: string;
@@ -653,6 +655,7 @@ function toUsageMatch(match: {
 }): UsageMatch {
   return {
     id: match.id,
+    apiMatchId: match.apiMatchId ?? null,
     roundId: match.roundId,
     homeTeamId: match.homeTeamId,
     awayTeamId: match.awayTeamId,
@@ -668,6 +671,7 @@ function toUsageMatch(match: {
 function primeUsageCachesFromMatches(
   matches: {
     id: string;
+    apiMatchId?: string | null;
     roundId: string;
     homeTeamId: string;
     awayTeamId: string;
@@ -706,6 +710,7 @@ function primeUsageCachesFromMatches(
       matchShellMemoryCache.set(match.id, {
         data: {
           id: match.id,
+          apiMatchId: match.apiMatchId ?? null,
           matchTime: match.matchTime instanceof Date
             ? match.matchTime
             : new Date(match.matchTime),
@@ -1080,6 +1085,7 @@ export async function getMatchByIdForPredict(matchId: string, userId?: string) {
   });
   primeUsageMatchCache({
     id: match.id,
+    apiMatchId: match.apiMatchId,
     roundId: match.roundId,
     homeTeamId: match.homeTeamId,
     awayTeamId: match.awayTeamId,

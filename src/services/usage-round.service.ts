@@ -1,8 +1,10 @@
 import { unstable_cache } from "next/cache";
+import { getBracketByApiMatchId, getBracketRoundLabel } from "@/lib/wc-bracket";
 import { prisma } from "@/lib/prisma";
 
 export type UsageMatch = {
   id: string;
+  apiMatchId: string | null;
   roundId: string;
   homeTeamId: string;
   awayTeamId: string;
@@ -117,9 +119,20 @@ function isGroupStage(stageName: string | null): boolean {
   return stageKey(stageName).includes("group");
 }
 
-function hasSpecificKnockoutStage(stageName: string | null): boolean {
-  const key = stageKey(stageName);
-  return knockoutPhaseFromKey(key) != null;
+function specificKnockoutPhaseFromMatch(
+  match: Pick<UsageMatch, "apiMatchId" | "stageName" | "round">
+): UsageRoundPhase | null {
+  const stagePhase = knockoutPhaseFromKey(stageKey(match.stageName));
+  if (stagePhase) return stagePhase;
+
+  const bracket = getBracketByApiMatchId(match.apiMatchId);
+  const bracketLabel = bracket ? getBracketRoundLabel(bracket.matchNo) : null;
+  const bracketPhase = bracketLabel
+    ? knockoutPhaseFromKey(stageKey(bracketLabel))
+    : null;
+  if (bracketPhase) return bracketPhase;
+
+  return knockoutPhaseFromKey(stageKey(match.round?.name ?? null));
 }
 
 function matchTimeMs(matchTime: Date | string): number {
@@ -173,8 +186,12 @@ function isGroupMatch(match: UsageMatch): boolean {
   return Boolean(normalizedGroupCode(match.groupCode)) || isGroupStage(match.stageName);
 }
 
-function knockoutPhaseFromIndex(index: number, total: number): string {
-  if (total >= 32) {
+function knockoutPhaseFromIndex(
+  index: number,
+  total: number,
+  startsAtRoundOf32: boolean
+): UsageRoundPhase {
+  if (startsAtRoundOf32 || total >= 32) {
     if (index < 16) return "round-of-32";
     if (index < 24) return "round-of-16";
     if (index < 28) return "quarter-finals";
@@ -214,12 +231,21 @@ function knockoutFallbackUsageKey(match: UsageMatch, roundMatches: UsageMatch[])
       const timeDiff = matchTimeMs(a.matchTime) - matchTimeMs(b.matchTime);
       return timeDiff !== 0 ? timeDiff : a.id.localeCompare(b.id);
     });
+  const startsAtRoundOf32 =
+    knockoutMatches.length > 16 ||
+    knockoutMatches.some(
+      (candidate) => specificKnockoutPhaseFromMatch(candidate) === "round-of-32"
+    );
   const index = Math.max(
     0,
     knockoutMatches.findIndex((candidate) => candidate.id === match.id)
   );
 
-  return `${match.roundId}:knockout:${knockoutPhaseFromIndex(index, knockoutMatches.length)}`;
+  return `${match.roundId}:stage:${knockoutPhaseFromIndex(
+    index,
+    knockoutMatches.length,
+    startsAtRoundOf32
+  )}`;
 }
 
 export function buildUsageRoundKey(
@@ -227,12 +253,9 @@ export function buildUsageRoundKey(
   roundMatches: UsageMatch[]
 ): string {
   if (!isGroupMatch(match)) {
-    if (hasSpecificKnockoutStage(match.stageName)) {
-      return `${match.roundId}:stage:${stageKey(match.stageName)}`;
-    }
-
-    if (hasSpecificKnockoutStage(match.round?.name ?? null)) {
-      return `${match.roundId}:stage:${stageKey(match.round?.name ?? null)}`;
+    const phase = specificKnockoutPhaseFromMatch(match);
+    if (phase) {
+      return `${match.roundId}:stage:${phase}`;
     }
 
     return knockoutFallbackUsageKey(match, roundMatches);
@@ -282,6 +305,7 @@ export function buildUsageRoundKey(
 
 const usageMatchSelect = {
   id: true,
+  apiMatchId: true,
   roundId: true,
   homeTeamId: true,
   awayTeamId: true,

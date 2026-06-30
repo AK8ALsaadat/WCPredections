@@ -31,7 +31,6 @@ import {
 import {
   calculateDoubleBonus,
   calculateFinishTypePoints,
-  calculateKnockoutPenaltyWinnerPoints,
   calculatePerfectPredictionBonus,
   calculatePerfectPredictionBonusWithMinute,
   calculateScorePredictionPoints,
@@ -108,6 +107,36 @@ export async function validateDoubleUsage(
       `يمكنك استخدام ${maxDoubles} مضاعفات فقط في كل جولة`
     );
   }
+  const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(scope);
+  const [boldInScope, octopusInScope] = await Promise.all([
+    prisma.boldScorerBet.findUnique({
+      where: {
+        userId_usageRoundKey: {
+          userId,
+          usageRoundKey: scope.key,
+        },
+      },
+      select: { cancelledAt: true },
+    }),
+    prisma.octopusGoalkeeperBet.findUnique({
+      where: {
+        userId_usageRoundKey: {
+          userId,
+          usageRoundKey: scope.key,
+        },
+      },
+      select: { cancelledAt: true },
+    }),
+  ]);
+
+  if (
+    (octopusInScope && !octopusInScope.cancelledAt) ||
+    (boldInScope && !boldInScope.cancelledAt && !allowDoubleWithBold)
+  ) {
+    throw new Error(
+      "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط في نفس الجولة"
+    );
+  }
 }
 
 export async function submitPrediction(
@@ -157,7 +186,7 @@ export async function submitPrediction(
   }
 
   if (isDouble) {
-    const [boldOnThisMatch, octopusOnThisMatch] = await Promise.all([
+    const [boldInScope, octopusInScope] = await Promise.all([
       prisma.boldScorerBet.findUnique({
         where: {
           userId_usageRoundKey: {
@@ -178,12 +207,9 @@ export async function submitPrediction(
       }),
     ]);
     const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(usageScope);
-    if (
-      octopusOnThisMatch?.matchId === data.matchId ||
-      (boldOnThisMatch?.matchId === data.matchId && !allowDoubleWithBold)
-    ) {
+    if (octopusInScope || (boldInScope && !allowDoubleWithBold)) {
       throw new Error(
-        "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
+        "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط في نفس الجولة"
       );
     }
   }
@@ -803,14 +829,26 @@ export async function submitMatchPredictionBundle(
   const nextBoldActiveOnThisMatch = Boolean(data.boldPlayerId);
   const nextOctopusActiveOnThisMatch = Boolean(data.octopusPlayerId);
   const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(usageScope);
+  const storedBoldActiveInScope =
+    storedBold != null && storedBold.cancelledAt == null;
+  const storedOctopusActiveInScope =
+    storedOctopus != null && storedOctopus.cancelledAt == null;
+  const nextBoldActiveInScope =
+    nextBoldActiveOnThisMatch ||
+    (storedBoldActiveInScope &&
+      !(storedBoldActiveOnThisMatch && !data.boldPlayerId));
+  const nextOctopusActiveInScope =
+    nextOctopusActiveOnThisMatch ||
+    (storedOctopusActiveInScope &&
+      !(storedOctopusActiveOnThisMatch && !data.octopusPlayerId));
 
   if (
     isDouble &&
-    (nextOctopusActiveOnThisMatch ||
-      (nextBoldActiveOnThisMatch && !allowDoubleWithBold))
+    (nextOctopusActiveInScope ||
+      (nextBoldActiveInScope && !allowDoubleWithBold))
   ) {
     throw new Error(
-      "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
+      "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط في نفس الجولة"
     );
   }
 
@@ -856,6 +894,16 @@ export async function submitMatchPredictionBundle(
     if (storedOctopusOnThisMatchId && !data.octopusPlayerId) {
       await tx.octopusGoalkeeperBet.delete({
         where: { id: storedOctopusOnThisMatchId },
+      });
+    }
+    if (data.boldPlayerId && !allowDoubleWithBold) {
+      await tx.prediction.updateMany({
+        where: {
+          userId,
+          isDouble: true,
+          matchId: { in: usageScope.matchIds },
+        },
+        data: { isDouble: false, doubleBonus: 0 },
       });
     }
 
@@ -1198,14 +1246,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
         )
       : 0;
 
-    const penaltyWinnerPoints =
-      shouldAwardBasePoints && match.isKnockout && match.actualFinishType === "PENALTIES"
-        ? calculateKnockoutPenaltyWinnerPoints(
-            prediction.predictedFinishType,
-            prediction.predictedPenaltyWinnerTeamId,
-            match.penaltyWinnerTeamId
-          )
-        : 0;
+    const penaltyWinnerPoints = 0;
 
     const baseMatchPoints =
       scorePoints +

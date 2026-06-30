@@ -152,6 +152,9 @@ async function buildRoundUsageLimits(
   const doublesUsedElsewhere =
     doublesInRound - (doubleOnThisMatch ? 1 : 0);
   const highValueBoldScorer = canDoubleBoostBoldScorer && doubleOnThisMatch;
+  const featureBetBlocksDouble =
+    Boolean(usage?.octopusMatchId) ||
+    (Boolean(usage?.boldMatchId) && !allowDoubleWithBold);
 
   return {
     roundId: resolvedRoundId,
@@ -162,8 +165,10 @@ async function buildRoundUsageLimits(
       used: doublesInRound,
       max: maxDoubles,
       onThisMatch: doubleOnThisMatch,
-      canEnable: doublesUsedElsewhere < maxDoubles,
-      remaining: Math.max(0, maxDoubles - doublesUsedElsewhere),
+      canEnable: doublesUsedElsewhere < maxDoubles && !featureBetBlocksDouble,
+      remaining: featureBetBlocksDouble
+        ? 0
+        : Math.max(0, maxDoubles - doublesUsedElsewhere),
     },
     boldScorer: {
       used: !!usage?.boldMatchId,
