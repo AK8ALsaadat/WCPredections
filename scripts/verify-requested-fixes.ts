@@ -13,6 +13,7 @@ import { mergeLineupData } from "../src/lib/lineup-state";
 import { dedupeDisplayMatches } from "../src/lib/match-list-dedupe";
 import { buildMatchHistoryEntries } from "../src/lib/profile-history";
 import { isPredictionAllowed } from "../src/lib/utils";
+import { fullPredictionBundleSchema } from "../src/lib/validations";
 import {
   calculateScorerPredictionPoints,
   getPositionPointsMultiplier,
@@ -83,6 +84,34 @@ check(
       ...sourceMatchBase,
       finishType: "PENALTIES",
     }) === "PENALTIES"
+);
+check(
+  "prediction validation rejects penalties without a drawn score",
+  !fullPredictionBundleSchema.safeParse({
+    matchId: "match-1",
+    predHome: 2,
+    predAway: 1,
+    isDouble: false,
+    predictedFinishType: "PENALTIES",
+    predictedPenaltyWinnerTeamId: "home-team",
+    picks: [],
+    boldPlayerId: null,
+    octopusPlayerId: null,
+  }).success
+);
+check(
+  "prediction validation allows penalties with a drawn score and winner",
+  fullPredictionBundleSchema.safeParse({
+    matchId: "match-1",
+    predHome: 1,
+    predAway: 1,
+    isDouble: false,
+    predictedFinishType: "PENALTIES",
+    predictedPenaltyWinnerTeamId: "home-team",
+    picks: [],
+    boldPlayerId: null,
+    octopusPlayerId: null,
+  }).success
 );
 
 const squad = [

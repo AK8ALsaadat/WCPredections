@@ -672,6 +672,10 @@ export default function PredictPage() {
   );
 
   const hasAnyGoals = predHome > 0 || predAway > 0;
+  const penaltiesRequireDrawMessage =
+    locale === "ar"
+      ? "ركلات الترجيح متاحة فقط إذا كانت النتيجة المتوقعة تعادل"
+      : "Penalties are only available when your predicted score is a draw";
   const octopusCopy = useMemo(
     () =>
       locale === "ar"
@@ -731,6 +735,12 @@ export default function PredictPage() {
         : pruned;
     });
   }, [predHome, predAway, teamSets]);
+
+  useEffect(() => {
+    if (finishType !== "PENALTIES" || predHome === predAway) return;
+    setFinishType("");
+    setPenaltyWinner("");
+  }, [finishType, predHome, predAway]);
 
   useEffect(() => {
     const cachedMatch = readPredictMatchCache<MatchData>(matchId);
@@ -1271,6 +1281,14 @@ export default function PredictPage() {
   }
 
   function handleFinishTypeChange(value: string) {
+    if (value === "PENALTIES" && predHome !== predAway) {
+      setFinishType("");
+      setPenaltyWinner("");
+      setError(penaltiesRequireDrawMessage);
+      return;
+    }
+
+    setError("");
     setFinishType(value);
     if (value !== "PENALTIES") {
       setPenaltyWinner("");
@@ -1501,6 +1519,15 @@ export default function PredictPage() {
 
     if (match?.isKnockout && !finishType) {
       setError(t.predict.selectFinish);
+      return;
+    }
+
+    if (
+      match?.isKnockout &&
+      finishType === "PENALTIES" &&
+      predHome !== predAway
+    ) {
+      setError(penaltiesRequireDrawMessage);
       return;
     }
 
@@ -2303,7 +2330,11 @@ export default function PredictPage() {
                 { value: "", label: t.predict.selectFinish },
                 { value: "NINETY_MINUTES", label: t.predict.ninety },
                 { value: "EXTRA_TIME", label: t.predict.extraTime },
-                { value: "PENALTIES", label: t.predict.penalties },
+                {
+                  value: "PENALTIES",
+                  label: t.predict.penalties,
+                  disabled: predHome !== predAway,
+                },
               ]}
             />
 

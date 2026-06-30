@@ -44,6 +44,18 @@ export const predictionSchema = z
   .refine(
     (data) => {
       if (data.predictedFinishType === "PENALTIES") {
+        return data.predHome === data.predAway;
+      }
+      return true;
+    },
+    {
+      message: "Penalties are only available when the predicted score is a draw",
+      path: ["predictedFinishType"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.predictedFinishType === "PENALTIES") {
         return !!data.predictedPenaltyWinnerTeamId;
       }
       return true;

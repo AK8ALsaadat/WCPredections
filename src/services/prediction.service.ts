@@ -55,6 +55,12 @@ type SavedPredictionRow = {
   predictedPenaltyWinnerTeamId: string | null;
 };
 
+function assertPenaltyPredictionIsDraw(predHome: number, predAway: number) {
+  if (predHome !== predAway) {
+    throw new Error("ركلات الترجيح متاحة فقط إذا كانت النتيجة المتوقعة تعادل");
+  }
+}
+
 export function shouldIgnorePositionMultiplierForScorerPrediction(
   scorerPredictionId: string
 ): boolean {
@@ -187,6 +193,7 @@ export async function submitPrediction(
   }
 
   if (data.predictedFinishType === "PENALTIES") {
+    assertPenaltyPredictionIsDraw(data.predHome, data.predAway);
     if (!data.predictedPenaltyWinnerTeamId) {
       throw new Error("يجب اختيار أحد فريقي المباراة كفائز بركلات الترجيح");
     }
@@ -603,6 +610,7 @@ export async function submitMatchPredictionBundle(
   }
 
   if (data.predictedFinishType === "PENALTIES") {
+    assertPenaltyPredictionIsDraw(data.predHome, data.predAway);
     if (!data.predictedPenaltyWinnerTeamId) {
       throw new Error("يجب اختيار أحد فريقي المباراة كفائز بركلات الترجيح");
     }
