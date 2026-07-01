@@ -71,6 +71,7 @@ type MatchCardProps = {
       goalsConceded?: number | null;
       player: { name: string };
     } | null;
+    missingPredictionUsernames?: string[];
   };
   showPredictButton?: boolean;
   isPastMatch?: boolean;
@@ -164,8 +165,12 @@ export function MatchCard({
   const { messages: t, locale } = useI18n();
   const [canPredict, setCanPredict] = useState(false);
   const [lockReason, setLockReason] = useState<string | null>(null);
+  const [missingPopupOpen, setMissingPopupOpen] = useState(false);
   const isFinished = match.status === "FINISHED";
   const isLive = match.status === "LIVE";
+  const missingPredictionUsernames = match.missingPredictionUsernames;
+  const showMissingPredictionButton =
+    Array.isArray(missingPredictionUsernames) && !isFinished && !isLive;
   const hasPrediction = !!match.userPrediction;
   const actualFinishType = asFinishType(match.actualFinishType);
   const predictedFinishType = asFinishType(
@@ -439,6 +444,64 @@ export function MatchCard({
       {showPredictButton && !isFinished && !isLive && !isPastMatch && (
         <div className="mt-3">
           <PredictionCountdown matchTime={match.matchTime} />
+        </div>
+      )}
+
+      {showMissingPredictionButton && (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setMissingPopupOpen(true)}
+            className="w-full rounded-lg border border-amber-300/45 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:border-amber-200/70 hover:bg-amber-500/15"
+          >
+            {locale === "ar"
+              ? `شف اللي ما توقعوا (${missingPredictionUsernames.length})`
+              : `Missing predictions (${missingPredictionUsernames.length})`}
+          </button>
+        </div>
+      )}
+
+      {showMissingPredictionButton && missingPopupOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          onClick={() => setMissingPopupOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative w-full max-w-sm rounded-lg border border-card-border bg-card p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label={locale === "ar" ? "إغلاق" : "Close"}
+              onClick={() => setMissingPopupOpen(false)}
+              className="absolute end-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-card-border text-sm font-bold text-muted transition hover:border-primary/50 hover:text-foreground"
+            >
+              x
+            </button>
+            <h3 className="pe-9 text-lg font-bold">
+              {locale === "ar" ? "اللي ما توقعوا" : "Missing predictions"}
+            </h3>
+            {missingPredictionUsernames.length > 0 ? (
+              <ul className="mt-4 max-h-72 space-y-2 overflow-y-auto pe-1">
+                {missingPredictionUsernames.map((username) => (
+                  <li
+                    key={username}
+                    className="rounded-md border border-card-border bg-background/60 px-3 py-2 text-sm font-semibold"
+                  >
+                    {username}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 rounded-md border border-emerald-300/35 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
+                {locale === "ar"
+                  ? "كل المستخدمين توقعوا"
+                  : "Everyone has predicted"}
+              </p>
+            )}
+          </div>
         </div>
       )}
 

@@ -14,6 +14,7 @@ import { hasCompleteStartingLineups } from "../src/lib/lineup-completeness";
 import { dedupeDisplayMatches } from "../src/lib/match-list-dedupe";
 import { buildMatchHistoryEntries } from "../src/lib/profile-history";
 import { isPredictionAllowed } from "../src/lib/utils";
+import { shouldShowMissingPredictionUsers } from "../src/lib/missing-predictions";
 import { fullPredictionBundleSchema } from "../src/lib/validations";
 import {
   getRelegationStatus,
@@ -812,6 +813,30 @@ check(
   historyEntries.length === 2 &&
     historyEntries[0].match.id === "locked" &&
     !historyEntries.some((entry) => entry.match.id === "open")
+);
+check(
+  "missing-prediction popup appears only inside the final two hours before deadline",
+  shouldShowMissingPredictionUsers(
+    {
+      matchTime: new Date("2026-07-01T20:00:00Z"),
+      status: "SCHEDULED",
+    },
+    new Date("2026-07-01T18:30:00Z")
+  ) &&
+    !shouldShowMissingPredictionUsers(
+      {
+        matchTime: new Date("2026-07-01T20:00:00Z"),
+        status: "SCHEDULED",
+      },
+      new Date("2026-07-01T17:00:00Z")
+    ) &&
+    !shouldShowMissingPredictionUsers(
+      {
+        matchTime: new Date("2026-07-01T20:00:00Z"),
+        status: "SCHEDULED",
+      },
+      new Date("2026-07-01T19:51:00Z")
+    )
 );
 check(
   "round of 32 blocks doubles until quarter-finals",

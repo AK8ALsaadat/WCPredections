@@ -62,6 +62,12 @@ function assertPenaltyPredictionIsDraw(predHome: number, predAway: number) {
   }
 }
 
+function doubleLimitError(maxDoubles: number) {
+  return maxDoubles <= 0
+    ? "المضاعفة تبدأ من ربع النهائي فقط"
+    : `يمكنك استخدام ${maxDoubles} مضاعفات فقط في كل جولة`;
+}
+
 export function shouldIgnorePositionMultiplierForScorerPrediction(
   scorerPredictionId: string
 ): boolean {
@@ -105,9 +111,7 @@ export async function validateDoubleUsage(
   });
 
   if (doublesUsed >= maxDoubles) {
-    throw new Error(
-      `يمكنك استخدام ${maxDoubles} مضاعفات فقط في كل جولة`
-    );
+    throw new Error(doubleLimitError(maxDoubles));
   }
   const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(scope);
   const [boldInScope, octopusInScope] = await Promise.all([
@@ -183,7 +187,7 @@ export async function submitPrediction(
       },
     });
     if (doublesUsed >= maxDoubles) {
-      throw new Error(`يمكنك استخدام ${maxDoubles} مضاعفات فقط في كل جولة`);
+      throw new Error(doubleLimitError(maxDoubles));
     }
   }
 
@@ -761,9 +765,7 @@ export async function submitMatchPredictionBundle(
       },
     });
     if (doublesUsed >= maxDoubles) {
-      throw new Error(
-        `يمكنك استخدام ${maxDoubles} مضاعفات فقط في كل جولة`
-      );
+      throw new Error(doubleLimitError(maxDoubles));
     }
   }
 

@@ -1,5 +1,5 @@
 import { asFinishType } from "@/lib/finish-type";
-import { isPredictionAllowed } from "@/lib/utils";
+import { isPredictionLocked } from "@/lib/utils";
 import type { MatchPointsBreakdownInput } from "@/lib/match-points-breakdown";
 
 export type HistoryMatch = {
@@ -153,7 +153,7 @@ export function buildMatchHistoryEntries(history: RawHistory): MatchHistoryEntry
 
   return Array.from(byMatch.values()).filter((entry) => {
     if (entry.match.status !== "SCHEDULED") return true;
-    return !isPredictionAllowed(entry.match.matchTime, entry.match.status);
+    return isPredictionLocked(entry.match.matchTime);
   }).sort((a, b) => {
     const statusDiff =
       (statusPriority[a.match.status] ?? 5) -

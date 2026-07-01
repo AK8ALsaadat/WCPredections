@@ -5,6 +5,7 @@ import {
   SCHEDULE_PAGE_SIZE,
 } from "@/lib/schedule-pagination";
 import { getCurrentUser } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 import {
   getUpcomingMatches,
   getAllMatches,
@@ -15,6 +16,7 @@ import {
   prewarmFastMatchLineups,
 } from "@/services/match.service";
 import { matchIdentityKey } from "@/lib/team-identity";
+import { shouldShowMissingPredictionUsers } from "@/lib/missing-predictions";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,69 @@ const PRIVATE_SHORT_CACHE = {
     "Cache-Control": "private, max-age=15, stale-while-revalidate=45",
   },
 } satisfies ResponseInit;
+
+async function attachMissingPredictionUsernames<
+  T extends { id: string; matchTime: Date | string; status: string },
+>(matches: T[], enabled: boolean): Promise<T[]> {
+  if (!enabled || matches.length === 0) return matches;
+
+  const targetMatches = matches.filter((match) =>
+    shouldShowMissingPredictionUsers(match)
+  );
+  if (targetMatches.length === 0) return matches;
+
+  const matchIds = targetMatches.map((match) => match.id);
+  const [users, predictions] = await Promise.all([
+    prisma.user.findMany({
+      where: {
+        NOT: [
+          { username: "verifier" },
+          { username: { startsWith: "qa_" } },
+          { username: { startsWith: "ui_qa_" } },
+          { username: { startsWith: "test" } },
+          { username: { contains: "tester", mode: "insensitive" } },
+          { username: { startsWith: "demo" } },
+          { username: { startsWith: "sample" } },
+          { username: { startsWith: "tmp" } },
+          { username: { contains: "_test", mode: "insensitive" } },
+          { username: { contains: "codex", mode: "insensitive" } },
+        ],
+      },
+      select: { id: true, username: true },
+      orderBy: { username: "asc" },
+    }),
+    prisma.prediction.findMany({
+      where: { matchId: { in: matchIds } },
+      select: { matchId: true, userId: true },
+    }),
+  ]);
+
+  const predictedByMatch = new Map<string, Set<string>>();
+  for (const prediction of predictions) {
+    const predicted = predictedByMatch.get(prediction.matchId) ?? new Set();
+    predicted.add(prediction.userId);
+    predictedByMatch.set(prediction.matchId, predicted);
+  }
+
+  const missingByMatch = new Map(
+    matchIds.map((matchId) => {
+      const predicted = predictedByMatch.get(matchId) ?? new Set<string>();
+      return [
+        matchId,
+        users
+          .filter((user) => !predicted.has(user.id))
+          .map((user) => user.username),
+      ] as const;
+    })
+  );
+
+  return matches.map((match) => {
+    const missingPredictionUsernames = missingByMatch.get(match.id);
+    return missingPredictionUsernames
+      ? { ...match, missingPredictionUsernames }
+      : match;
+  });
+}
 
 export async function GET(request: Request) {
   try {
@@ -102,7 +167,10 @@ export async function GET(request: Request) {
       const { items, meta } = paginateSchedule(dedupedRaw, page, pageSize);
       
       if (light && !completed) {
-        const matches = await enrichMatchesWithUserPredictions(items, user?.userId);
+        const matches = await attachMissingPredictionUsernames(
+          await enrichMatchesWithUserPredictions(items, user?.userId),
+          Boolean(user?.userId)
+        );
         prewarmFastMatchLineups(matches.map((match) => match.id));
         return apiSuccess({ matches, pinnedMatches: [], ...meta }, 200, PRIVATE_SHORT_CACHE);
       }
@@ -113,11 +181,19 @@ export async function GET(request: Request) {
           ? getUserPinnedTodayMatches(user.userId, roundId)
           : [],
       ]);
-      prewarmFastMatchLineups([
-        ...matches.map((match) => match.id),
-        ...pinnedMatches.map((match) => match.id),
+      const [matchesWithMissing, pinnedWithMissing] = await Promise.all([
+        attachMissingPredictionUsernames(matches, Boolean(user?.userId)),
+        attachMissingPredictionUsernames(pinnedMatches, Boolean(user?.userId)),
       ]);
-      return apiSuccess({ matches, pinnedMatches, ...meta }, 200, PRIVATE_SHORT_CACHE);
+      prewarmFastMatchLineups([
+        ...matchesWithMissing.map((match) => match.id),
+        ...pinnedWithMissing.map((match) => match.id),
+      ]);
+      return apiSuccess(
+        { matches: matchesWithMissing, pinnedMatches: pinnedWithMissing, ...meta },
+        200,
+        PRIVATE_SHORT_CACHE
+      );
     }
 
     if (light && !completed) {
@@ -138,7 +214,10 @@ export async function GET(request: Request) {
       return apiSuccess(lite, 200, PRIVATE_SHORT_CACHE);
     }
 
-    const matches = await enrichMatchesWithUserPredictions(dedupedRaw, user?.userId);
+    const matches = await attachMissingPredictionUsernames(
+      await enrichMatchesWithUserPredictions(dedupedRaw, user?.userId),
+      Boolean(user?.userId)
+    );
     prewarmFastMatchLineups(matches.map((match) => match.id));
 
     return apiSuccess(matches, 200, PRIVATE_SHORT_CACHE);

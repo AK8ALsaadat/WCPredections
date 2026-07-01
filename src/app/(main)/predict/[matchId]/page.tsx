@@ -1469,7 +1469,13 @@ export default function PredictPage() {
       !doubleLimits.canEnable &&
       !doubleLimits.onThisMatch
     ) {
-      setError(t.predict.doubleExhausted);
+      setError(
+        doubleLimits.max <= 0
+          ? locale === "ar"
+            ? "المضاعفة تبدأ من ربع النهائي فقط"
+            : "Doubles start from the quarter-finals only"
+          : t.predict.doubleExhausted
+      );
       return;
     }
 
@@ -1653,6 +1659,13 @@ export default function PredictPage() {
   const needsLineupForScorers = hasAnyGoals && !hasPlayers;
 
   const doubleLimits = match.roundUsageLimits?.doubles;
+  const doubleUnavailableBeforeQuarterFinals = Boolean(
+    doubleLimits && doubleLimits.max <= 0 && !doubleLimits.onThisMatch
+  );
+  const doubleUnavailableMessage =
+    locale === "ar"
+      ? "المضاعفة تبدأ من ربع النهائي فقط"
+      : "Doubles start from the quarter-finals only";
   const boldLimits = match.roundUsageLimits?.boldScorer;
   const octopusLimits = match.roundUsageLimits?.octopus;
   const allowDoubleWithBold = match.roundUsageLimits?.allowDoubleWithBold ?? false;
@@ -1909,14 +1922,20 @@ export default function PredictPage() {
             {doubleLimits && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-orange-400/30 bg-orange-500/10 px-3 py-2 text-sm">
                 <span className="font-semibold text-orange-200">
-                  {t.predict.doubleCounter(
-                    doubleLimits.used,
-                    doubleLimits.max
-                  )}
+                  {doubleUnavailableBeforeQuarterFinals
+                    ? doubleUnavailableMessage
+                    : t.predict.doubleCounter(
+                        doubleLimits.used,
+                        doubleLimits.max
+                      )}
                 </span>
                 {doubleLimits.onThisMatch ? (
                   <span className="text-orange-200">
                     {t.predict.doubleOnThisMatch}
+                  </span>
+                ) : doubleUnavailableBeforeQuarterFinals ? (
+                  <span className="text-muted">
+                    {locale === "ar" ? "غير متاحة الآن" : "Not available yet"}
                   </span>
                 ) : doubleLimits.remaining > 0 ? (
                   <span className="text-muted">
@@ -1951,6 +1970,8 @@ export default function PredictPage() {
                 <p className="text-sm text-muted">
                   {isDouble
                     ? t.predict.doubleEnabled
+                    : doubleUnavailableBeforeQuarterFinals
+                    ? doubleUnavailableMessage
                     : boldEnabled && !allowDoubleWithBold
                     ? t.predict.doubleAndBoldConflict
                     : t.predict.doubleHint}
