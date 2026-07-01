@@ -31,6 +31,7 @@ import {
 import {
   calculateDoubleBonus,
   calculateFinishTypePoints,
+  calculatePenaltyWinnerPoints,
   calculatePerfectPredictionBonus,
   calculatePerfectPredictionBonusWithMinute,
   calculateScorePredictionPoints,
@@ -1248,7 +1249,15 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
         )
       : 0;
 
-    const penaltyWinnerPoints = 0;
+    const penaltyWinnerPoints =
+      shouldAwardBasePoints &&
+      match.isKnockout &&
+      scoringActualFinishType === "PENALTIES"
+        ? calculatePenaltyWinnerPoints(
+            prediction.predictedPenaltyWinnerTeamId,
+            match.penaltyWinnerTeamId
+          )
+        : 0;
 
     const baseMatchPoints =
       scorePoints +

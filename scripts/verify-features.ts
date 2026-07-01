@@ -169,8 +169,8 @@ ok(
   calculateFinishTypePoints("NINETY_MINUTES", "PENALTIES") === 0
 );
 ok(
-  "ركلات صح = 0 كنقطة منفصلة",
-  calculatePenaltyWinnerPoints("team-a", "team-a") === 0
+  "ركلات صح = +1 كنقطة منفصلة",
+  calculatePenaltyWinnerPoints("team-a", "team-a") === 1
 );
 ok(
   "ركلات خطأ = 0",
@@ -235,7 +235,7 @@ ok(
   )
 );
 ok(
-  "penalty winner is scored through the normal result point only",
+  "penalty winner earns both the normal result point and the penalty-winner point",
   calculateScorePredictionPoints(2, 2, 1, 1, false, {
     homeTeamId: "team-a",
     awayTeamId: "team-b",
@@ -244,7 +244,8 @@ ok(
     actualFinishType: "PENALTIES",
     actualPenaltyWinnerTeamId: "team-a",
   }) === 1 &&
-    calculateKnockoutPenaltyWinnerPoints("PENALTIES", "team-a", "team-a") === 0 &&
+    calculatePenaltyWinnerPoints("team-a", "team-a") === 1 &&
+    calculateKnockoutPenaltyWinnerPoints("PENALTIES", "team-a", "team-a") === 1 &&
     calculateKnockoutPenaltyWinnerPoints("PENALTIES", "team-a", "team-b") === 0 &&
     calculateKnockoutPenaltyWinnerPoints("EXTRA_TIME", "team-a", "team-a") === 0 &&
     calculateKnockoutPenaltyWinnerPoints("NINETY_MINUTES", "team-a", "team-a") === 0
@@ -267,7 +268,7 @@ const breakdown = buildMatchPointsBreakdown({
     points: 5,
     doubleBonus: 0,
     finishTypePoints: 4,
-    penaltyWinnerPoints: 0,
+    penaltyWinnerPoints: 1,
     predictedFinishType: "PENALTIES",
     predictedPenaltyWinnerTeamId: "home-id",
   },
@@ -275,10 +276,10 @@ const breakdown = buildMatchPointsBreakdown({
     { predictedGoals: 2, points: 1, player: { name: "سالم" } },
   ],
 }, ar);
-ok("match breakdown total with penalties = 10", breakdown.total === 10);
+ok("match breakdown total with penalties = 11", breakdown.total === 11);
 ok(
   "عدد بنود التفصيل = 4",
-  breakdown.lines.length === 3,
+  breakdown.lines.length === 4,
   `got ${breakdown.lines.length}`
 );
 const stalePenaltyBreakdown = buildMatchPointsBreakdown({
@@ -343,7 +344,7 @@ const perfectBreakdown = buildMatchPointsBreakdown({
     predHome: 1,
     predAway: 0,
     isDouble: false,
-    points: 5,
+    points: 8,
     doubleBonus: 0,
     finishTypePoints: 0,
     penaltyWinnerPoints: 0,
@@ -352,7 +353,7 @@ const perfectBreakdown = buildMatchPointsBreakdown({
     { predictedGoals: 1, points: 1, player: { name: "سالم" } },
   ],
 }, ar);
-ok("مجموع التفصيل مع البونص = 6", perfectBreakdown.total === 6);
+ok("perfect breakdown total = 9", perfectBreakdown.total === 9);
 ok(
   "عدد بنود التفصيل مع البونص = 3",
   perfectBreakdown.lines.length === 3,
@@ -363,8 +364,8 @@ ok(
   perfectBreakdown.lines.find((l) => l.id === "perfect-bonus")?.points === 3
 );
 ok(
-  "بند النتيجة = 2 (5 - بونص 3)",
-  perfectBreakdown.lines.find((l) => l.id === "score")?.points === 2
+  "بند النتيجة = 5",
+  perfectBreakdown.lines.find((l) => l.id === "score")?.points === 5
 );
 const wrongFinishPerfectBreakdown = buildMatchPointsBreakdown({
   homeScore: 1,

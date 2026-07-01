@@ -7,7 +7,10 @@ import {
   getOctopusCleanSheetBonus,
   getOctopusSaveTierPoints,
 } from "@/lib/octopus-points";
-import { PERFECT_PREDICTION_BONUS_POINTS } from "@/services/scoring.service";
+import {
+  EXACT_SCORE_POINTS,
+  PERFECT_PREDICTION_BONUS_POINTS,
+} from "@/services/scoring.service";
 
 /** تحويل موضع اللاعب الإنجليزي إلى عربي مع عدد النقاط */
 function getPositionLabel(position: string | null | undefined): string {
@@ -116,11 +119,10 @@ function computePerfectBonus(input: MatchPointsBreakdownInput): number {
     return 0;
   }
 
-  const picks = input.userScorerPredictions ?? [];
-  const totalPredicted = picks.reduce((sum, sp) => sum + sp.predictedGoals, 0);
-  const totalEarned = picks.reduce((sum, sp) => sum + sp.points, 0);
-
-  return totalEarned === totalPredicted ? PERFECT_PREDICTION_BONUS_POINTS : 0;
+  const storedBonus = p.points - EXACT_SCORE_POINTS;
+  return storedBonus === PERFECT_PREDICTION_BONUS_POINTS
+    ? PERFECT_PREDICTION_BONUS_POINTS
+    : 0;
 }
 
 function scoreBreakdownLine(
@@ -208,8 +210,7 @@ function penaltyLine(
   ) {
     return null;
   }
-  if (p.penaltyWinnerPoints === 0) return null;
-  if (!showMisses && !p.penaltyWinnerPoints) return null;
+  if (!showMisses && p.penaltyWinnerPoints === 0) return null;
 
   const hit = p.penaltyWinnerPoints > 0;
   return {
