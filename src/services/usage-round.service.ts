@@ -91,14 +91,7 @@ export function getMaxDoublesForUsageScope(
   scopeOrKey: string | UsageRoundScope
 ): number {
   const phase = getUsageRoundPhase(scopeOrKey);
-  if (phase === "round-of-32" || phase === "round-of-16") return 0;
-
-  return phase === "quarter-finals" ||
-    phase === "semi-finals" ||
-    phase === "third-place-final" ||
-    phase === "final"
-    ? 1
-    : 2;
+  return phase === "group" ? 2 : 1;
 }
 
 export function canCombineDoubleAndBoldForUsageScope(

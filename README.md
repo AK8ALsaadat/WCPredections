@@ -5,7 +5,7 @@ A full-stack fantasy-style football prediction web application built with Next.j
 ## Features
 
 - **Custom authentication** — username + password with bcrypt hashing (no Supabase Auth)
-- **Match predictions** — score, double boost (2 per round), knockout finish type, penalty winner
+- **Match predictions** — score, double boost, knockout finish type, penalty winner
 - **Goal scorer predictions** — multiple scorers per match (+1 each)
 - **Automatic scoring** — points calculated when matches finish
 - **Leaderboards** — overall and per-round rankings
@@ -107,7 +107,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | Winner/draw correct (wrong score) | +1 |
 | Wrong | 0 |
 
-**Double boost:** Multiplies score prediction points (exact: 6, winner: 2). Max 2 doubles per round.
+**Double boost:** Multiplies match prediction points. Max 2 doubles per group gameweek and 1 double per knockout scope. Combining a double with the scorer bet starts from the quarter-finals.
 
 ### Goal Scorers
 - +1 per correctly predicted scorer

@@ -64,7 +64,7 @@ function assertPenaltyPredictionIsDraw(predHome: number, predAway: number) {
 
 function doubleLimitError(maxDoubles: number) {
   return maxDoubles <= 0
-    ? "المضاعفة تبدأ من ربع النهائي فقط"
+    ? "المضاعفة غير متاحة لهذه الجولة"
     : `يمكنك استخدام ${maxDoubles} مضاعفات فقط في كل جولة`;
 }
 

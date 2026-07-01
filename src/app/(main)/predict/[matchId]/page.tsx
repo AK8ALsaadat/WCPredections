@@ -1472,8 +1472,8 @@ export default function PredictPage() {
       setError(
         doubleLimits.max <= 0
           ? locale === "ar"
-            ? "المضاعفة تبدأ من ربع النهائي فقط"
-            : "Doubles start from the quarter-finals only"
+            ? "المضاعفة غير متاحة لهذه الجولة"
+            : "Doubles are not available this round"
           : t.predict.doubleExhausted
       );
       return;
@@ -1659,13 +1659,13 @@ export default function PredictPage() {
   const needsLineupForScorers = hasAnyGoals && !hasPlayers;
 
   const doubleLimits = match.roundUsageLimits?.doubles;
-  const doubleUnavailableBeforeQuarterFinals = Boolean(
+  const doubleUnavailableForRound = Boolean(
     doubleLimits && doubleLimits.max <= 0 && !doubleLimits.onThisMatch
   );
   const doubleUnavailableMessage =
     locale === "ar"
-      ? "المضاعفة تبدأ من ربع النهائي فقط"
-      : "Doubles start from the quarter-finals only";
+      ? "المضاعفة غير متاحة لهذه الجولة"
+      : "Doubles are not available this round";
   const boldLimits = match.roundUsageLimits?.boldScorer;
   const octopusLimits = match.roundUsageLimits?.octopus;
   const allowDoubleWithBold = match.roundUsageLimits?.allowDoubleWithBold ?? false;
@@ -1706,8 +1706,8 @@ export default function PredictPage() {
       !doubleLimits.onThisMatch);
   const knockoutRulesNotice =
     locale === "ar"
-      ? `تنبيه: المضاعفة تبدأ من ربع النهائي فقط. من ربع النهائي تقدر تجمع مضاعفة واحدة مع الرهان؛ إذا الرهان على مباراة مضاعفة يصير +10 / -10، وبدون المضاعفة يبقى +5 / -5.`
-      : "Notice: doubles start from the quarter-finals only. From the quarter-finals you can combine one double with the scorer bet; a bet on a doubled match is +10 / -10, otherwise it remains +5 / -5.";
+      ? `تنبيه: من ربع النهائي تقدر تجمع مضاعفة واحدة مع الرهان؛ إذا الرهان على مباراة مضاعفة يصير +10 / -10، وبدون المضاعفة يبقى +5 / -5.`
+      : "Notice: from the quarter-finals you can combine one double with the scorer bet; a bet on a doubled match is +10 / -10, otherwise it remains +5 / -5.";
   const predictedScorerIds = new Set(Object.keys(scorerPicks));
   const hasPredictedScorers = predictedScorerIds.size > 0;
   const toBoldPlayerOption = (player: MatchPlayerView) => ({
@@ -1922,7 +1922,7 @@ export default function PredictPage() {
             {doubleLimits && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-orange-400/30 bg-orange-500/10 px-3 py-2 text-sm">
                 <span className="font-semibold text-orange-200">
-                  {doubleUnavailableBeforeQuarterFinals
+                  {doubleUnavailableForRound
                     ? doubleUnavailableMessage
                     : t.predict.doubleCounter(
                         doubleLimits.used,
@@ -1933,7 +1933,7 @@ export default function PredictPage() {
                   <span className="text-orange-200">
                     {t.predict.doubleOnThisMatch}
                   </span>
-                ) : doubleUnavailableBeforeQuarterFinals ? (
+                ) : doubleUnavailableForRound ? (
                   <span className="text-muted">
                     {locale === "ar" ? "غير متاحة الآن" : "Not available yet"}
                   </span>
@@ -1970,7 +1970,7 @@ export default function PredictPage() {
                 <p className="text-sm text-muted">
                   {isDouble
                     ? t.predict.doubleEnabled
-                    : doubleUnavailableBeforeQuarterFinals
+                    : doubleUnavailableForRound
                     ? doubleUnavailableMessage
                     : boldEnabled && !allowDoubleWithBold
                     ? t.predict.doubleAndBoldConflict

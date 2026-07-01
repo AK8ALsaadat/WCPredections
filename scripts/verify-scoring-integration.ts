@@ -412,6 +412,22 @@ async function main() {
   }
   check("round of 16 rejects double with bold", r16Rejected);
 
+  await submitMatchPredictionBundle(r16User.id, {
+    matchId: r16Match.id,
+    predHome: 1,
+    predAway: 0,
+    isDouble: true,
+    predictedFinishType: "NINETY_MINUTES",
+    predictedPenaltyWinnerTeamId: null,
+    picks: [{ playerId: homeForward.id, goals: 1 }],
+    boldPlayerId: null,
+    octopusPlayerId: null,
+  });
+  const savedR16 = await prisma.prediction.findUniqueOrThrow({
+    where: { userId_matchId: { userId: r16User.id, matchId: r16Match.id } },
+  });
+  check("round of 16 accepts double without bold", savedR16.isDouble);
+
   if (failures > 0) {
     throw new Error(`${failures} integration checks failed`);
   }

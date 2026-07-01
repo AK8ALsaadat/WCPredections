@@ -565,13 +565,13 @@ ok(
   getMaxDoublesForUsageScope("wc:group-gameweek:1") === 2
 );
 ok(
-  "round of 32 blocks doubles",
-  getMaxDoublesForUsageScope("wc:stage:round-of-32") === 0
+  "round of 32 allows one double",
+  getMaxDoublesForUsageScope("wc:stage:round-of-32") === 1
 );
 ok("البطاقة الجريئة: مرة واحدة لكل جولة", MAX_BOLD_SCORER_BETS_PER_ROUND === 1);
 ok(
-  "round of 16 blocks doubles",
-  getMaxDoublesForUsageScope("wc:stage:round-of-16") === 0
+  "round of 16 allows one double",
+  getMaxDoublesForUsageScope("wc:stage:round-of-16") === 1
 );
 ok(
   "quarter-finals allows one double",

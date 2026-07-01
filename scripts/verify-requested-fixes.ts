@@ -839,8 +839,12 @@ check(
     )
 );
 check(
-  "round of 32 blocks doubles until quarter-finals",
-  getMaxDoublesForUsageScope("wc:stage:round-of-32") === 0
+  "round of 32 allows one double",
+  getMaxDoublesForUsageScope("wc:stage:round-of-32") === 1
+);
+check(
+  "round of 16 allows one double",
+  getMaxDoublesForUsageScope("wc:stage:round-of-16") === 1
 );
 check(
   "group stage keeps two doubles",
