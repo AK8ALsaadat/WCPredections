@@ -405,7 +405,8 @@ export async function calculateOctopusPointsForMatch(matchId: string) {
             match.status === "FINISHED" || savesByPlayer.has(bet.playerId)
               ? calculateOctopusPoints(
                   savesByPlayer.get(bet.playerId),
-                  goalsConcededByTeam.get(bet.player.teamId)
+                  goalsConcededByTeam.get(bet.player.teamId),
+                  { includeCleanSheet: match.status === "FINISHED" }
                 )
               : 0,
         },

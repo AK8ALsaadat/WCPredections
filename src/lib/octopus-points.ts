@@ -46,11 +46,16 @@ export function getOctopusCleanSheetBonus(
 
 export function calculateOctopusPoints(
   saves: number | null | undefined,
-  goalsConceded?: number | null
+  goalsConceded?: number | null,
+  options?: { includeCleanSheet?: boolean }
 ) {
   const savePoints = Math.min(
     getOctopusSaveTierPoints(saves),
     getOctopusConcededCapPoints(goalsConceded)
   );
-  return savePoints + getOctopusCleanSheetBonus(goalsConceded);
+  const cleanSheetBonus =
+    (options?.includeCleanSheet ?? true)
+      ? getOctopusCleanSheetBonus(goalsConceded)
+      : 0;
+  return savePoints + cleanSheetBonus;
 }

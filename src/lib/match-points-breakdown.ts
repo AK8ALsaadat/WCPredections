@@ -301,9 +301,10 @@ export function buildMatchPointsBreakdown(
     if (showMisses || octopus.points !== 0) {
       const saveTierPoints = getOctopusSaveTierPoints(octopus.saves);
       const concededCap = getOctopusConcededCapPoints(octopus.goalsConceded);
-      const cleanSheetBonus = getOctopusCleanSheetBonus(
-        octopus.goalsConceded
-      );
+      const cleanSheetBonus =
+        octopus.points > saveTierPoints
+          ? getOctopusCleanSheetBonus(octopus.goalsConceded)
+          : 0;
       const cappedByGoals =
         Number.isFinite(concededCap) && saveTierPoints > concededCap;
       const octopusDetails = [

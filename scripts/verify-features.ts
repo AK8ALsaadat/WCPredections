@@ -770,6 +770,10 @@ ok("octopus clean sheet bonus = 3", getOctopusCleanSheetBonus(0) === 3);
 ok("octopus no clean sheet bonus when conceded", getOctopusCleanSheetBonus(1) === 0);
 ok("octopus save tier 10 saves = 8", getOctopusSaveTierPoints(10) === 8);
 ok("octopus clean sheet with 0 saves = 3", calculateOctopusPoints(0, 0) === 3);
+ok(
+  "octopus live clean sheet withholds bonus",
+  calculateOctopusPoints(5, 0, { includeCleanSheet: false }) === 3
+);
 ok("octopus 0 saves without clean sheet = 0", calculateOctopusPoints(0, 1) === 0);
 ok("octopus clean sheet with 3 saves = 4", calculateOctopusPoints(3, 0) === 4);
 ok("octopus clean sheet with 10 saves = 11", calculateOctopusPoints(10, 0) === 11);

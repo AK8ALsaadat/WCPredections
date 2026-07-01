@@ -3,6 +3,7 @@ import {
   recalculateMatchScoring,
   submitMatchPredictionBundle,
 } from "../src/services/prediction.service";
+import { calculateOctopusPointsForMatch } from "../src/services/octopus-bet.service";
 import { getOverallLeaderboard } from "../src/services/leaderboard.service";
 import {
   getUserTotalPoints,
@@ -333,6 +334,55 @@ async function main() {
   });
   check("octopus points are stored", octopusBet.points === 6, `got ${octopusBet.points}`);
   await assertUserTotal(octopusUser.username, octopusUser.id, 6);
+
+  const liveOctopusMatch = await createMatch({
+    roundId: round.id,
+    homeTeamId: homeTeam.id,
+    awayTeamId: awayTeam.id,
+    matchTime: new Date(Date.now() - 60 * 60 * 1000),
+    status: "LIVE",
+    homeScore: 0,
+    awayScore: 0,
+  });
+  await prisma.octopusGoalkeeperBet.create({
+    data: {
+      userId: octopusUser.id,
+      roundId: round.id,
+      usageRoundKey: `${round.id}:qa-octopus-live`,
+      matchId: liveOctopusMatch.id,
+      playerId: homeGoalkeeper.id,
+    },
+  });
+  await prisma.matchGoalkeeperStat.create({
+    data: {
+      matchId: liveOctopusMatch.id,
+      playerId: homeGoalkeeper.id,
+      saves: 5,
+      source: "manual-source:codex-qa",
+    },
+  });
+  await calculateOctopusPointsForMatch(liveOctopusMatch.id);
+  const liveOctopusBet = await prisma.octopusGoalkeeperBet.findFirstOrThrow({
+    where: { userId: octopusUser.id, matchId: liveOctopusMatch.id },
+  });
+  check(
+    "live octopus with clean sheet stores save points only",
+    liveOctopusBet.points === 3,
+    `got ${liveOctopusBet.points}`
+  );
+  await prisma.match.update({
+    where: { id: liveOctopusMatch.id },
+    data: { status: "FINISHED" },
+  });
+  await calculateOctopusPointsForMatch(liveOctopusMatch.id);
+  const finishedOctopusBet = await prisma.octopusGoalkeeperBet.findFirstOrThrow({
+    where: { userId: octopusUser.id, matchId: liveOctopusMatch.id },
+  });
+  check(
+    "finished octopus clean sheet adds bonus",
+    finishedOctopusBet.points === 6,
+    `got ${finishedOctopusBet.points}`
+  );
 
   const qfMatch = await createMatch({
     roundId: round.id,

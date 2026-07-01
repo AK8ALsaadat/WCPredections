@@ -61,7 +61,9 @@ async function auditActiveBets(): Promise<AuditRow[]> {
     const goalsConceded = goalsConcededForTeam(bet.match, bet.player.teamId);
     const expected =
       bet.match.status === "FINISHED" || saves != null
-        ? calculateOctopusPoints(saves, goalsConceded)
+        ? calculateOctopusPoints(saves, goalsConceded, {
+            includeCleanSheet: bet.match.status === "FINISHED",
+          })
         : 0;
 
     if (bet.points !== expected) {

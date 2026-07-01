@@ -112,7 +112,8 @@ function octopusSummary(
   const saves = bet.saves ?? null;
   const goalsConceded = bet.goalsConceded ?? null;
   const saveTierPoints = getOctopusSaveTierPoints(saves);
-  const cleanSheetBonus = getOctopusCleanSheetBonus(goalsConceded);
+  const cleanSheetBonus =
+    bet.points > saveTierPoints ? getOctopusCleanSheetBonus(goalsConceded) : 0;
   const concededCap = getOctopusConcededCapPoints(goalsConceded);
   const cappedByGoals = Number.isFinite(concededCap) && saveTierPoints > concededCap;
   const isAr = locale === "ar";
