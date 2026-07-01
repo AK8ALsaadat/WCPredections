@@ -41,6 +41,8 @@ async function attachMissingPredictionUsernames<
     prisma.user.findMany({
       where: {
         NOT: [
+          { username: "ali" },
+          { username: "mmg" },
           { username: "verifier" },
           { username: { startsWith: "qa_" } },
           { username: { startsWith: "ui_qa_" } },
