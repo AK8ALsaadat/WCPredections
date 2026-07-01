@@ -60,7 +60,7 @@ export const en = {
       {
         icon: "✨",
         title: "Fifth: double points",
-        body: "Double your match score points — from the Round of 32 onward, only once per round.",
+        body: "Double your match score points — from the quarter-finals onward, only once per round.",
         example: "Exact score 5 pts → with double becomes 10",
         points: "×2",
         note: "Applies to score and winner points only.",

@@ -1693,8 +1693,8 @@ export default function PredictPage() {
       !doubleLimits.onThisMatch);
   const knockoutRulesNotice =
     locale === "ar"
-      ? `تنبيه: من دور 16 الحد مضاعفة واحدة فقط. من ربع النهائي تقدر تجمع مضاعفة واحدة مع الرهان؛ إذا الرهان على مباراة مضاعفة يصير +10 / -10، وبدون المضاعفة يبقى +5 / -5.`
-      : "Notice: Round of 16 allows one double only. From the quarter-finals you can combine one double with the scorer bet; a bet on a doubled match is +10 / -10, otherwise it remains +5 / -5.";
+      ? `تنبيه: المضاعفة تبدأ من ربع النهائي فقط. من ربع النهائي تقدر تجمع مضاعفة واحدة مع الرهان؛ إذا الرهان على مباراة مضاعفة يصير +10 / -10، وبدون المضاعفة يبقى +5 / -5.`
+      : "Notice: doubles start from the quarter-finals only. From the quarter-finals you can combine one double with the scorer bet; a bet on a doubled match is +10 / -10, otherwise it remains +5 / -5.";
   const predictedScorerIds = new Set(Object.keys(scorerPicks));
   const hasPredictedScorers = predictedScorerIds.size > 0;
   const toBoldPlayerOption = (player: MatchPlayerView) => ({

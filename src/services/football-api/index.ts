@@ -6,6 +6,7 @@ import { syncMatchScorersFromApi } from "@/services/match-scorers.service";
 import { syncGoalkeeperSavesFromApi } from "@/services/octopus-bet.service";
 import { recalculateMatchScoring } from "@/services/prediction.service";
 import { clearPredictionMatchMetaCache } from "@/services/prediction-match-cache";
+import { resolveScoringActualFinishType } from "@/services/scoring.service";
 import { publish } from '@/lib/broadcaster';
 import { ApiFootballProvider } from "./api-football.provider";
 import { FootballDataProvider } from "./football-data.provider";
@@ -683,8 +684,11 @@ async function syncMatch(
   const nextStatus = preserveFinishedState ? existing.status : mapped.status;
   const nextHomeScore = preserveFinishedState ? existing.homeScore : mapped.homeScore;
   const nextAwayScore = preserveFinishedState ? existing.awayScore : mapped.awayScore;
+  const preservedActualFinishType = existing
+    ? resolveScoringActualFinishType(existing)
+    : null;
   const nextActualFinishType = preserveFinishedState
-    ? existing.actualFinishType
+    ? preservedActualFinishType
     : actualFinishType;
   const nextPenaltyWinnerTeamId = preserveFinishedState
     ? existing.penaltyWinnerTeamId

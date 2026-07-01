@@ -23,6 +23,7 @@ import {
 import {
   calculateScorerPredictionPoints,
   getPositionPointsMultiplier,
+  resolveScoringActualFinishType,
 } from "../src/services/scoring.service";
 import { parseEspnGoalkeeperTeamSaves } from "../src/services/football-api/espn-live.provider";
 import {
@@ -100,6 +101,31 @@ check(
       ...sourceMatchBase,
       finishType: "PENALTIES",
     }) === "PENALTIES"
+);
+check(
+  "scoring infers missing 90-minute finish type on finished knockout winners",
+  resolveScoringActualFinishType({
+    actualFinishType: null,
+    awayScore: 0,
+    homeScore: 3,
+    isKnockout: true,
+    matchTime: sourceMatchBase.matchTime,
+    status: "FINISHED",
+  }) === "NINETY_MINUTES"
+);
+check(
+  "scoring infers missing 90-minute finish type on stale live knockout winners",
+  resolveScoringActualFinishType(
+    {
+      actualFinishType: null,
+      awayScore: 2,
+      homeScore: 1,
+      isKnockout: true,
+      matchTime: new Date("2026-06-30T17:00:00Z"),
+      status: "LIVE",
+    },
+    { now: new Date("2026-06-30T20:00:00Z") }
+  ) === "NINETY_MINUTES"
 );
 check(
   "prediction validation rejects penalties without a drawn score",
@@ -788,8 +814,8 @@ check(
     !historyEntries.some((entry) => entry.match.id === "open")
 );
 check(
-  "round of 32 allows only one double",
-  getMaxDoublesForUsageScope("wc:stage:round-of-32") === 1
+  "round of 32 blocks doubles until quarter-finals",
+  getMaxDoublesForUsageScope("wc:stage:round-of-32") === 0
 );
 check(
   "group stage keeps two doubles",

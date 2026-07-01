@@ -41,6 +41,7 @@ import {
   isMatchEligibleForScorerPoints,
   PERFECT_PREDICTION_MIN_MINUTE,
   isMatchFinishedForScoring,
+  resolveScoringActualFinishType,
 } from "@/services/scoring.service";
 
 export const MAX_DOUBLES_PER_ROUND = 1;
@@ -1110,6 +1111,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
 
   const finished = isMatchFinishedForScoring(match);
   const canScoreScorers = isMatchEligibleForScorerPoints(match);
+  const scoringActualFinishType = resolveScoringActualFinishType(match);
 
   if (!finished && !canScoreScorers) {
     throw new Error("Match is not eligible for scoring");
@@ -1118,7 +1120,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
   const scorerGoalsByPlayer = canScoreScorers
     ? getScorerGoalsForPoints(
         {
-          actualFinishType: match.actualFinishType,
+          actualFinishType: scoringActualFinishType,
           homeTeamId: match.homeTeamId,
           awayTeamId: match.awayTeamId,
           homeTeamName: match.homeTeam.name,
@@ -1156,7 +1158,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
             awayTeamId: match.awayTeamId,
             homeScore: match.homeScore!,
             awayScore: match.awayScore!,
-            actualFinishType: match.actualFinishType,
+            actualFinishType: scoringActualFinishType,
             matchScorers: match.matchScorers,
           },
           scorerGoalsByPlayer,
@@ -1192,7 +1194,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
             predictedFinishType: prediction.predictedFinishType,
             predictedPenaltyWinnerTeamId:
               prediction.predictedPenaltyWinnerTeamId,
-            actualFinishType: match.actualFinishType,
+            actualFinishType: scoringActualFinishType,
             actualPenaltyWinnerTeamId: match.penaltyWinnerTeamId,
           }
         )
@@ -1209,8 +1211,8 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
       const finishTypeCorrectForPerfect =
         !match.isKnockout ||
         Boolean(
-          match.actualFinishType &&
-            prediction.predictedFinishType === match.actualFinishType
+          scoringActualFinishType &&
+            prediction.predictedFinishType === scoringActualFinishType
         );
       const picks = picksByUser.get(prediction.userId) ?? [];
       
@@ -1242,7 +1244,7 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
     const finishTypePoints = (shouldAwardBasePoints && match.isKnockout)
       ? calculateFinishTypePoints(
           prediction.predictedFinishType,
-          match.actualFinishType
+          scoringActualFinishType
         )
       : 0;
 

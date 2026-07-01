@@ -18,6 +18,7 @@ import {
   getScorerGoalsForPoints,
   hasRequiredScorerPicksForPerfectBonus,
   PERFECT_PREDICTION_BONUS_POINTS,
+  resolveScoringActualFinishType,
 } from "../src/services/scoring.service";
 import {
   MAX_DOUBLES_PER_ROUND,
@@ -174,6 +175,56 @@ ok(
 ok(
   "ركلات خطأ = 0",
   calculatePenaltyWinnerPoints("team-a", "team-b") === 0
+);
+ok(
+  "missing finished knockout finish type is inferred as 90 minutes for a winner",
+  resolveScoringActualFinishType({
+    actualFinishType: null,
+    awayScore: 1,
+    homeScore: 3,
+    isKnockout: true,
+    matchTime: new Date("2026-06-30T21:00:00Z"),
+    status: "FINISHED",
+  }) === "NINETY_MINUTES"
+);
+ok(
+  "stale live knockout winner can still award 90-minute finish points",
+  resolveScoringActualFinishType(
+    {
+      actualFinishType: null,
+      awayScore: 2,
+      homeScore: 1,
+      isKnockout: true,
+      matchTime: new Date("2026-06-30T17:00:00Z"),
+      status: "LIVE",
+    },
+    { now: new Date("2026-06-30T20:00:00Z") }
+  ) === "NINETY_MINUTES"
+);
+ok(
+  "live tied knockout match does not infer penalties before it is finished",
+  resolveScoringActualFinishType(
+    {
+      actualFinishType: null,
+      awayScore: 1,
+      homeScore: 1,
+      isKnockout: true,
+      matchTime: new Date("2026-06-30T17:00:00Z"),
+      status: "LIVE",
+    },
+    { now: new Date("2026-06-30T20:00:00Z") }
+  ) === null
+);
+ok(
+  "finished tied knockout match infers penalties",
+  resolveScoringActualFinishType({
+    actualFinishType: null,
+    awayScore: 1,
+    homeScore: 1,
+    isKnockout: true,
+    matchTime: new Date("2026-06-30T17:00:00Z"),
+    status: "FINISHED",
+  }) === "PENALTIES"
 );
 ok(
   "all wrong knockout finish type combinations = 0",
@@ -513,13 +564,13 @@ ok(
   getMaxDoublesForUsageScope("wc:group-gameweek:1") === 2
 );
 ok(
-  "round of 32 allows one double",
-  getMaxDoublesForUsageScope("wc:stage:round-of-32") === 1
+  "round of 32 blocks doubles",
+  getMaxDoublesForUsageScope("wc:stage:round-of-32") === 0
 );
 ok("البطاقة الجريئة: مرة واحدة لكل جولة", MAX_BOLD_SCORER_BETS_PER_ROUND === 1);
 ok(
-  "round of 16 allows one double",
-  getMaxDoublesForUsageScope("wc:stage:round-of-16") === 1
+  "round of 16 blocks doubles",
+  getMaxDoublesForUsageScope("wc:stage:round-of-16") === 0
 );
 ok(
   "quarter-finals allows one double",

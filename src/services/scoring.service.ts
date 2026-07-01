@@ -171,6 +171,50 @@ export function isMatchFinishedForScoring(match: Match): boolean {
  * الحد الأدنى من الدقائق المسموحة قبل حساب بونص التوقع الصحيح
  * لا يتم حساب البونص حتى نصل للدقيقة 75 (أو نهاية المباراة)
  */
+// Stale LIVE knockout matches with a winner still need finish-type points.
+export const FINISH_TYPE_INFERENCE_MIN_MINUTE = 150;
+
+type MatchForScoringFinishType = Pick<
+  Match,
+  | "actualFinishType"
+  | "awayScore"
+  | "homeScore"
+  | "isKnockout"
+  | "matchTime"
+  | "status"
+>;
+
+export function resolveScoringActualFinishType(
+  match: MatchForScoringFinishType,
+  options?: { now?: Date | number }
+): FinishType | null {
+  if (match.actualFinishType) return match.actualFinishType;
+  if (!match.isKnockout) return null;
+  if (match.homeScore === null || match.awayScore === null) return null;
+
+  if (match.status === "FINISHED") {
+    return match.homeScore === match.awayScore ? "PENALTIES" : "NINETY_MINUTES";
+  }
+
+  if (match.status !== "LIVE") return null;
+  if (match.homeScore === match.awayScore) return null;
+
+  const nowMs =
+    options?.now instanceof Date
+      ? options.now.getTime()
+      : typeof options?.now === "number"
+        ? options.now
+        : Date.now();
+  const minutesElapsed =
+    (nowMs - new Date(match.matchTime).getTime()) / (1000 * 60);
+
+  return Number.isFinite(minutesElapsed) &&
+    minutesElapsed >= FINISH_TYPE_INFERENCE_MIN_MINUTE
+    ? "NINETY_MINUTES"
+    : null;
+}
+
+// Minimum elapsed minute before the perfect prediction bonus can be awarded.
 export const PERFECT_PREDICTION_MIN_MINUTE = 75;
 
 /**
