@@ -5,6 +5,13 @@ export type LeaderboardSpecialBadge = {
 
 const SPECIAL_LEADERBOARD_BADGES = new Map<string, LeaderboardSpecialBadge>([
   [
+    "nawafmd",
+    {
+      label: "معاذ بركه",
+      title: "بادج خاص لـ nawafmd",
+    },
+  ],
+  [
     "nawafmd5",
     {
       label: "معاذ بركه",

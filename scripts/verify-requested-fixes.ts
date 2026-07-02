@@ -194,6 +194,7 @@ check(
 check(
   "nawafmd5 gets the Muath blessing leaderboard badge",
   getLeaderboardSpecialBadge("NawafMD5")?.label === "معاذ بركه" &&
+    getLeaderboardSpecialBadge("nawafmd")?.label === "معاذ بركه" &&
     getLeaderboardSpecialBadge("alfaris") === null
 );
 
