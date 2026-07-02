@@ -146,6 +146,7 @@ async function buildRoundUsageLimits(
   const phase = getUsageRoundPhase(scope);
   const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(scope);
   const canDoubleBoostBoldScorer = isHighValueBoldScorerRound(scope);
+  const usageRoundStarted = scope.hasStarted;
 
   const doubleOnThisMatch = usage?.doubleOnThisMatch ?? false;
   const doublesInRound = Number(usage?.doublesInRound ?? 0);
@@ -159,6 +160,7 @@ async function buildRoundUsageLimits(
     roundId: resolvedRoundId,
     usageRoundKey: scope.key,
     phase,
+    usageRoundStarted,
     allowDoubleWithBold,
     doubles: {
       used: doublesInRound,
@@ -176,7 +178,7 @@ async function buildRoundUsageLimits(
       onOtherMatch: !!usage?.boldMatchId && !boldOnThisMatch,
       canUse:
         boldOnThisMatch ||
-        (hasBoldPoints && !usage?.boldMatchId),
+        (usageRoundStarted && hasBoldPoints && !usage?.boldMatchId),
       hasMinimumPoints: hasBoldPoints,
       minimumPoints: MIN_POINTS_FOR_BOLD_SCORER_BET,
       userPoints: totalPoints,
@@ -195,7 +197,9 @@ async function buildRoundUsageLimits(
       max: 1,
       onThisMatch: octopusOnThisMatch,
       onOtherMatch: !!usage?.octopusMatchId && !octopusOnThisMatch,
-      canUse: octopusOnThisMatch || !usage?.octopusMatchId,
+      canUse:
+        octopusOnThisMatch ||
+        (usageRoundStarted && !usage?.octopusMatchId),
       otherMatchId:
         usage?.octopusMatchId && !octopusOnThisMatch
           ? usage.octopusMatchId

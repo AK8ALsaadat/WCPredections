@@ -796,6 +796,13 @@ export async function submitMatchPredictionBundle(
     }),
   ]);
 
+  if (
+    (data.boldPlayerId || data.octopusPlayerId) &&
+    !usageScope.hasStarted
+  ) {
+    throw new Error("ما يمديك تستخدم الرهان أو الأخطبوط قبل بداية الجولة");
+  }
+
   if (!storedBold) {
     const sameMatchBold = await prisma.boldScorerBet.findFirst({
       where: { userId, matchId: data.matchId, cancelledAt: null },

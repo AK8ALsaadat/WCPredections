@@ -64,6 +64,12 @@ import type { LeaderboardEntry } from "../src/types";
 let passed = 0;
 let failed = 0;
 
+function matchTimeMsForVerify(matchTime: Date | string) {
+  return matchTime instanceof Date
+    ? matchTime.getTime()
+    : new Date(matchTime).getTime();
+}
+
 function ok(name: string, cond: boolean, detail?: string) {
   if (cond) {
     passed++;
@@ -635,6 +641,53 @@ ok(
   getUsageRoundPhase(partialWorldCupKeys[5]) === "round-of-32" &&
     getUsageRoundPhase(partialWorldCupKeys[15]) === "round-of-32" &&
     getUsageRoundPhase(partialWorldCupKeys[16]) === "round-of-16"
+);
+const earlyPartialWorldCupKnockoutSchedule =
+  partialWorldCupKnockoutSchedule.slice(0, 10);
+ok(
+  "partial World Cup knockout schedule does not jump to quarter-finals",
+  earlyPartialWorldCupKnockoutSchedule.every(
+    (match) =>
+      getUsageRoundPhase(
+        buildUsageRoundKey(match, earlyPartialWorldCupKnockoutSchedule)
+      ) === "round-of-32"
+  )
+);
+const duplicatedWorldCupKnockoutSchedule = [
+  ...partialWorldCupKnockoutSchedule.slice(0, 7),
+  {
+    ...partialWorldCupKnockoutSchedule[6],
+    id: "wc-ko-provider-duplicate",
+    apiMatchId: "provider-duplicate",
+    matchTime: new Date(
+      matchTimeMsForVerify(partialWorldCupKnockoutSchedule[6].matchTime) +
+        60 * 60 * 1000
+    ),
+  },
+  ...partialWorldCupKnockoutSchedule.slice(7),
+];
+const duplicatedWorldCupKeys = duplicatedWorldCupKnockoutSchedule.map((match) =>
+  buildUsageRoundKey(match, duplicatedWorldCupKnockoutSchedule)
+);
+ok(
+  "duplicate provider knockout rows do not advance the next phase early",
+  getUsageRoundPhase(duplicatedWorldCupKeys[16]) === "round-of-32" &&
+    getUsageRoundPhase(duplicatedWorldCupKeys[17]) === "round-of-16"
+);
+const oldRoundKnockoutMatch = {
+  ...partialWorldCupKnockoutSchedule[4],
+  roundId: "old-main-round",
+  stageName: "Round of 32",
+};
+const newRoundKnockoutMatch = {
+  ...partialWorldCupKnockoutSchedule[4],
+  roundId: "new-main-round",
+  stageName: "Round of 32",
+};
+ok(
+  "feature usage key does not reset when the database round id changes",
+  buildUsageRoundKey(oldRoundKnockoutMatch, [oldRoundKnockoutMatch]) ===
+    buildUsageRoundKey(newRoundKnockoutMatch, [newRoundKnockoutMatch])
 );
 const usageRoundMatches = [
   {

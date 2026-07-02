@@ -540,6 +540,10 @@ export async function submitOctopusBet(
     return null;
   }
 
+  if (!scope.hasStarted) {
+    throw new Error("ما يمديك تستخدم الأخطبوط قبل بداية الجولة");
+  }
+
   if (existing && !existing.cancelledAt && existing.matchId !== matchId) {
     throw new Error("استخدمت الأخطبوط في مباراة ثانية هالجولة — مرة واحدة بس");
   }

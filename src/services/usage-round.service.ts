@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { isTournamentRoundName } from "@/lib/rounds";
 import { getBracketByApiMatchId, getBracketRoundLabel } from "@/lib/wc-bracket";
 import { prisma } from "@/lib/prisma";
 
@@ -20,6 +21,8 @@ export type UsageRoundScope = {
   key: string;
   matchIds: string[];
   databaseRoundId: string;
+  startsAt: Date;
+  hasStarted: boolean;
 };
 
 export type UsageRoundPhase =
@@ -128,6 +131,25 @@ function specificKnockoutPhaseFromMatch(
   return knockoutPhaseFromKey(stageKey(match.round?.name ?? null));
 }
 
+export function getUsageCompetitionKey(): string {
+  return process.env.USAGE_COMPETITION_KEY?.trim() || "wc";
+}
+
+function usageKeyPrefix() {
+  return getUsageCompetitionKey();
+}
+
+function isLikelyWorldCupRoundName(name: string | null | undefined) {
+  if (!name) return false;
+  const normalized = name.trim().toLowerCase();
+  return (
+    isTournamentRoundName(name) ||
+    normalized.includes("world cup") ||
+    normalized.includes("fifa") ||
+    name.includes("كأس العالم")
+  );
+}
+
 function matchTimeMs(matchTime: Date | string): number {
   return matchTime instanceof Date
     ? matchTime.getTime()
@@ -175,6 +197,15 @@ function pairUsageKey(match: UsageMatch) {
   ].join("|");
 }
 
+function unorderedPairUsageKey(match: UsageMatch) {
+  return [
+    teamUsageKey(match.homeTeam, match.homeTeamId),
+    teamUsageKey(match.awayTeam, match.awayTeamId),
+  ]
+    .sort()
+    .join("|");
+}
+
 function isGroupMatch(match: UsageMatch): boolean {
   return Boolean(normalizedGroupCode(match.groupCode)) || isGroupStage(match.stageName);
 }
@@ -217,6 +248,40 @@ function knockoutPhaseFromIndex(
   return index === 0 && total > 1 ? "third-place-final" : "final";
 }
 
+function dedupeKnockoutMatchesForOrdering(knockoutMatches: UsageMatch[]) {
+  const duplicateWindowMs = 6 * 60 * 60 * 1000;
+  const canonicalMatches: UsageMatch[] = [];
+  const duplicateToCanonical = new Map<string, string>();
+
+  for (const candidate of knockoutMatches) {
+    const pairKey = unorderedPairUsageKey(candidate);
+    const candidateTime = matchTimeMs(candidate.matchTime);
+    const duplicate = canonicalMatches.find(
+      (canonical) =>
+        unorderedPairUsageKey(canonical) === pairKey &&
+        Math.abs(matchTimeMs(canonical.matchTime) - candidateTime) <=
+          duplicateWindowMs
+    );
+
+    if (duplicate) {
+      duplicateToCanonical.set(candidate.id, duplicate.id);
+      continue;
+    }
+
+    canonicalMatches.push(candidate);
+  }
+
+  return { canonicalMatches, duplicateToCanonical };
+}
+
+function shouldStartKnockoutAtRoundOf32(knockoutMatches: UsageMatch[]) {
+  return knockoutMatches.some(
+    (candidate) =>
+      specificKnockoutPhaseFromMatch(candidate) === "round-of-32" ||
+      isLikelyWorldCupRoundName(candidate.round?.name)
+  );
+}
+
 function knockoutFallbackUsageKey(match: UsageMatch, roundMatches: UsageMatch[]) {
   const knockoutMatches = roundMatches
     .filter((candidate) => !isGroupMatch(candidate))
@@ -224,19 +289,20 @@ function knockoutFallbackUsageKey(match: UsageMatch, roundMatches: UsageMatch[])
       const timeDiff = matchTimeMs(a.matchTime) - matchTimeMs(b.matchTime);
       return timeDiff !== 0 ? timeDiff : a.id.localeCompare(b.id);
     });
+  const { canonicalMatches, duplicateToCanonical } =
+    dedupeKnockoutMatchesForOrdering(knockoutMatches);
+  const canonicalMatchId = duplicateToCanonical.get(match.id) ?? match.id;
   const startsAtRoundOf32 =
-    knockoutMatches.length > 16 ||
-    knockoutMatches.some(
-      (candidate) => specificKnockoutPhaseFromMatch(candidate) === "round-of-32"
-    );
+    canonicalMatches.length > 16 ||
+    shouldStartKnockoutAtRoundOf32(canonicalMatches);
   const index = Math.max(
     0,
-    knockoutMatches.findIndex((candidate) => candidate.id === match.id)
+    canonicalMatches.findIndex((candidate) => candidate.id === canonicalMatchId)
   );
 
-  return `${match.roundId}:stage:${knockoutPhaseFromIndex(
+  return `${usageKeyPrefix()}:stage:${knockoutPhaseFromIndex(
     index,
-    knockoutMatches.length,
+    canonicalMatches.length,
     startsAtRoundOf32
   )}`;
 }
@@ -248,7 +314,7 @@ export function buildUsageRoundKey(
   if (!isGroupMatch(match)) {
     const phase = specificKnockoutPhaseFromMatch(match);
     if (phase) {
-      return `${match.roundId}:stage:${phase}`;
+      return `${usageKeyPrefix()}:stage:${phase}`;
     }
 
     return knockoutFallbackUsageKey(match, roundMatches);
@@ -274,7 +340,7 @@ export function buildUsageRoundKey(
         distinctIndex += 1;
       }
       if (candidate.id === match.id) {
-        return `${match.roundId}:group-gameweek:${Math.floor(candidateIndex / 2) + 1}`;
+        return `${usageKeyPrefix()}:group-gameweek:${Math.floor(candidateIndex / 2) + 1}`;
       }
     }
   }
@@ -293,7 +359,7 @@ export function buildUsageRoundKey(
       previousMatchesForTeam(match.awayTeamId)
     ) + 1;
 
-  return `${match.roundId}:group-gameweek:${gameweek}`;
+  return `${usageKeyPrefix()}:group-gameweek:${gameweek}`;
 }
 
 const usageMatchSelect = {
@@ -322,6 +388,29 @@ const fetchUsageRoundMatches = (roundId: string) =>
     select: usageMatchSelect,
   });
 
+async function fetchUsageCompetitionMatches() {
+  const rounds = await prisma.round.findMany({
+    select: {
+      id: true,
+      name: true,
+      _count: { select: { matches: true } },
+    },
+  });
+  const roundIds = rounds
+    .filter(
+      (round) =>
+        round._count.matches >= 10 || isLikelyWorldCupRoundName(round.name)
+    )
+    .map((round) => round.id);
+
+  if (roundIds.length === 0) return [];
+
+  return prisma.match.findMany({
+    where: { roundId: { in: roundIds } },
+    select: usageMatchSelect,
+  });
+}
+
 const getCachedUsageMatch = unstable_cache(
   fetchUsageMatch,
   ["usage-match-v4"],
@@ -340,6 +429,10 @@ const usageMatchMemoryCache = new Map<
   { data: UsageMatch; expiresAt: number }
 >();
 const usageRoundMatchesMemoryCache = new Map<
+  string,
+  { data: UsageMatch[]; expiresAt: number }
+>();
+const usageCompetitionMatchesMemoryCache = new Map<
   string,
   { data: UsageMatch[]; expiresAt: number }
 >();
@@ -429,6 +522,38 @@ async function getUsageRoundMatches(roundId: string) {
   }
 }
 
+async function getUsageCompetitionMatches() {
+  const cacheKey = usageKeyPrefix();
+  const cached = getFreshCacheValue(
+    usageCompetitionMatchesMemoryCache,
+    cacheKey
+  );
+  if (cached) return cached;
+
+  const matches = await fetchUsageCompetitionMatches();
+  setFreshCacheValue(usageCompetitionMatchesMemoryCache, cacheKey, matches);
+  return matches;
+}
+
+function shouldUseCompetitionScope(
+  match: UsageMatch,
+  roundMatches: UsageMatch[]
+) {
+  if (roundMatches.length >= 10 || isLikelyWorldCupRoundName(match.round?.name)) {
+    return true;
+  }
+
+  return roundMatches.some((candidate) =>
+    isLikelyWorldCupRoundName(candidate.round?.name)
+  );
+}
+
+async function getFreshRoundMatches(roundId: string) {
+  const matches = await fetchUsageRoundMatches(roundId);
+  setFreshCacheValue(usageRoundMatchesMemoryCache, roundId, matches);
+  return matches;
+}
+
 export async function getUsageRoundScope(
   matchId: string,
   knownRoundId?: string
@@ -444,20 +569,41 @@ export async function getUsageRoundScope(
       ? getUsageRoundMatches(knownRoundId)
       : Promise.resolve(null),
   ]);
-  const roundMatches =
+  let roundMatches =
     knownRoundMatches ?? (await getUsageRoundMatches(match.roundId));
+  if (!roundMatches.some((candidate) => candidate.id === match.id)) {
+    roundMatches = await getFreshRoundMatches(match.roundId);
+  }
+  if (!isGroupMatch(match) || shouldUseCompetitionScope(match, roundMatches)) {
+    roundMatches = await getFreshRoundMatches(match.roundId);
+  }
+  if (shouldUseCompetitionScope(match, roundMatches)) {
+    const competitionMatches = await getUsageCompetitionMatches();
+    if (competitionMatches.some((candidate) => candidate.id === match.id)) {
+      roundMatches = competitionMatches;
+    }
+  }
   const key = buildUsageRoundKey(match, roundMatches);
-  const scopedMatchIds = roundMatches
-    .filter((candidate) => buildUsageRoundKey(candidate, roundMatches) === key)
-    .map((candidate) => candidate.id);
+  const scopedMatches = roundMatches.filter(
+    (candidate) => buildUsageRoundKey(candidate, roundMatches) === key
+  );
+  const scopedMatchIds = scopedMatches.map((candidate) => candidate.id);
   const matchIds = scopedMatchIds.includes(match.id)
     ? scopedMatchIds
     : [...scopedMatchIds, match.id];
+  const startsAtMs = Math.min(
+    ...[...scopedMatches, match].map((candidate) =>
+      matchTimeMs(candidate.matchTime)
+    )
+  );
+  const startsAt = new Date(startsAtMs);
 
   const scope = {
     key,
     matchIds,
     databaseRoundId: match.roundId,
+    startsAt,
+    hasStarted: Number.isFinite(startsAtMs) && startsAtMs <= Date.now(),
   };
   setFreshCacheValue(usageScopeMemoryCache, cacheKey, scope);
   return scope;

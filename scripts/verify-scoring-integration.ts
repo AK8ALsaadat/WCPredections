@@ -428,6 +428,15 @@ async function main() {
     `got ${finishedOctopusBet.points}`
   );
 
+  await createMatch({
+    roundId: round.id,
+    homeTeamId: homeTeam.id,
+    awayTeamId: awayTeam.id,
+    matchTime: new Date(Date.now() - 30 * 60 * 1000),
+    status: "LIVE",
+    isKnockout: true,
+    stageName: "Quarter-finals",
+  });
   const qfMatch = await createMatch({
     roundId: round.id,
     homeTeamId: homeTeam.id,

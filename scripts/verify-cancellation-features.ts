@@ -39,6 +39,7 @@ async function main() {
     userId: "",
     roundId: "",
     matchId: "",
+    matchIds: [] as string[],
     teamIds: [] as string[],
     playerIds: [] as string[],
   };
@@ -46,6 +47,7 @@ async function main() {
   try {
     const now = Date.now();
     const startsAt = new Date(now - 60 * 60 * 1000);
+    const phaseStartTime = new Date(now - 30 * 60 * 1000);
     const matchTime = new Date(now + 24 * 60 * 60 * 1000);
     const endsAt = new Date(now + 72 * 60 * 60 * 1000);
 
@@ -83,6 +85,18 @@ async function main() {
     created.roundId = round.id;
     created.teamIds.push(home.id, away.id);
 
+    const phaseOpener = await prisma.match.create({
+      data: {
+        roundId: round.id,
+        homeTeamId: home.id,
+        awayTeamId: away.id,
+        matchTime: phaseStartTime,
+        status: "LIVE",
+        stageName: "Round of 16",
+      },
+    });
+    created.matchIds.push(phaseOpener.id);
+
     const match = await prisma.match.create({
       data: {
         roundId: round.id,
@@ -94,6 +108,19 @@ async function main() {
       },
     });
     created.matchId = match.id;
+    created.matchIds.push(match.id);
+
+    const futurePhaseMatch = await prisma.match.create({
+      data: {
+        roundId: round.id,
+        homeTeamId: home.id,
+        awayTeamId: away.id,
+        matchTime: new Date(now + 48 * 60 * 60 * 1000),
+        status: "SCHEDULED",
+        stageName: "Quarter-finals",
+      },
+    });
+    created.matchIds.push(futurePhaseMatch.id);
 
     const players = await prisma.player.createManyAndReturn({
       data: [
@@ -131,6 +158,25 @@ async function main() {
     const keeper1 = players.find((player) => player.name === "QA Keeper One")!;
     const keeper2 = players.find((player) => player.name === "QA Keeper Two")!;
     const usageRoundKey = (await getUsageRoundScope(match.id, round.id)).key;
+
+    let futureFeatureRejected = false;
+    try {
+      await submitMatchPredictionBundle(user.id, {
+        matchId: futurePhaseMatch.id,
+        predHome: 1,
+        predAway: 0,
+        isDouble: false,
+        picks: [{ playerId: attacker1.id, goals: 1 }],
+        boldPlayerId: attacker1.id,
+        octopusPlayerId: null,
+      });
+    } catch {
+      futureFeatureRejected = true;
+    }
+    assert(
+      futureFeatureRejected,
+      "future phase feature usage should be blocked until the round starts"
+    );
 
     await prisma.prediction.create({
       data: {
@@ -261,8 +307,8 @@ async function main() {
         prisma.prediction.deleteMany({ where: { userId: created.userId } })
       );
     }
-    if (created.matchId) {
-      cleanup.push(prisma.match.deleteMany({ where: { id: created.matchId } }));
+    if (created.matchIds.length > 0) {
+      cleanup.push(prisma.match.deleteMany({ where: { id: { in: created.matchIds } } }));
     }
     if (created.playerIds.length > 0) {
       cleanup.push(prisma.player.deleteMany({ where: { id: { in: created.playerIds } } }));

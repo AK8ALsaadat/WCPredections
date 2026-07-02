@@ -173,6 +173,7 @@ type MatchData = {
     roundId: string;
     usageRoundKey?: string;
     phase?: string;
+    usageRoundStarted?: boolean;
     allowDoubleWithBold?: boolean;
     doubles: {
       used: number;
@@ -689,6 +690,7 @@ export default function PredictPage() {
             counter: (used: boolean, max: number) =>
               `الأخطبوط: ${used ? 1 : 0}/${max}`,
             available: "متاحة — اختر حارساً واحداً",
+            notStarted: "تفتح مع بداية الجولة",
             usedHere: (name: string) => `مستخدمة هالمباراة: ${name}`,
             usedElsewhere: "استخدمت الأخطبوط في مباراة ثانية هالجولة",
             choose: "اختر الحارس",
@@ -708,6 +710,7 @@ export default function PredictPage() {
             counter: (used: boolean, max: number) =>
               `Octopus: ${used ? 1 : 0}/${max}`,
             available: "Available — pick one goalkeeper",
+            notStarted: "Opens when this round starts",
             usedHere: (name: string) => `Used this match: ${name}`,
             usedElsewhere: "You used Octopus on another match this round",
             choose: "Choose goalkeeper",
@@ -1127,6 +1130,19 @@ export default function PredictPage() {
     const limits = match?.roundUsageLimits?.boldScorer;
     if (
       checked &&
+      match?.roundUsageLimits &&
+      !match.roundUsageLimits.usageRoundStarted &&
+      !limits?.onThisMatch
+    ) {
+      setError(
+        locale === "ar"
+          ? "الرهان يفتح مع بداية الجولة"
+          : "The scorer bet opens when this round starts"
+      );
+      return;
+    }
+    if (
+      checked &&
       limits &&
       !limits.hasMinimumPoints &&
       !limits.onThisMatch
@@ -1248,6 +1264,15 @@ export default function PredictPage() {
 
   function handleOctopusToggle(checked: boolean) {
     const limits = match?.roundUsageLimits?.octopus;
+    if (
+      checked &&
+      match?.roundUsageLimits &&
+      !match.roundUsageLimits.usageRoundStarted &&
+      !limits?.onThisMatch
+    ) {
+      setError(octopusCopy.notStarted);
+      return;
+    }
     if (checked && limits && !limits.canUse && !limits.onThisMatch) {
       setError(octopusCopy.usedElsewhere);
       return;
@@ -1668,6 +1693,8 @@ export default function PredictPage() {
       : "Doubles are not available this round";
   const boldLimits = match.roundUsageLimits?.boldScorer;
   const octopusLimits = match.roundUsageLimits?.octopus;
+  const usageRoundStarted =
+    match.roundUsageLimits?.usageRoundStarted ?? true;
   const allowDoubleWithBold = match.roundUsageLimits?.allowDoubleWithBold ?? false;
   const boldOnThisMatch =
     Boolean(boldLimits?.onThisMatch) ||
@@ -2007,6 +2034,10 @@ export default function PredictPage() {
                     ? locale === "ar"
                       ? `يتطلب ${boldLimits.minimumPoints} نقاط (نقاطك ${boldLimits.userPoints})`
                       : `Requires ${boldLimits.minimumPoints} points (${boldLimits.userPoints} now)`
+                  : !usageRoundStarted && !boldLimits.onThisMatch
+                    ? locale === "ar"
+                      ? "تفتح مع بداية الجولة"
+                      : "Opens when this round starts"
                   : boldLimits.onOtherMatch
                     ? t.predict.boldExhausted
                     : t.predict.boldAvailable}
@@ -2185,6 +2216,8 @@ export default function PredictPage() {
                   ? octopusCopy.usedHere(octopusLimits.playerName)
                   : octopusLimits.onOtherMatch
                     ? octopusCopy.usedElsewhere
+                    : !usageRoundStarted
+                      ? octopusCopy.notStarted
                     : octopusCopy.available}
               </span>
             </div>

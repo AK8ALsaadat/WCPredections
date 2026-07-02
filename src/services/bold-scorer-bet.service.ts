@@ -158,6 +158,10 @@ export async function submitBoldScorerBet(
     return null;
   }
 
+  if (!scope.hasStarted) {
+    throw new Error("ما يمديك تستخدم الرهان قبل بداية الجولة");
+  }
+
   if (!existing) {
     const totalPoints = await getUserTotalPoints(userId);
     if (totalPoints < MIN_POINTS_FOR_BOLD_SCORER_BET) {
