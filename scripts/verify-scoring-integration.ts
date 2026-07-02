@@ -4,6 +4,7 @@ import {
   submitMatchPredictionBundle,
 } from "../src/services/prediction.service";
 import { calculateOctopusPointsForMatch } from "../src/services/octopus-bet.service";
+import { getRoundUsageLimits } from "../src/services/round-usage.service";
 import { getOverallLeaderboard } from "../src/services/leaderboard.service";
 import {
   getUserTotalPoints,
@@ -154,13 +155,22 @@ async function main() {
   ]);
   created.players.push(homeForward.id, awayForward.id, homeGoalkeeper.id);
 
-  const [perfectUser, extraUser, penaltyUser, qfUser, r16User, octopusUser] =
+  const [
+    perfectUser,
+    extraUser,
+    penaltyUser,
+    qfUser,
+    r16User,
+    r16OtherFeatureUser,
+    octopusUser,
+  ] =
     await Promise.all([
       createUser(`${stamp}_perfect`),
       createUser(`${stamp}_extra`),
       createUser(`${stamp}_penalty`),
       createUser(`${stamp}_qf`),
       createUser(`${stamp}_r16`),
+      createUser(`${stamp}_r16_other_feature`),
       createUser(`${stamp}_octopus`),
     ]);
 
@@ -174,7 +184,7 @@ async function main() {
     awayScore: 0,
   });
   await prisma.prediction.createMany({
-    data: [qfUser.id, r16User.id].map((userId) => ({
+    data: [qfUser.id, r16User.id, r16OtherFeatureUser.id].map((userId) => ({
       userId,
       matchId: seedMatch.id,
       predHome: 1,
@@ -477,6 +487,69 @@ async function main() {
     where: { userId_matchId: { userId: r16User.id, matchId: r16Match.id } },
   });
   check("round of 16 accepts double without bold", savedR16.isDouble);
+
+  const r16BoldElsewhereMatch = await createMatch({
+    roundId: round.id,
+    homeTeamId: homeTeam.id,
+    awayTeamId: awayTeam.id,
+    matchTime: new Date(Date.now() + 8 * 60 * 60 * 1000),
+    status: "SCHEDULED",
+    isKnockout: true,
+    stageName: "Round of 16",
+  });
+  await submitMatchPredictionBundle(r16OtherFeatureUser.id, {
+    matchId: r16BoldElsewhereMatch.id,
+    predHome: 1,
+    predAway: 0,
+    isDouble: false,
+    predictedFinishType: "NINETY_MINUTES",
+    predictedPenaltyWinnerTeamId: null,
+    picks: [{ playerId: homeForward.id, goals: 1 }],
+    boldPlayerId: homeForward.id,
+    octopusPlayerId: null,
+  });
+  const r16DoubleAfterBoldMatch = await createMatch({
+    roundId: round.id,
+    homeTeamId: homeTeam.id,
+    awayTeamId: awayTeam.id,
+    matchTime: new Date(Date.now() + 9 * 60 * 60 * 1000),
+    status: "SCHEDULED",
+    isKnockout: true,
+    stageName: "Round of 16",
+  });
+  const r16DoubleLimits = await getRoundUsageLimits(
+    r16OtherFeatureUser.id,
+    r16DoubleAfterBoldMatch.id,
+    round.id
+  );
+  check(
+    "round of 16 double stays enabled when bold is on another match",
+    r16DoubleLimits.doubles.canEnable,
+    JSON.stringify(r16DoubleLimits.doubles)
+  );
+  await submitMatchPredictionBundle(r16OtherFeatureUser.id, {
+    matchId: r16DoubleAfterBoldMatch.id,
+    predHome: 1,
+    predAway: 0,
+    isDouble: true,
+    predictedFinishType: "NINETY_MINUTES",
+    predictedPenaltyWinnerTeamId: null,
+    picks: [{ playerId: homeForward.id, goals: 1 }],
+    boldPlayerId: null,
+    octopusPlayerId: null,
+  });
+  const savedR16DoubleAfterBold = await prisma.prediction.findUniqueOrThrow({
+    where: {
+      userId_matchId: {
+        userId: r16OtherFeatureUser.id,
+        matchId: r16DoubleAfterBoldMatch.id,
+      },
+    },
+  });
+  check(
+    "round of 16 accepts double when bold is on another match",
+    savedR16DoubleAfterBold.isDouble
+  );
 
   if (failures > 0) {
     throw new Error(`${failures} integration checks failed`);

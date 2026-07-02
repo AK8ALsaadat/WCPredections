@@ -229,7 +229,7 @@ export async function submitBoldScorerBet(
         where: {
           userId,
           isDouble: true,
-          matchId: { in: scope.matchIds },
+          matchId,
         },
         data: { isDouble: false, doubleBonus: 0 },
       });

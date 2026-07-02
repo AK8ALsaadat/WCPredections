@@ -447,9 +447,12 @@ export async function getUsageRoundScope(
   const roundMatches =
     knownRoundMatches ?? (await getUsageRoundMatches(match.roundId));
   const key = buildUsageRoundKey(match, roundMatches);
-  const matchIds = roundMatches
+  const scopedMatchIds = roundMatches
     .filter((candidate) => buildUsageRoundKey(candidate, roundMatches) === key)
     .map((candidate) => candidate.id);
+  const matchIds = scopedMatchIds.includes(match.id)
+    ? scopedMatchIds
+    : [...scopedMatchIds, match.id];
 
   const scope = {
     key,

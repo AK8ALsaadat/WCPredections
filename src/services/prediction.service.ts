@@ -122,7 +122,7 @@ export async function validateDoubleUsage(
           usageRoundKey: scope.key,
         },
       },
-      select: { cancelledAt: true },
+      select: { matchId: true, cancelledAt: true },
     }),
     prisma.octopusGoalkeeperBet.findUnique({
       where: {
@@ -131,16 +131,21 @@ export async function validateDoubleUsage(
           usageRoundKey: scope.key,
         },
       },
-      select: { cancelledAt: true },
+      select: { matchId: true, cancelledAt: true },
     }),
   ]);
 
   if (
-    (octopusInScope && !octopusInScope.cancelledAt) ||
-    (boldInScope && !boldInScope.cancelledAt && !allowDoubleWithBold)
+    (octopusInScope &&
+      !octopusInScope.cancelledAt &&
+      octopusInScope.matchId === matchId) ||
+    (boldInScope &&
+      !boldInScope.cancelledAt &&
+      boldInScope.matchId === matchId &&
+      !allowDoubleWithBold)
   ) {
     throw new Error(
-      "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط في نفس الجولة"
+      "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
     );
   }
 }
@@ -213,9 +218,12 @@ export async function submitPrediction(
       }),
     ]);
     const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(usageScope);
-    if (octopusInScope || (boldInScope && !allowDoubleWithBold)) {
+    if (
+      octopusInScope?.matchId === data.matchId ||
+      (boldInScope?.matchId === data.matchId && !allowDoubleWithBold)
+    ) {
       throw new Error(
-        "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط في نفس الجولة"
+        "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
       );
     }
   }
@@ -833,26 +841,13 @@ export async function submitMatchPredictionBundle(
   const nextBoldActiveOnThisMatch = Boolean(data.boldPlayerId);
   const nextOctopusActiveOnThisMatch = Boolean(data.octopusPlayerId);
   const allowDoubleWithBold = canCombineDoubleAndBoldForUsageScope(usageScope);
-  const storedBoldActiveInScope =
-    storedBold != null && storedBold.cancelledAt == null;
-  const storedOctopusActiveInScope =
-    storedOctopus != null && storedOctopus.cancelledAt == null;
-  const nextBoldActiveInScope =
-    nextBoldActiveOnThisMatch ||
-    (storedBoldActiveInScope &&
-      !(storedBoldActiveOnThisMatch && !data.boldPlayerId));
-  const nextOctopusActiveInScope =
-    nextOctopusActiveOnThisMatch ||
-    (storedOctopusActiveInScope &&
-      !(storedOctopusActiveOnThisMatch && !data.octopusPlayerId));
-
   if (
     isDouble &&
-    (nextOctopusActiveInScope ||
-      (nextBoldActiveInScope && !allowDoubleWithBold))
+    (nextOctopusActiveOnThisMatch ||
+      (nextBoldActiveOnThisMatch && !allowDoubleWithBold))
   ) {
     throw new Error(
-      "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط في نفس الجولة"
+      "ما تقدر تستخدم المضاعفة مع الرهان أو الأخطبوط على نفس المباراة"
     );
   }
 
@@ -905,7 +900,7 @@ export async function submitMatchPredictionBundle(
         where: {
           userId,
           isDouble: true,
-          matchId: { in: usageScope.matchIds },
+          matchId: data.matchId,
         },
         data: { isDouble: false, doubleBonus: 0 },
       });

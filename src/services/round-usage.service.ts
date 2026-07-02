@@ -153,8 +153,7 @@ async function buildRoundUsageLimits(
     doublesInRound - (doubleOnThisMatch ? 1 : 0);
   const highValueBoldScorer = canDoubleBoostBoldScorer && doubleOnThisMatch;
   const featureBetBlocksDouble =
-    Boolean(usage?.octopusMatchId) ||
-    (Boolean(usage?.boldMatchId) && !allowDoubleWithBold);
+    octopusOnThisMatch || (boldOnThisMatch && !allowDoubleWithBold);
 
   return {
     roundId: resolvedRoundId,
