@@ -4,7 +4,10 @@ import { applyRemappedMatchState } from "@/lib/wc-dates";
 import { advanceKnockoutTeams } from "@/services/knockout-advancement.service";
 import { syncMatchScorersFromApi } from "@/services/match-scorers.service";
 import { syncGoalkeeperSavesFromApi } from "@/services/octopus-bet.service";
-import { recalculateMatchScoring } from "@/services/prediction.service";
+import {
+  recalculateMatchScoring,
+  recalculateStaleFinishedMatchScoringForRound,
+} from "@/services/prediction.service";
 import { clearPredictionMatchMetaCache } from "@/services/prediction-match-cache";
 import { resolveScoringActualFinishType } from "@/services/scoring.service";
 import { publish } from '@/lib/broadcaster';
@@ -972,6 +975,9 @@ export async function syncMatchesFromApi(
     : await advanceKnockoutTeams(roundId);
 
   await reconcileDuplicateMatchesInRound(roundId);
+  pointsCalculated += await recalculateStaleFinishedMatchScoringForRound(
+    roundId
+  );
 
   if (updated > 0 || created > 0) {
     try {

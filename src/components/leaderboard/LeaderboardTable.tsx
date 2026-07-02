@@ -6,6 +6,7 @@ import type { LeaderboardEntry } from "@/types";
 import { Card } from "@/components/ui/Card";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { clientFetch } from "@/lib/client-fetch";
+import { getLeaderboardSpecialBadge } from "@/lib/leaderboard-badges";
 import {
   getRelegationStatus,
   splitLeaderboardLeagues,
@@ -157,6 +158,37 @@ function NightChampionTag({ points }: { points?: number }) {
   );
 }
 
+function SpecialLeaderboardBadge({
+  username,
+  compact = false,
+}: {
+  username: string;
+  compact?: boolean;
+}) {
+  const badge = getLeaderboardSpecialBadge(username);
+  if (!badge) return null;
+
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-cyan-200/55 bg-gradient-to-l from-cyan-300/20 via-emerald-300/15 to-amber-200/20 font-black text-cyan-50 shadow-[0_0_24px_rgba(125,211,252,0.24)] ring-1 ring-white/10 ${
+        compact ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-[11px]"
+      }`}
+      title={badge.title}
+      aria-label={badge.title}
+    >
+      <span
+        className={`inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-100 via-emerald-200 to-amber-200 font-black text-slate-950 shadow-[0_0_16px_rgba(125,211,252,0.55)] ${
+          compact ? "h-4 w-4 text-[10px]" : "h-5 w-5 text-[11px]"
+        }`}
+        aria-hidden
+      >
+        م
+      </span>
+      <span className="whitespace-nowrap">{badge.label}</span>
+    </span>
+  );
+}
+
 function LeaderSpotlight({
   entry,
   highlightUserId,
@@ -171,6 +203,7 @@ function LeaderSpotlight({
   const { messages: t } = useI18n();
   const isMe = entry.userId === highlightUserId;
   const isNightChampion = entry.isNightChampion;
+  const hasSpecialBadge = Boolean(getLeaderboardSpecialBadge(entry.username));
 
   return (
     <Link
@@ -178,13 +211,17 @@ function LeaderSpotlight({
       className={`group relative block overflow-hidden rounded-2xl border p-[1px] shadow-[0_20px_60px_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5 ${
         isNightChampion
           ? "border-orange-300/80"
-          : isMe ? "border-primary/70" : "border-amber-300/60"
+          : hasSpecialBadge
+            ? "border-cyan-200/75"
+            : isMe ? "border-primary/70" : "border-amber-300/60"
       }`}
     >
       <div
         className={`absolute inset-0 ${
           isNightChampion
             ? "bg-gradient-to-r from-red-600/65 via-orange-300/40 to-yellow-400/55"
+            : hasSpecialBadge
+              ? "bg-gradient-to-r from-cyan-300/55 via-emerald-200/30 to-amber-300/45"
             : "bg-gradient-to-r from-amber-500/60 via-yellow-200/30 to-amber-600/60"
         }`}
       />
@@ -192,6 +229,8 @@ function LeaderSpotlight({
         className={`relative overflow-hidden rounded-[15px] px-4 py-5 sm:px-7 sm:py-6 ${
           isNightChampion
             ? "bg-gradient-to-br from-[#3a0b05] via-[#241007] to-[#101722]"
+            : hasSpecialBadge
+              ? "bg-gradient-to-br from-[#06252b] via-[#10251d] to-[#101722]"
             : "bg-gradient-to-br from-[#302307] via-[#191912] to-[#101722]"
         }`}
       >
@@ -218,6 +257,7 @@ function LeaderSpotlight({
               {isNightChampion && (
                 <NightChampionTag points={entry.nightWindowPoints} />
               )}
+              <SpecialLeaderboardBadge username={entry.username} />
               <LeaderTag />
               {entry.streakDays && entry.streakDays >= 3 ? (
                 <FireStreakTag days={entry.streakDays} />
@@ -276,6 +316,7 @@ function MobileLeaderboardList({
         const isExempt = exemptUserIds.has(entry.userId);
         const isMe = entry.userId === highlightUserId;
         const isNightChampion = entry.isNightChampion;
+        const hasSpecialBadge = Boolean(getLeaderboardSpecialBadge(entry.username));
 
         return (
           <Link
@@ -288,6 +329,10 @@ function MobileLeaderboardList({
                   }`
                 : isNightChampion
                 ? `border-orange-300/55 bg-gradient-to-l from-red-950/80 via-orange-900/35 to-card shadow-[0_10px_32px_rgba(249,115,22,0.18)] hover:border-orange-200/70 ${
+                    isMe ? "ring-1 ring-primary/60" : ""
+                  }`
+                : hasSpecialBadge
+                ? `border-cyan-200/55 bg-gradient-to-l from-cyan-950/75 via-emerald-950/35 to-card shadow-[0_10px_32px_rgba(125,211,252,0.14)] hover:border-cyan-100/70 ${
                     isMe ? "ring-1 ring-primary/60" : ""
                   }`
                 : isRelegated
@@ -317,6 +362,7 @@ function MobileLeaderboardList({
                 {isNightChampion && (
                   <NightChampionTag points={entry.nightWindowPoints} />
                 )}
+                <SpecialLeaderboardBadge username={entry.username} compact />
                 {isExempt ? (
                   <AdministrationExemptionTag />
                 ) : isRelegated ? (
@@ -342,6 +388,8 @@ function MobileLeaderboardList({
                     ? "text-emerald-100/70"
                     : isNightChampion
                       ? "text-orange-100/75"
+                    : hasSpecialBadge
+                      ? "text-cyan-100/75"
                     : isRelegated
                       ? "text-red-200/70"
                       : "text-muted"
@@ -355,6 +403,8 @@ function MobileLeaderboardList({
                     ? "text-emerald-200"
                     : isNightChampion
                       ? "text-orange-200"
+                    : hasSpecialBadge
+                      ? "text-cyan-100"
                     : isRelegated
                       ? "text-red-200"
                       : pointsTone(entry.points)
@@ -422,18 +472,22 @@ function YeloLeagueSection({
         {entries.map((entry, index) => {
           const tone = toneForIndex(index);
           const isMe = entry.userId === highlightUserId;
+          const hasSpecialBadge = Boolean(getLeaderboardSpecialBadge(entry.username));
 
           return (
             <Link
               key={entry.userId}
               href={`/user/${encodeURIComponent(entry.username)}`}
               className={`flex items-center gap-3 rounded-xl border px-3 py-3 transition hover:border-yellow-200/55 md:px-5 ${
-                tone.row
+                hasSpecialBadge
+                  ? "border-cyan-200/45 bg-gradient-to-l from-cyan-950/70 via-emerald-950/30 to-card"
+                  : tone.row
               } ${isMe ? "ring-1 ring-primary/60" : ""}`}
             >
               <div className="min-w-0 flex-1 text-end">
                 <div className="flex min-w-0 items-center justify-end gap-2">
                   {showRankTrend && <RankTrend change={entry.rankChange} />}
+                  <SpecialLeaderboardBadge username={entry.username} compact />
                   <span className="truncate font-semibold text-foreground">
                     {entry.username}
                   </span>
@@ -602,6 +656,7 @@ export function LeaderboardTable({
                 const isExempt = exemptUserIds.has(entry.userId);
                 const isMe = entry.userId === highlightUserId;
                 const isNightChampion = entry.isNightChampion;
+                const hasSpecialBadge = Boolean(getLeaderboardSpecialBadge(entry.username));
 
                 return (
                   <tr
@@ -613,6 +668,10 @@ export function LeaderboardTable({
                           }`
                         : isNightChampion
                         ? `border-orange-300/30 bg-gradient-to-l from-red-950/65 via-orange-950/30 to-transparent shadow-[inset_4px_0_0_rgba(249,115,22,0.75)] hover:from-orange-900/55 ${
+                            isMe ? "outline outline-1 -outline-offset-1 outline-primary/60" : ""
+                          }`
+                        : hasSpecialBadge
+                        ? `border-cyan-200/30 bg-gradient-to-l from-cyan-950/55 via-emerald-950/25 to-transparent shadow-[inset_4px_0_0_rgba(125,211,252,0.75)] hover:from-cyan-900/45 ${
                             isMe ? "outline outline-1 -outline-offset-1 outline-primary/60" : ""
                           }`
                         : isRelegated
@@ -638,6 +697,7 @@ export function LeaderboardTable({
                         {isNightChampion && (
                           <NightChampionTag points={entry.nightWindowPoints} />
                         )}
+                        <SpecialLeaderboardBadge username={entry.username} compact />
                         {isExempt ? (
                           <AdministrationExemptionTag />
                         ) : isRelegated ? (
@@ -662,6 +722,8 @@ export function LeaderboardTable({
                         ? "text-emerald-200"
                           : isNightChampion
                             ? "text-orange-200"
+                          : hasSpecialBadge
+                            ? "text-cyan-100"
                         : isRelegated
                             ? "text-red-200"
                             : pointsTone(entry.points)

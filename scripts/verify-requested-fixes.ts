@@ -15,6 +15,7 @@ import { dedupeDisplayMatches } from "../src/lib/match-list-dedupe";
 import { buildMatchHistoryEntries } from "../src/lib/profile-history";
 import { isPredictionAllowed } from "../src/lib/utils";
 import { shouldShowMissingPredictionUsers } from "../src/lib/missing-predictions";
+import { getLeaderboardSpecialBadge } from "../src/lib/leaderboard-badges";
 import { fullPredictionBundleSchema } from "../src/lib/validations";
 import {
   getRelegationStatus,
@@ -189,6 +190,11 @@ check(
   !splitLeagues.yeloEntries.some((entry) =>
     ["ali", "mmg"].includes(entry.username)
   )
+);
+check(
+  "nawafmd5 gets the Muath blessing leaderboard badge",
+  getLeaderboardSpecialBadge("NawafMD5")?.label === "معاذ بركه" &&
+    getLeaderboardSpecialBadge("alfaris") === null
 );
 
 const alsaadatDropEntries = leagueEntries.map((entry, index) =>

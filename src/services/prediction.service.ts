@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Prisma, type FinishType } from "@prisma/client";
+import { Prisma, type FinishType, type MatchStatus } from "@prisma/client";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { resolveScorerGoalsForPlayer } from "@/lib/player-matching";
 import { goalkeeperPositionWhere } from "@/lib/goalkeeper";
@@ -1294,6 +1294,201 @@ export async function recalculateMatchScoring(matchId: string): Promise<void> {
     // eslint-disable-next-line no-console
     console.warn("[revalidate] skipped due to missing store:", err instanceof Error ? err.message : err);
   }
+}
+
+type FinishedMatchScoringAuditRow = {
+  id: string;
+  status: MatchStatus;
+  isKnockout: boolean;
+  matchTime: Date;
+  homeTeamId: string;
+  awayTeamId: string;
+  homeTeam: { name: string };
+  awayTeam: { name: string };
+  homeScore: number | null;
+  awayScore: number | null;
+  actualFinishType: FinishType | null;
+  penaltyWinnerTeamId: string | null;
+  predictions: {
+    predictedFinishType: FinishType | null;
+    predictedPenaltyWinnerTeamId: string | null;
+    finishTypePoints: number;
+    penaltyWinnerPoints: number;
+  }[];
+  scorerPredictions: {
+    id: string;
+    playerId: string;
+    predictedGoals: number;
+    points: number;
+    player: {
+      name: string;
+      teamId: string;
+      position: string | null;
+      team?: { name?: string | null } | null;
+    };
+  }[];
+  matchScorers: {
+    playerId: string;
+    goals: number;
+    player: {
+      name: string;
+      teamId: string;
+      team?: { name?: string | null } | null;
+    };
+  }[];
+};
+
+export function hasFinishedMatchScoringDrift(
+  match: FinishedMatchScoringAuditRow
+): boolean {
+  if (
+    match.status !== "FINISHED" ||
+    !match.isKnockout ||
+    match.homeScore === null ||
+    match.awayScore === null
+  ) {
+    return false;
+  }
+
+  const scoringActualFinishType = resolveScoringActualFinishType(match);
+  if (!scoringActualFinishType) return false;
+
+  const predictionPointDrift = match.predictions.some((prediction) => {
+    const expectedFinishTypePoints = calculateFinishTypePoints(
+      prediction.predictedFinishType,
+      scoringActualFinishType
+    );
+    const expectedPenaltyWinnerPoints =
+      scoringActualFinishType === "PENALTIES"
+        ? calculatePenaltyWinnerPoints(
+            prediction.predictedPenaltyWinnerTeamId,
+            match.penaltyWinnerTeamId
+          )
+        : 0;
+
+    return (
+      prediction.finishTypePoints !== expectedFinishTypePoints ||
+      prediction.penaltyWinnerPoints !== expectedPenaltyWinnerPoints
+    );
+  });
+
+  if (predictionPointDrift) return true;
+  if (match.scorerPredictions.length === 0) return false;
+
+  const scorerGoalsByPlayer = getScorerGoalsForPoints(
+    {
+      actualFinishType: scoringActualFinishType,
+      homeTeamId: match.homeTeamId,
+      awayTeamId: match.awayTeamId,
+      homeTeamName: match.homeTeam.name,
+      awayTeamName: match.awayTeam.name,
+      homeScore: match.homeScore,
+      awayScore: match.awayScore,
+    },
+    match.matchScorers
+  );
+
+  return match.scorerPredictions.some((scorerPrediction) => {
+    const actualGoals = resolveScorerGoalsForPlayer(
+      scorerPrediction.playerId,
+      scorerPrediction.player,
+      scorerGoalsByPlayer,
+      match.matchScorers
+    );
+    const expectedPoints = calculateScorerPredictionPoints(
+      scorerPrediction.predictedGoals,
+      actualGoals,
+      scorerPrediction.player.position as Parameters<
+        typeof calculateScorerPredictionPoints
+      >[2],
+      {
+        ignorePositionMultiplier:
+          shouldIgnorePositionMultiplierForScorerPrediction(
+            scorerPrediction.id
+          ),
+      }
+    );
+
+    return scorerPrediction.points !== expectedPoints;
+  });
+}
+
+export async function recalculateStaleFinishedMatchScoringForRound(
+  roundId: string
+): Promise<number> {
+  const matches = await prisma.match.findMany({
+    where: {
+      roundId,
+      status: "FINISHED",
+      isKnockout: true,
+      homeScore: { not: null },
+      awayScore: { not: null },
+      OR: [
+        { predictions: { some: {} } },
+        { scorerPredictions: { some: {} } },
+      ],
+    },
+    select: {
+      id: true,
+      status: true,
+      isKnockout: true,
+      matchTime: true,
+      homeTeamId: true,
+      awayTeamId: true,
+      homeScore: true,
+      awayScore: true,
+      actualFinishType: true,
+      penaltyWinnerTeamId: true,
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+      predictions: {
+        select: {
+          predictedFinishType: true,
+          predictedPenaltyWinnerTeamId: true,
+          finishTypePoints: true,
+          penaltyWinnerPoints: true,
+        },
+      },
+      scorerPredictions: {
+        select: {
+          id: true,
+          playerId: true,
+          predictedGoals: true,
+          points: true,
+          player: {
+            select: {
+              name: true,
+              teamId: true,
+              position: true,
+              team: { select: { name: true } },
+            },
+          },
+        },
+      },
+      matchScorers: {
+        select: {
+          playerId: true,
+          goals: true,
+          player: {
+            select: {
+              name: true,
+              teamId: true,
+              team: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  let recalculated = 0;
+  for (const match of matches) {
+    if (!hasFinishedMatchScoringDrift(match)) continue;
+    await recalculateMatchScoring(match.id);
+    recalculated++;
+  }
+
+  return recalculated;
 }
 
 export async function calculateMatchPoints(matchId: string): Promise<void> {

@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import {
   recalculateMatchScoring,
+  recalculateStaleFinishedMatchScoringForRound,
   submitMatchPredictionBundle,
 } from "../src/services/prediction.service";
 import { calculateOctopusPointsForMatch } from "../src/services/octopus-bet.service";
@@ -310,6 +311,39 @@ async function main() {
   check("penalties store finish-type points", penaltyPrediction.finishTypePoints === 4);
   check("penalties store winner points", penaltyPrediction.penaltyWinnerPoints === 1);
   check("penalties store scorer points", penaltyScorers._sum.points === 2);
+
+  await prisma.prediction.update({
+    where: { userId_matchId: { userId: penaltyUser.id, matchId: penaltyMatch.id } },
+    data: { finishTypePoints: 1, penaltyWinnerPoints: 0 },
+  });
+  await prisma.scorerPrediction.update({
+    where: {
+      userId_matchId_playerId: {
+        userId: penaltyUser.id,
+        matchId: penaltyMatch.id,
+        playerId: homeForward.id,
+      },
+    },
+    data: { points: 99 },
+  });
+  const staleRecalculated =
+    await recalculateStaleFinishedMatchScoringForRound(round.id);
+  const repairedPenaltyPrediction = await prisma.prediction.findUniqueOrThrow({
+    where: { userId_matchId: { userId: penaltyUser.id, matchId: penaltyMatch.id } },
+  });
+  const repairedHomeScorer = await prisma.scorerPrediction.findUniqueOrThrow({
+    where: {
+      userId_matchId_playerId: {
+        userId: penaltyUser.id,
+        matchId: penaltyMatch.id,
+        playerId: homeForward.id,
+      },
+    },
+  });
+  check("stale finished knockout match is recalculated", staleRecalculated >= 1);
+  check("stale penalty finish-type points are repaired", repairedPenaltyPrediction.finishTypePoints === 4);
+  check("stale penalty winner points are repaired", repairedPenaltyPrediction.penaltyWinnerPoints === 1);
+  check("stale scorer points are repaired", repairedHomeScorer.points === 1);
   await assertUserTotal(penaltyUser.username, penaltyUser.id, 15);
 
   const octopusMatch = await createMatch({
